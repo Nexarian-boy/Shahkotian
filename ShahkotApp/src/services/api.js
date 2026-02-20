@@ -149,9 +149,15 @@ export const chatAPI = {
     text: data.text || null,
     images: data.images || [],
     videos: [],
+    voiceUrl: data.voiceUrl || null,
     replyToId: data.replyToId || null,
   }),
-  report: (id, reason) => api.post(`/chat/messages/${id}/report`, { reason }),
+  uploadVoice: (formData) => api.post('/chat/voice', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  getUserProfile: (userId) => api.get(`/chat/user/${userId}`),
+  reactToMessage: (msgId, emoji) => api.post(`/chat/messages/${msgId}/react`, { emoji }),
+  reportMessage: (data) => api.post('/chat/report', data),
 };
 
 // ============ CHATBOT API ============

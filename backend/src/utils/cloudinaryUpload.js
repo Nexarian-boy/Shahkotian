@@ -101,10 +101,31 @@ async function deleteFromCloudinary(imageUrl) {
   }
 }
 
+/**
+ * Upload audio buffer to Cloudinary (uses video resource type for audio)
+ */
+async function uploadAudioToCloudinary(buffer) {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: 'shahkot-app/chat-audio',
+        resource_type: 'video', // Cloudinary uses 'video' for audio too
+        format: 'm4a',
+      },
+      (error, result) => {
+        if (error) reject(new Error(`Cloudinary audio upload failed: ${error.message}`));
+        else resolve(result.secure_url);
+      }
+    );
+    uploadStream.end(buffer);
+  });
+}
+
 module.exports = {
   uploadToCloudinary,
   uploadMultipleToCloudinary,
   uploadVideoToCloudinary,
   uploadMultipleVideosToCloudinary,
+  uploadAudioToCloudinary,
   deleteFromCloudinary,
 };

@@ -8,60 +8,75 @@ import { Audio } from 'expo-av';
 import { useAuth } from '../context/AuthContext';
 import { chatAPI } from '../services/api';
 
-// Discord-like dark theme
+// WhatsApp-style dark theme
 const COLORS = {
-    bg: '#0D1117',
-    surface: '#161B22',
-    card: '#1C2333',
-    primary: '#5865F2', // Discord blue
-    text: '#DCDDDE',
-    textMuted: '#72767D',
-    textDim: 'rgba(255,255,255,0.45)',
-    border: '#40444B',
-    sent: '#5865F2',
-    received: '#2F3136',
-    accent: '#ED4245', // Discord red
-    success: '#3BA55C', // Discord green
+    bg: '#0B141A',
+    surface: '#1F2C34',
+    card: '#2A3942',
+    primary: '#00A884',
+    primaryDark: '#005C4B',
+    text: '#E9EDEF',
+    textMuted: '#8696A0',
+    textDim: 'rgba(255,255,255,0.4)',
+    border: '#2A3942',
+    sent: '#005C4B',
+    received: '#1F2C34',
+    accent: '#EF4444',
+    success: '#00A884',
     warning: '#FAA61A',
-    reaction: '#2F3136',
-    online: '#3BA55C',
+    reaction: '#2A3942',
+    online: '#00A884',
 };
 
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '😡', '🔥', '👏'];
 
 export default function OpenChatScreen({ navigation }) {
     const { user } = useAuth();
-    const [messages, setMessages] = useState([]);
-    const [text, setText] = useState('');
+    const [messages, setMessages]             = useState([]);
+    const [reactionsMap, setReactionsMap]     = useState({}); // separate state, survives polls
+    const [text, setText]                     = useState('');
     const [selectedImages, setSelectedImages] = useState([]);
-    const [replyTo, setReplyTo] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [sending, setSending] = useState(false);
-    const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(true);
-    const [profileModal, setProfileModal] = useState(null);
-    const [menuMsg, setMenuMsg] = useState(null);
-    const [showReactions, setShowReactions] = useState(null);
-    const [isRecording, setIsRecording] = useState(false);
+    const [replyTo, setReplyTo]               = useState(null);
+    const [loading, setLoading]               = useState(true);
+    const [sending, setSending]               = useState(false);
+    const [page, setPage]                     = useState(1);
+    const [hasMore, setHasMore]               = useState(true);
+    const [profileModal, setProfileModal]     = useState(null);
+    const [menuMsg, setMenuMsg]               = useState(null);
+    const [showReactions, setShowReactions]   = useState(null);
+    const [isRecording, setIsRecording]       = useState(false);
     const [recordingDuration, setRecordingDuration] = useState(0);
-    const flatListRef = useRef(null);
-    const pollRef = useRef(null);
-    const recordingRef = useRef(null);
-    const recordingTimerRef = useRef(null);
+    const [uploadingVoice, setUploadingVoice] = useState(false);
+    const [playingId, setPlayingId]           = useState(null);
+    const [playPositions, setPlayPositions]   = useState({});
+    const flatListRef      = useRef(null);
+    const pollRef          = useRef(null);
+    const recordingRef     = useRef(null);
+    const recordingTimerRef= useRef(null);
+    const soundRef         = useRef(null);
+    const playingIdRef     = useRef(null);
 
-    // Load messages
+    // Load messages — smart merge so poll does NOT replace existing messages
     const loadMessages = useCallback(async (pageNum = 1, append = false) => {
         try {
             const res = await chatAPI.getMessages(pageNum);
             const msgs = res.data.messages || [];
             if (append) {
+                // Loading older pages: prepend older messages
                 setMessages(prev => {
                     const existingIds = new Set(prev.map(m => m.id));
-                    const newMsgs = msgs.filter(m => !existingIds.has(m.id));
-                    return [...newMsgs, ...prev];
+                    const older = msgs.filter(m => !existingIds.has(m.id));
+                    return [...older, ...prev];
                 });
             } else {
-                setMessages(msgs);
+                // Poll / initial: only append truly new messages, keep existing intact
+                setMessages(prev => {
+                    if (prev.length === 0) return msgs;
+                    const existingIds = new Set(prev.map(m => m.id));
+                    const newMsgs = msgs.filter(m => !existingIds.has(m.id));
+                    if (newMsgs.length === 0) return prev; // no change → no re-render
+                    return [...prev, ...newMsgs];
+                });
             }
             setHasMore(res.data.pagination?.page < res.data.pagination?.totalPages);
         } catch (err) {
@@ -71,11 +86,14 @@ export default function OpenChatScreen({ navigation }) {
         }
     }, []);
 
-    // Initial load + polling (5s for more real-time feel)
+    // Initial load + polling every 4s
     useEffect(() => {
         loadMessages(1);
-        pollRef.current = setInterval(() => loadMessages(1), 5000);
-        return () => { if (pollRef.current) clearInterval(pollRef.current); };
+        pollRef.current = setInterval(() => loadMessages(1), 4000);
+        return () => {
+            clearInterval(pollRef.current);
+            soundRef.current?.unloadAsync().catch(() => {});
+        };
     }, []);
 
     // Pick images
@@ -127,21 +145,18 @@ export default function OpenChatScreen({ navigation }) {
 
     const stopRecording = async () => {
         if (!recordingRef.current) return;
-
         clearInterval(recordingTimerRef.current);
         setIsRecording(false);
-
+        const dur = recordingDuration;
         try {
             await recordingRef.current.stopAndUnloadAsync();
             const uri = recordingRef.current.getURI();
             recordingRef.current = null;
-
-            if (uri && recordingDuration > 0) {
-                sendVoiceMessage(uri);
-            }
+            if (uri && dur >= 1) sendVoiceMessage(uri, dur);
         } catch (err) {
             console.error('Stop recording error:', err);
         }
+        setRecordingDuration(0);
     };
 
     const cancelRecording = async () => {
@@ -158,22 +173,81 @@ export default function OpenChatScreen({ navigation }) {
         }
     };
 
-    const sendVoiceMessage = async (uri) => {
+    const sendVoiceMessage = async (uri, dur) => {
         setSending(true);
+        setUploadingVoice(true);
         try {
+            // 1. Upload audio file to backend → Cloudinary
+            const form = new FormData();
+            form.append('audio', { uri, type: 'audio/m4a', name: `voice_${Date.now()}.m4a` });
+            const upRes = await chatAPI.uploadVoice(form);
+            const voiceUrl = upRes.data.voiceUrl;
+
+            // 2. Send message with voiceUrl
             await chatAPI.sendMessage({
-                text: `🎤 Voice Message (${recordingDuration}s)`,
+                text: null,
                 images: [],
-                voiceUri: uri,
+                voiceUrl,
                 replyToId: replyTo?.id || null,
             });
             setReplyTo(null);
             await loadMessages(1);
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 300);
         } catch (err) {
             Alert.alert('Error', 'Failed to send voice message.');
         } finally {
             setSending(false);
+            setUploadingVoice(false);
             setRecordingDuration(0);
+        }
+    };
+
+    // Voice playback
+    const togglePlayVoice = async (msg) => {
+        const msgId = msg.id;
+        if (!msg.voiceUrl) return;
+
+        // Pause if already playing this message
+        if (playingIdRef.current === msgId) {
+            try { await soundRef.current?.pauseAsync(); } catch (_) {}
+            setPlayingId(null);
+            playingIdRef.current = null;
+            return;
+        }
+
+        // Unload previous sound
+        if (soundRef.current) {
+            try { await soundRef.current.unloadAsync(); } catch (_) {}
+            soundRef.current = null;
+        }
+        setPlayingId(msgId);
+        playingIdRef.current = msgId;
+
+        try {
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+            const { sound } = await Audio.Sound.createAsync(
+                { uri: msg.voiceUrl },
+                { shouldPlay: true },
+                (status) => {
+                    if (status.isLoaded) {
+                        setPlayPositions(prev => ({
+                            ...prev,
+                            [msgId]: { pos: status.positionMillis || 0, dur: status.durationMillis || 1 },
+                        }));
+                        if (status.didJustFinish) {
+                            setPlayingId(null);
+                            playingIdRef.current = null;
+                            soundRef.current?.unloadAsync().catch(() => {});
+                            soundRef.current = null;
+                        }
+                    }
+                }
+            );
+            soundRef.current = sound;
+        } catch (err) {
+            Alert.alert('Error', 'Could not play voice message.');
+            setPlayingId(null);
+            playingIdRef.current = null;
         }
     };
 
@@ -203,27 +277,21 @@ export default function OpenChatScreen({ navigation }) {
         }
     };
 
-    // React to message
-    const reactToMessage = async (msgId, emoji) => {
-        try {
-            // Optimistic update
-            setMessages(prev => prev.map(m => {
-                if (m.id === msgId) {
-                    const reactions = m.reactions || {};
-                    if (reactions[emoji]?.includes(user?.id)) {
-                        reactions[emoji] = reactions[emoji].filter(id => id !== user?.id);
-                        if (reactions[emoji].length === 0) delete reactions[emoji];
-                    } else {
-                        reactions[emoji] = [...(reactions[emoji] || []), user?.id];
-                    }
-                    return { ...m, reactions };
-                }
-                return m;
-            }));
-            await chatAPI.reactToMessage?.(msgId, emoji);
-        } catch (err) {
-            console.error('React error:', err);
-        }
+    // React to message — stored in reactionsMap, NOT in messages array, so polls never wipe them
+    const reactToMessage = (msgId, emoji) => {
+        setReactionsMap(prev => {
+            const existing = prev[msgId] || {};
+            const users = existing[emoji] || [];
+            let updated;
+            if (users.includes(user?.id)) {
+                const kept = users.filter(id => id !== user?.id);
+                updated = { ...existing, [emoji]: kept };
+                if (kept.length === 0) delete updated[emoji];
+            } else {
+                updated = { ...existing, [emoji]: [...users, user?.id] };
+            }
+            return { ...prev, [msgId]: updated };
+        });
         setShowReactions(null);
     };
 
@@ -285,32 +353,33 @@ export default function OpenChatScreen({ navigation }) {
     };
 
     const formatTime = (date) => {
-        const d = new Date(date);
-        return d.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true });
+        return new Date(date).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true });
     };
 
     const formatDuration = (seconds) => {
-        const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
+        const s = Math.round(seconds || 0);
+        return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
     };
 
     const renderMessage = ({ item }) => {
-        const isMine = item.userId === user?.id;
-        const reactions = item.reactions || {};
+        const isMine     = item.userId === user?.id;
+        const reactions  = reactionsMap[item.id] || {};   // from separate state, poll-safe
         const hasReactions = Object.keys(reactions).length > 0;
+        const isPlaying  = playingId === item.id;
+        const voicePos   = playPositions[item.id] || { pos: 0, dur: 1 };
+        const voiceProgress = item.voiceUrl ? Math.min(voicePos.pos / (voicePos.dur || 1), 1) : 0;
 
         return (
             <View style={styles.messageContainer}>
                 <TouchableOpacity
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                     onLongPress={() => setMenuMsg(item)}
                     onPress={() => setShowReactions(showReactions === item.id ? null : item.id)}
                     style={[styles.msgRow, isMine ? styles.msgRowRight : styles.msgRowLeft]}
                 >
                     {/* Avatar for others */}
                     {!isMine && (
-                        <TouchableOpacity onPress={() => viewProfile(item.userId)}>
+                        <TouchableOpacity onPress={() => viewProfile(item.userId)} style={{ marginRight: 6 }}>
                             {item.user?.photoUrl ? (
                                 <Image source={{ uri: item.user.photoUrl }} style={styles.avatar} />
                             ) : (
@@ -318,7 +387,6 @@ export default function OpenChatScreen({ navigation }) {
                                     <Text style={styles.avatarText}>{item.user?.name?.[0] || '?'}</Text>
                                 </View>
                             )}
-                            <View style={styles.onlineDot} />
                         </TouchableOpacity>
                     )}
 
@@ -328,8 +396,13 @@ export default function OpenChatScreen({ navigation }) {
                         {/* Reply preview */}
                         {item.replyTo && (
                             <View style={styles.replyPreview}>
-                                <Text style={styles.replyName}>↩ {item.replyTo.user?.name || 'User'}</Text>
-                                <Text style={styles.replyText} numberOfLines={1}>{item.replyTo.text || '📷 Image'}</Text>
+                                <View style={styles.replyAccentBar} />
+                                <View>
+                                    <Text style={styles.replyName}>{item.replyTo.user?.name || 'User'}</Text>
+                                    <Text style={styles.replyText} numberOfLines={1}>
+                                        {item.replyTo.voiceUrl ? '🎤 Voice message' : (item.replyTo.text || '📷 Photo')}
+                                    </Text>
+                                </View>
                             </View>
                         )}
 
@@ -342,11 +415,43 @@ export default function OpenChatScreen({ navigation }) {
                             </View>
                         )}
 
+                        {/* Voice message player */}
+                        {item.voiceUrl && (
+                            <TouchableOpacity
+                                style={styles.voicePlayer}
+                                onPress={() => togglePlayVoice(item)}
+                                activeOpacity={0.8}
+                            >
+                                <View style={[styles.voicePlayBtn, isPlaying && { backgroundColor: COLORS.primary }]}>
+                                    <Text style={{ fontSize: 16, color: '#fff' }}>{isPlaying ? '⏸' : '▶'}</Text>
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    {/* Waveform bar */}
+                                    <View style={styles.waveformRow}>
+                                        {[...Array(18)].map((_, i) => (
+                                            <View
+                                                key={i}
+                                                style={[
+                                                    styles.waveSegment,
+                                                    { height: 8 + Math.sin(i * 0.9) * 8 },
+                                                    i / 18 < voiceProgress && { backgroundColor: COLORS.primary },
+                                                ]}
+                                            />
+                                        ))}
+                                    </View>
+                                    <Text style={styles.voiceDuration}>
+                                        {isPlaying ? formatDuration(voicePos.pos / 1000) : formatDuration(item.voiceDuration || 0)}
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        )}
+
                         {/* Text */}
                         {item.text && <Text style={styles.msgText}>{item.text}</Text>}
-                        
+
                         <View style={styles.msgFooter}>
                             <Text style={styles.msgTime}>{formatTime(item.createdAt)}</Text>
+                            {isMine && <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginLeft: 4 }}>✓✓</Text>}
                         </View>
                     </View>
                 </TouchableOpacity>
@@ -355,8 +460,8 @@ export default function OpenChatScreen({ navigation }) {
                 {hasReactions && (
                     <View style={[styles.reactionsRow, isMine && styles.reactionsRowRight]}>
                         {Object.entries(reactions).map(([emoji, users]) => (
-                            <TouchableOpacity 
-                                key={emoji} 
+                            <TouchableOpacity
+                                key={emoji}
                                 style={[styles.reactionBadge, users.includes(user?.id) && styles.reactionBadgeActive]}
                                 onPress={() => reactToMessage(item.id, emoji)}
                             >
@@ -371,8 +476,8 @@ export default function OpenChatScreen({ navigation }) {
                 {showReactions === item.id && (
                     <View style={[styles.reactionsPicker, isMine && styles.reactionsPickerRight]}>
                         {REACTIONS.map(emoji => (
-                            <TouchableOpacity 
-                                key={emoji} 
+                            <TouchableOpacity
+                                key={emoji}
                                 style={styles.reactionOption}
                                 onPress={() => reactToMessage(item.id, emoji)}
                             >
@@ -432,13 +537,10 @@ export default function OpenChatScreen({ navigation }) {
                                 <Text style={styles.menuText}>👤 View Profile</Text>
                             </TouchableOpacity>
                             {menuMsg.userId !== user?.id && (
-                                <TouchableOpacity style={styles.menuItem} onPress={() => reportMessage(menuMsg)}>
+                                <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]} onPress={() => reportMessage(menuMsg)}>
                                     <Text style={[styles.menuText, { color: COLORS.accent }]}>🚩 Report</Text>
                                 </TouchableOpacity>
                             )}
-                            <TouchableOpacity style={styles.menuItem} onPress={() => viewProfile(menuMsg.userId)}>
-                                <Text style={styles.menuText}>👤 View Profile</Text>
-                            </TouchableOpacity>
                         </View>
                     </TouchableOpacity>
                 </Modal>
@@ -461,7 +563,7 @@ export default function OpenChatScreen({ navigation }) {
                                 Member since {new Date(profileModal.createdAt).toLocaleDateString('en-PK', { month: 'long', year: 'numeric' })}
                             </Text>
                             <TouchableOpacity style={styles.profileClose} onPress={() => setProfileModal(null)}>
-                                <Text style={{ color: COLORS.primary, fontWeight: '700' }}>Close</Text>
+                                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Close</Text>
                             </TouchableOpacity>
                         </View>
                     </TouchableOpacity>
@@ -553,53 +655,55 @@ export default function OpenChatScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: COLORS.bg },
     center: { justifyContent: 'center', alignItems: 'center' },
-    list: { paddingHorizontal: 10, paddingTop: 10, paddingBottom: 6 },
+    list: { paddingHorizontal: 8, paddingTop: 10, paddingBottom: 6 },
 
     // Messages
     messageContainer: { marginBottom: 4 },
     msgRow: { flexDirection: 'row', marginBottom: 2, alignItems: 'flex-end' },
     msgRowLeft: { justifyContent: 'flex-start' },
     msgRowRight: { justifyContent: 'flex-end' },
-    avatar: { width: 36, height: 36, borderRadius: 18, marginRight: 8 },
+    avatar: { width: 34, height: 34, borderRadius: 17 },
     avatarPlaceholder: { backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center' },
-    avatarText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-    onlineDot: { 
-        position: 'absolute', bottom: 0, right: 6, width: 12, height: 12, 
-        borderRadius: 6, backgroundColor: COLORS.success, borderWidth: 2, borderColor: COLORS.bg 
-    },
+    avatarText: { color: '#fff', fontWeight: 'bold', fontSize: 13 },
 
-    msgBubble: { maxWidth: '78%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 18 },
+    msgBubble: { maxWidth: '78%', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16 },
     sentBubble: { backgroundColor: COLORS.sent, borderBottomRightRadius: 4 },
-    receivedBubble: { backgroundColor: COLORS.received, borderBottomLeftRadius: 4 },
+    receivedBubble: { backgroundColor: COLORS.received, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: COLORS.border },
     senderName: { fontSize: 12, fontWeight: '700', color: COLORS.primary, marginBottom: 3 },
     msgText: { fontSize: 15, color: COLORS.text, lineHeight: 21 },
-    msgFooter: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4 },
-    msgTime: { fontSize: 10, color: COLORS.textDim },
+    msgFooter: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 4, gap: 2 },
+    msgTime: { fontSize: 10, color: 'rgba(255,255,255,0.5)' },
 
     imageGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 6 },
-    msgImage: { width: 140, height: 100, borderRadius: 10 },
+    msgImage: { width: 140, height: 110, borderRadius: 10 },
 
-    replyPreview: {
-        backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 8,
-        padding: 8, marginBottom: 6, borderLeftWidth: 3, borderLeftColor: COLORS.primary,
-    },
-    replyName: { fontSize: 11, fontWeight: '700', color: COLORS.primary },
-    replyText: { fontSize: 12, color: COLORS.textDim, marginTop: 2 },
+    // Reply inside bubble
+    replyPreview: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 8, padding: 8, marginBottom: 6, overflow: 'hidden' },
+    replyAccentBar: { width: 3, backgroundColor: COLORS.primary, borderRadius: 2, marginRight: 8 },
+    replyName: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+    replyText: { fontSize: 12, color: COLORS.textMuted, marginTop: 2 },
+
+    // Voice player
+    voicePlayer:   { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4, minWidth: 200 },
+    voicePlayBtn:  { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.card, justifyContent: 'center', alignItems: 'center' },
+    waveformRow:   { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 4 },
+    waveSegment:   { width: 3, borderRadius: 2, backgroundColor: COLORS.textMuted },
+    voiceDuration: { fontSize: 11, color: COLORS.textMuted },
 
     // Reactions
-    reactionsRow: { flexDirection: 'row', marginLeft: 44, marginTop: 2, gap: 4 },
+    reactionsRow: { flexDirection: 'row', marginLeft: 40, marginTop: 2, gap: 4, flexWrap: 'wrap' },
     reactionsRowRight: { justifyContent: 'flex-end', marginRight: 8, marginLeft: 0 },
     reactionBadge: { 
         flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.reaction,
-        paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4,
+        paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 3,
         borderWidth: 1, borderColor: COLORS.border,
     },
-    reactionBadgeActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '20' },
+    reactionBadgeActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryDark + '80' },
     reactionEmoji: { fontSize: 14 },
     reactionCount: { fontSize: 12, color: COLORS.text, fontWeight: '600' },
 
     reactionsPicker: { 
-        flexDirection: 'row', marginLeft: 44, marginTop: 4, backgroundColor: COLORS.surface,
+        flexDirection: 'row', marginLeft: 40, marginTop: 4, backgroundColor: COLORS.surface,
         borderRadius: 24, padding: 6, gap: 2, alignSelf: 'flex-start',
         borderWidth: 1, borderColor: COLORS.border,
     },
@@ -610,34 +714,33 @@ const styles = StyleSheet.create({
     // Input
     inputBar: {
         flexDirection: 'row', alignItems: 'flex-end',
-        backgroundColor: COLORS.surface, paddingHorizontal: 10, paddingVertical: 10,
+        backgroundColor: '#202C33', paddingHorizontal: 10,
+        paddingVertical: 8, paddingBottom: Platform.OS === 'ios' ? 24 : 8,
         borderTopWidth: 1, borderTopColor: COLORS.border, gap: 8,
     },
-    attachBtn: { padding: 8, backgroundColor: COLORS.card, borderRadius: 20 },
-    voiceBtn: { padding: 8, backgroundColor: COLORS.card, borderRadius: 20 },
+    attachBtn: { padding: 8, justifyContent: 'center', alignItems: 'center' },
+    voiceBtn: { padding: 8, justifyContent: 'center', alignItems: 'center' },
     input: {
-        flex: 1, backgroundColor: COLORS.card, borderRadius: 20,
+        flex: 1, backgroundColor: COLORS.card, borderRadius: 22,
         paddingHorizontal: 16, paddingVertical: 10, fontSize: 15,
-        color: COLORS.text, maxHeight: 100,
+        color: COLORS.text, maxHeight: 120,
     },
     sendBtn: {
-        width: 42, height: 42, borderRadius: 21,
+        width: 44, height: 44, borderRadius: 22,
         backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center',
     },
     sendText: { fontSize: 18, color: '#fff' },
 
     // Voice Recording
-    recordingBar: { 
-        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    },
+    recordingBar: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     cancelRecordBtn: { padding: 10 },
     recordingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.accent },
     recordingTime: { fontSize: 16, fontWeight: '700', color: COLORS.text },
     recordingText: { fontSize: 13, color: COLORS.textMuted },
     stopRecordBtn: {
-        width: 42, height: 42, borderRadius: 21,
-        backgroundColor: COLORS.success, justifyContent: 'center', alignItems: 'center',
+        width: 44, height: 44, borderRadius: 22,
+        backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center',
     },
 
     // Image preview
@@ -665,23 +768,26 @@ const styles = StyleSheet.create({
 
     // Menu
     menuOverlay: {
-        flex: 1, backgroundColor: 'rgba(0,0,0,0.7)',
+        flex: 1, backgroundColor: 'rgba(0,0,0,0.72)',
         justifyContent: 'center', alignItems: 'center',
     },
     menuBox: {
         backgroundColor: COLORS.surface, borderRadius: 16,
         width: 260, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border,
     },
-    menuItem: { paddingVertical: 16, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+    menuItem: { paddingVertical: 15, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border },
     menuText: { fontSize: 15, color: COLORS.text, fontWeight: '600' },
 
     // Profile modal
     profileBox: {
         backgroundColor: COLORS.surface, borderRadius: 20,
-        padding: 24, alignItems: 'center', width: 300, borderWidth: 1, borderColor: COLORS.border,
+        padding: 28, alignItems: 'center', width: 300, borderWidth: 1, borderColor: COLORS.border,
     },
-    profileImage: { width: 88, height: 88, borderRadius: 44, marginBottom: 14 },
+    profileImage: { width: 90, height: 90, borderRadius: 45, marginBottom: 14 },
     profileName: { fontSize: 20, fontWeight: '700', color: COLORS.text },
     profileJoined: { fontSize: 12, color: COLORS.textMuted, marginTop: 6 },
-    profileClose: { marginTop: 20, paddingVertical: 10, paddingHorizontal: 24, backgroundColor: COLORS.primary, borderRadius: 20 },
+    profileClose: {
+        marginTop: 22, paddingVertical: 11, paddingHorizontal: 30,
+        backgroundColor: COLORS.primary, borderRadius: 22,
+    },
 });

@@ -3,6 +3,9 @@ const router = express.Router();
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const { authenticate } = require('../middleware/auth');
+const multer = require('multer');
+const { uploadAudioToCloudinary } = require('../utils/cloudinaryUpload');
+const audioUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 // Get chat messages (paginated)
 router.get('/messages', authenticate, async (req, res) => {
@@ -42,12 +45,24 @@ router.get('/messages', authenticate, async (req, res) => {
     }
 });
 
+// Upload voice message
+router.post('/voice', authenticate, audioUpload.single('audio'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No audio file provided' });
+        const url = await uploadAudioToCloudinary(req.file.buffer);
+        res.json({ voiceUrl: url });
+    } catch (error) {
+        console.error('Voice upload error:', error);
+        res.status(500).json({ error: 'Failed to upload voice message' });
+    }
+});
+
 // Send message
 router.post('/messages', authenticate, async (req, res) => {
     try {
-        const { text, images = [], videos = [], replyToId } = req.body;
+        const { text, images = [], videos = [], voiceUrl, replyToId } = req.body;
 
-        if (!text && images.length === 0 && videos.length === 0) {
+        if (!text && images.length === 0 && videos.length === 0 && !voiceUrl) {
             return res.status(400).json({ error: 'Message cannot be empty' });
         }
 
@@ -63,6 +78,7 @@ router.post('/messages', authenticate, async (req, res) => {
                 text: text || null,
                 images,
                 videos,
+                voiceUrl: voiceUrl || null,
                 replyToId: replyToId || null,
             },
             include: {
