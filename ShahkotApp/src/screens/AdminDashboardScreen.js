@@ -60,7 +60,7 @@ export default function AdminDashboardScreen({ navigation }) {
           adminAPI.getDbStatus(),
           adminAPI.getStorage(),
         ]);
-        setDbStatus(Array.isArray(dbRes.data) ? dbRes.data : []);
+        setDbStatus(Array.isArray(dbRes.data?.databases) ? dbRes.data.databases : []);
         setStorageInfo(storRes.data || null);
       }
     } catch (err) {
