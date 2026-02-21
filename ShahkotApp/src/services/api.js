@@ -205,6 +205,8 @@ export const adminAPI = {
   // Storage / DB info
   getStorage: () => api.get('/admin/storage'),
   getDbStatus: () => api.get('/db-status'),
+  // Cleanup old records
+  cleanup: (target, olderThanDays = 30) => api.post('/admin/cleanup', { target, olderThanDays }),
 };
 
 // ============ ALIASES FOR BACKWARDS COMPATIBILITY ============

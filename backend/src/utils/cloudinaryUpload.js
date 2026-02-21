@@ -6,7 +6,11 @@ async function uploadToCloudinary(file, folder = 'shahkot') {
       {
         folder,
         resource_type: 'image',
-        transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+        // Resize to max 1080px wide, compress quality automatically, convert to WebP
+        transformation: [
+          { width: 1080, crop: 'limit' },
+          { quality: 'auto:good', fetch_format: 'auto' },
+        ],
       },
       (error, result) => {
         if (error) return reject(error);
@@ -18,12 +22,8 @@ async function uploadToCloudinary(file, folder = 'shahkot') {
 }
 
 async function uploadMultipleToCloudinary(files, folder = 'shahkot') {
-  const urls = [];
-  for (const file of files) {
-    const url = await uploadToCloudinary(file, folder);
-    urls.push(url);
-  }
-  return urls;
+  // Upload ALL images in parallel — much faster than sequential
+  return Promise.all(files.map(file => uploadToCloudinary(file, folder)));
 }
 
 async function uploadVideoToCloudinary(file, folder = 'shahkot/videos') {
@@ -36,7 +36,9 @@ async function uploadVideoToCloudinary(file, folder = 'shahkot/videos') {
         resource_type: 'video',
         chunk_size: 6 * 1024 * 1024,
         timeout: 300000,
-        eager: [{ width: 720, height: 1280, crop: 'limit', quality: 'auto:low', format: 'mp4' }],
+        // eager_async: true means Cloudinary transcodes in background.
+        // Server returns the original URL immediately — no waiting for transcoding.
+        eager: [{ width: 720, quality: 'auto:low', format: 'mp4' }],
         eager_async: true,
       };
 
@@ -58,7 +60,8 @@ async function uploadVideoToCloudinary(file, folder = 'shahkot/videos') {
       };
       writeChunk();
     } else {
-      const stream = cloudinary.uploader.upload_stream({ folder, resource_type: 'video', timeout: 120000, transformation: [{ quality: 'auto:low', fetch_format: 'mp4' }] }, (error, result) => {
+      // eager_async so we return immediately without waiting for transcoding
+      const stream = cloudinary.uploader.upload_stream({ folder, resource_type: 'video', timeout: 120000, eager: [{ quality: 'auto:low', format: 'mp4' }], eager_async: true }, (error, result) => {
         if (error) return reject(error);
         resolve(result.secure_url);
       });

@@ -17,7 +17,7 @@ import { COLORS } from '../config/constants';
 import { adminAPI, newsAPI, listingsAPI } from '../services/api';
 
 const { width } = Dimensions.get('window');
-const TABS = ['Overview', 'Users', 'Rishta', 'Content', 'News'];
+const TABS = ['Overview', 'Users', 'Rishta', 'Content', 'News', 'Storage'];
 
 export default function AdminDashboardScreen({ navigation }) {
   const [activeTab, setActiveTab] = useState('Overview');
@@ -29,6 +29,9 @@ export default function AdminDashboardScreen({ navigation }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [allNews, setAllNews] = useState([]);
   const [allListings, setAllListings] = useState([]);
+  const [dbStatus, setDbStatus] = useState([]);
+  const [storageInfo, setStorageInfo] = useState(null);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -52,6 +55,13 @@ export default function AdminDashboardScreen({ navigation }) {
       } else if (activeTab === 'News') {
         const res = await newsAPI.getAll({});
         setAllNews(res.data.news || []);
+      } else if (activeTab === 'Storage') {
+        const [dbRes, storRes] = await Promise.all([
+          adminAPI.getDbStatus(),
+          adminAPI.getStorage(),
+        ]);
+        setDbStatus(Array.isArray(dbRes.data) ? dbRes.data : []);
+        setStorageInfo(storRes.data || null);
       }
     } catch (err) {
       console.log('Admin data load error:', err);
@@ -138,6 +148,31 @@ export default function AdminDashboardScreen({ navigation }) {
         },
       },
     ]);
+  };
+
+  const handleCleanup = (target, label, olderThanDays = 30) => {
+    Alert.alert(
+      'Confirm Cleanup',
+      `Delete all ${label} older than ${olderThanDays} days?\nThis cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: async () => {
+            try {
+              setCleanupLoading(true);
+              const res = await adminAPI.cleanup(target, olderThanDays);
+              Alert.alert('Done', `Deleted ${res.data.deletedCount || 0} records.`);
+              loadData();
+            } catch (e) {
+              Alert.alert('Error', 'Cleanup failed.');
+            } finally {
+              setCleanupLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const renderOverview = () => (
@@ -314,6 +349,62 @@ export default function AdminDashboardScreen({ navigation }) {
     />
   );
 
+  const renderStorage = () => (
+    <ScrollView style={styles.tabContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}>
+      {/* DB Rotation Status */}
+      <Text style={styles.sectionTitle}>Database Rotation</Text>
+      <Text style={{ fontSize: 12, color: COLORS.textLight, marginBottom: 10 }}>Auto-switches when a DB reaches 450 MB. Total capacity ~5 GB.</Text>
+      {dbStatus.length === 0 && <Text style={{ color: COLORS.textLight, marginBottom: 12 }}>Loading...</Text>}
+      {dbStatus.map(d => (
+        <View key={d.index} style={[styles.dbRow, d.isActive && styles.dbRowActive]}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.dbTitle}>DB #{d.index + 1} {d.isActive ? '⚡ ACTIVE' : ''}</Text>
+            <View style={styles.dbBarBg}>
+              <View style={[styles.dbBarFill, { width: `${Math.min(100, (d.sizeMB / 512) * 100)}%`, backgroundColor: d.sizeMB > 400 ? '#F44336' : d.sizeMB > 300 ? '#FF9800' : '#4CAF50' }]} />
+            </View>
+            <Text style={styles.dbSizeText}>{d.sizeMB.toFixed(1)} MB / 512 MB</Text>
+          </View>
+          <View style={[styles.dbDot, { backgroundColor: d.isAvailable ? '#4CAF50' : '#F44336' }]} />
+        </View>
+      ))}
+
+      {/* Record Counts */}
+      {storageInfo?.totals && (
+        <>
+          <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Record Counts</Text>
+          <View style={styles.statsGrid}>
+            <StatCard icon="👥" label="Users" value={storageInfo.totals.users || 0} color="#4CAF50" />
+            <StatCard icon="📝" label="Posts" value={storageInfo.totals.posts || 0} color="#2196F3" />
+            <StatCard icon="🛒" label="Listings" value={storageInfo.totals.listings || 0} color="#FF9800" />
+            <StatCard icon="💬" label="Comments" value={storageInfo.totals.comments || 0} color="#9C27B0" />
+            <StatCard icon="🔔" label="Notifications" value={storageInfo.totals.notifications || 0} color="#00BCD4" />
+            <StatCard icon="💬" label="Chat Msgs" value={storageInfo.totals.chatMessages || 0} color="#795548" />
+            <StatCard icon="📰" label="News" value={storageInfo.totals.news || 0} color="#E91E63" />
+            <StatCard icon="🏆" label="Tournaments" value={storageInfo.totals.tournaments || 0} color="#607D8B" />
+          </View>
+        </>
+      )}
+
+      {/* Cleanup Actions */}
+      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Free Up Space</Text>
+      <Text style={{ fontSize: 12, color: COLORS.textLight, marginBottom: 12 }}>Permanently deletes old records. Images/videos on Cloudinary are NOT affected.</Text>
+      {cleanupLoading && <ActivityIndicator color={COLORS.primary} style={{ marginBottom: 10 }} />}
+
+      <CleanupBtn
+        icon="💬" title="Chat Messages" subtitle="Delete messages older than 30 days"
+        onPress={() => handleCleanup('chatMessages', 'chat messages', 30)} />
+      <CleanupBtn
+        icon="🔔" title="Notifications" subtitle="Delete notifications older than 30 days"
+        onPress={() => handleCleanup('notifications', 'notifications', 30)} />
+      <CleanupBtn
+        icon="🔔" title="Notifications (7 days)" subtitle="More aggressive — delete older than 7 days"
+        onPress={() => handleCleanup('notifications', 'notifications', 7)} />
+      <CleanupBtn
+        icon="💬" title="Chat Messages (7 days)" subtitle="More aggressive — delete older than 7 days"
+        onPress={() => handleCleanup('chatMessages', 'chat messages', 7)} />
+    </ScrollView>
+  );
+
   const renderNews = () => (
     <FlatList
       data={allNews}
@@ -353,6 +444,7 @@ export default function AdminDashboardScreen({ navigation }) {
       case 'Rishta': return renderRishta();
       case 'Content': return renderContent();
       case 'News': return renderNews();
+      case 'Storage': return renderStorage();
       default: return null;
     }
   };
@@ -400,6 +492,19 @@ function EmptyState({ icon, text }) {
       <Text style={styles.emptyIcon}>{icon}</Text>
       <Text style={styles.emptyText}>{text}</Text>
     </View>
+  );
+}
+
+function CleanupBtn({ icon, title, subtitle, onPress }) {
+  return (
+    <TouchableOpacity style={styles.cleanupBtn} onPress={onPress} activeOpacity={0.7}>
+      <Text style={styles.cleanupBtnIcon}>{icon}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cleanupBtnTitle}>{title}</Text>
+        <Text style={styles.cleanupBtnSub}>{subtitle}</Text>
+      </View>
+      <Text style={{ fontSize: 18, color: '#C62828' }}>›</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -562,4 +667,39 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', marginTop: 60 },
   emptyIcon: { fontSize: 40, marginBottom: 10 },
   emptyText: { fontSize: 15, color: COLORS.textLight },
+  // Storage tab styles
+  dbRow: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  dbRowActive: {
+    borderColor: COLORS.primary,
+    borderWidth: 2,
+  },
+  dbTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text, marginBottom: 6 },
+  dbBarBg: { height: 8, backgroundColor: '#E0E0E0', borderRadius: 4, marginBottom: 4 },
+  dbBarFill: { height: 8, borderRadius: 4 },
+  dbSizeText: { fontSize: 11, color: COLORS.textLight },
+  dbDot: { width: 12, height: 12, borderRadius: 6, marginLeft: 12 },
+  cleanupBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#FFCDD2',
+  },
+  cleanupBtnIcon: { fontSize: 22, marginRight: 12 },
+  cleanupBtnTitle: { fontSize: 14, fontWeight: '700', color: '#C62828' },
+  cleanupBtnSub: { fontSize: 12, color: COLORS.textLight, marginTop: 2 },
 });
