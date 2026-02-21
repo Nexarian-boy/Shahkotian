@@ -146,13 +146,23 @@ const prismaProxy = new Proxy({}, {
     if (prop === '$connect') return () => dbManager.initialize();
     if (prop === '$disconnect') return () => dbManager.disconnectAll();
 
+    // Try active database client first
     const active = dbManager.databases[dbManager.activeIndex];
-    if (active && active.client && active.client[prop]) return active.client[prop].bind(active.client);
+    if (active && active.client) {
+      const val = active.client[prop];
+      if (val !== undefined && val !== null) {
+        // Prisma model delegates (prisma.user, prisma.post etc.) are objects, not functions.
+        // Only bind if it's actually a function, otherwise return as-is.
+        return typeof val === 'function' ? val.bind(active.client) : val;
+      }
+    }
 
+    // Fallback to single-DB client
     if (!dbManager._fallback) {
       dbManager._fallback = new PrismaClient({ log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'] });
     }
-    return dbManager._fallback[prop];
+    const fval = dbManager._fallback[prop];
+    return typeof fval === 'function' ? fval.bind(dbManager._fallback) : fval;
   }
 });
 
