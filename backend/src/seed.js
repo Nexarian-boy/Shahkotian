@@ -151,6 +151,92 @@ async function main() {
   }
   console.log(`  ✅ ${shops.length} shops added`);
 
+  // ============ DOCTORS & CLINICS ============
+  console.log('🏥 Adding Doctors & Clinics...');
+  const doctors = [
+    {
+      name: 'Muhammad Asif',
+      specialty: 'GENERAL_PHYSICIAN',
+      clinicName: 'City Medical Center',
+      address: 'Main Bazaar, Shahkot',
+      phone: '0300-1234567',
+      whatsapp: '0300-1234567',
+      timings: 'Mon-Sat: 5PM-9PM',
+      fee: 500,
+      education: 'MBBS',
+      experience: '10 years',
+      isVerified: true,
+    },
+    {
+      name: 'Fatima Saeed',
+      specialty: 'GYNECOLOGIST',
+      clinicName: 'Women Care Clinic',
+      address: 'Hospital Road, Shahkot',
+      phone: '0321-9876543',
+      whatsapp: '0321-9876543',
+      timings: 'Mon-Sat: 4PM-8PM, Sun: Closed',
+      fee: 800,
+      education: 'MBBS, FCPS (Gynecology)',
+      experience: '12 years',
+      isVerified: true,
+    },
+    {
+      name: 'Adnan Khan',
+      specialty: 'PEDIATRICIAN',
+      clinicName: 'Child Care Clinic',
+      address: 'GT Road, Shahkot',
+      phone: '0333-5555666',
+      whatsapp: '0333-5555666',
+      timings: 'Daily: 6PM-10PM',
+      fee: 600,
+      education: 'MBBS, FCPS (Pediatrics)',
+      experience: '8 years',
+      isVerified: true,
+    },
+    {
+      name: 'Bilal Ahmed',
+      specialty: 'DENTIST',
+      clinicName: 'Smile Dental Clinic',
+      address: 'Railway Road, Shahkot',
+      phone: '0345-1112233',
+      whatsapp: '0345-1112233',
+      timings: 'Mon-Fri: 5PM-9PM',
+      fee: 700,
+      education: 'BDS',
+      experience: '6 years',
+      isVerified: true,
+    },
+    {
+      name: 'Hamid Raza',
+      specialty: 'HOMEOPATHIC',
+      clinicName: 'Natural Healing Center',
+      address: 'Mandi Road, Shahkot',
+      phone: '0312-4445556',
+      whatsapp: '0312-4445556',
+      timings: 'Daily: 8AM-12PM, 4PM-8PM',
+      fee: 300,
+      education: 'DHMS',
+      experience: '15 years',
+      isVerified: false,
+    },
+    {
+      name: 'Abdul Hakeem',
+      specialty: 'HAKEEM',
+      clinicName: 'Tibb-e-Unani Clinic',
+      address: 'College Road, Shahkot',
+      phone: '0303-7778889',
+      timings: 'Daily: 9AM-1PM, 5PM-9PM',
+      fee: 200,
+      experience: '20 years',
+      isVerified: false,
+    },
+  ];
+
+  for (const doctor of doctors) {
+    await prisma.doctor.create({ data: doctor });
+  }
+  console.log(`  ✅ ${doctors.length} doctors added`);
+
   // ============ NEWS REPORTER (ADMIN ADDED) ============
   console.log('📰 Adding Sample News Reporter...');
   const reporterPassword = await bcrypt.hash('reporter123', 12);

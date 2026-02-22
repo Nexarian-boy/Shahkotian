@@ -218,6 +218,16 @@ export const adminAPI = {
   cleanup: (target, olderThanDays = 30) => api.post('/admin/cleanup', { target, olderThanDays }),
 };
 
+// ============ DOCTORS API ============
+export const doctorsAPI = {
+  getAll: (params) => api.get('/doctors', { params }),
+  getSpecialties: () => api.get('/doctors/specialties'),
+  getOne: (id) => api.get(`/doctors/${id}`),
+  create: (data) => api.post('/doctors', data),
+  update: (id, data) => api.put(`/doctors/${id}`, data),
+  delete: (id) => api.delete(`/doctors/${id}`),
+};
+
 // ============ ALIASES FOR BACKWARDS COMPATIBILITY ============
 export const listingAPI = listingsAPI;
 export const tournamentAPI = tournamentsAPI;

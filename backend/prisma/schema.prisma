@@ -484,3 +484,45 @@ model Block {
   @@index([blockerId])
   @@index([blockedId])
 }
+
+// ============ DOCTORS & CLINICS ============
+
+enum DoctorSpecialty {
+  GENERAL_PHYSICIAN
+  PEDIATRICIAN
+  GYNECOLOGIST
+  CARDIOLOGIST
+  DERMATOLOGIST
+  ENT
+  ORTHOPEDIC
+  DENTIST
+  OPHTHALMOLOGIST
+  NEUROLOGIST
+  PSYCHIATRIST
+  UROLOGIST
+  HOMEOPATHIC
+  HAKEEM
+  OTHER
+}
+
+model Doctor {
+  id           String           @id @default(uuid())
+  name         String
+  specialty    DoctorSpecialty
+  clinicName   String?
+  address      String
+  phone        String
+  whatsapp     String?
+  timings      String?          // e.g., "Mon-Sat: 5PM-9PM"
+  fee          Int?             // Consultation fee in PKR
+  education    String?          // e.g., "MBBS, FCPS"
+  experience   String?          // e.g., "15 years"
+  isVerified   Boolean          @default(false)
+  latitude     Float?
+  longitude    Float?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([specialty])
+  @@index([name])
+}

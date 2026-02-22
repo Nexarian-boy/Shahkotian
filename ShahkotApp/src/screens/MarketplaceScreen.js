@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, Image,
   StyleSheet, RefreshControl, Linking, Alert, ActivityIndicator, Modal,
-  ScrollView, Dimensions,
+  ScrollView, Dimensions, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, LISTING_CATEGORIES } from '../config/constants';
@@ -403,7 +403,10 @@ export default function MarketplaceScreen() {
 
       {/* Create Listing Modal */}
       <Modal visible={showCreate} animationType="slide" transparent={false}>
-        <View style={styles.modalContainer}>
+        <KeyboardAvoidingView
+          style={styles.modalContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={() => setShowCreate(false)}>
               <Text style={styles.closeButton}>✕</Text>
@@ -412,7 +415,7 @@ export default function MarketplaceScreen() {
             <View style={{ width: 30 }} />
           </View>
 
-          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <TextInput style={styles.input} placeholder="Title *" value={title} onChangeText={setTitle} placeholderTextColor={COLORS.textLight} />
             <TextInput style={[styles.input, { height: 80, textAlignVertical: 'top' }]} placeholder="Description *" value={description} onChangeText={setDescription} multiline placeholderTextColor={COLORS.textLight} />
             <TextInput style={styles.input} placeholder="Price (Rs.) *" value={price} onChangeText={setPrice} keyboardType="numeric" placeholderTextColor={COLORS.textLight} />
@@ -457,9 +460,9 @@ export default function MarketplaceScreen() {
             >
               {creating ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.submitText}>Post Listing</Text>}
             </TouchableOpacity>
-            <View style={{ height: 40 }} />
+            <View style={{ height: 60 }} />
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Detail Modal */}

@@ -32,6 +32,7 @@ import AIChatbotScreen from './src/screens/AIChatbotScreen';
 import DMChatScreen from './src/screens/DMChatScreen';
 import OpenChatScreen from './src/screens/OpenChatScreen';
 import HelplineScreen from './src/screens/HelplineScreen';
+import DoctorsScreen from './src/screens/DoctorsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -148,6 +149,7 @@ function AppNavigator() {
           <Stack.Screen name="DMChat" component={DMChatScreen} />
           <Stack.Screen name="OpenChat" component={OpenChatScreen} />
           <Stack.Screen name="Helpline" component={HelplineScreen} />
+          <Stack.Screen name="Doctors" component={DoctorsScreen} />
         </>
       )}
     </Stack.Navigator>

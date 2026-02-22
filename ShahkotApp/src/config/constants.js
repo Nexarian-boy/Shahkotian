@@ -96,3 +96,22 @@ export const PRIVACY_OPTIONS = [
   { key: 'FRIENDS', label: 'Friends', icon: '👥', description: 'Only your friends' },
   { key: 'PRIVATE', label: 'Only Me', icon: '🔒', description: 'Only you can see this post' },
 ];
+
+// Doctor Specialties
+export const DOCTOR_SPECIALTIES = [
+  { key: 'GENERAL_PHYSICIAN', label: 'General Physician', icon: '👨‍⚕️' },
+  { key: 'PEDIATRICIAN', label: 'Child Specialist', icon: '👶' },
+  { key: 'GYNECOLOGIST', label: 'Gynecologist', icon: '🤰' },
+  { key: 'CARDIOLOGIST', label: 'Heart Specialist', icon: '❤️' },
+  { key: 'DERMATOLOGIST', label: 'Skin Specialist', icon: '🧴' },
+  { key: 'ENT', label: 'ENT Specialist', icon: '👂' },
+  { key: 'ORTHOPEDIC', label: 'Bone & Joint', icon: '🦴' },
+  { key: 'DENTIST', label: 'Dentist', icon: '🦷' },
+  { key: 'OPHTHALMOLOGIST', label: 'Eye Specialist', icon: '👁️' },
+  { key: 'NEUROLOGIST', label: 'Neurologist', icon: '🧠' },
+  { key: 'PSYCHIATRIST', label: 'Psychiatrist', icon: '🧘' },
+  { key: 'UROLOGIST', label: 'Urologist', icon: '💧' },
+  { key: 'HOMEOPATHIC', label: 'Homeopathic', icon: '🌿' },
+  { key: 'HAKEEM', label: 'Hakeem', icon: '🍃' },
+  { key: 'OTHER', label: 'Other', icon: '➕' },
+];

@@ -28,6 +28,7 @@ router.get('/dashboard', async (req, res) => {
       totalNews,
       totalShops,
       totalOffices,
+      totalDoctors,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.post.count(),
@@ -37,6 +38,7 @@ router.get('/dashboard', async (req, res) => {
       prisma.news.count(),
       prisma.shop.count(),
       prisma.govtOffice.count(),
+      prisma.doctor.count(),
     ]);
 
     res.json({
@@ -49,6 +51,7 @@ router.get('/dashboard', async (req, res) => {
         totalNews,
         totalShops,
         totalOffices,
+        totalDoctors,
       },
     });
   } catch (error) {
@@ -475,8 +478,8 @@ router.delete('/notifications-bulk', async (req, res) => {
 // Storage info endpoint
 router.get('/storage', async (req, res) => {
   try {
-    const [users, posts, listings, comments, likes, chatMessages, news, tournaments, shops, govtOffices, rishtaProfiles, notifications] = await Promise.all([
-      prisma.user.count(), prisma.post.count(), prisma.listing.count(), prisma.comment.count(), prisma.like.count(), prisma.chatMessage.count(), prisma.news.count(), prisma.tournament.count(), prisma.shop.count(), prisma.govtOffice.count(), prisma.rishtaProfile.count(), prisma.notification.count()
+    const [users, posts, listings, comments, likes, chatMessages, news, tournaments, shops, govtOffices, rishtaProfiles, notifications, doctors] = await Promise.all([
+      prisma.user.count(), prisma.post.count(), prisma.listing.count(), prisma.comment.count(), prisma.like.count(), prisma.chatMessage.count(), prisma.news.count(), prisma.tournament.count(), prisma.shop.count(), prisma.govtOffice.count(), prisma.rishtaProfile.count(), prisma.notification.count(), prisma.doctor.count()
     ]);
 
     let dbSizeMB = -1;
@@ -485,7 +488,7 @@ router.get('/storage', async (req, res) => {
       dbSizeMB = Math.round((Number(result[0].size) / (1024 * 1024)) * 100) / 100;
     } catch (e) { dbSizeMB = -1; }
 
-    res.json({ databaseSizeMB: dbSizeMB, totals: { users, posts, listings, comments, likes, chatMessages, news, tournaments, shops, govtOffices, rishtaProfiles, notifications } });
+    res.json({ databaseSizeMB: dbSizeMB, totals: { users, posts, listings, comments, likes, chatMessages, news, tournaments, shops, govtOffices, rishtaProfiles, notifications, doctors } });
   } catch (error) {
     console.error('Storage info error:', error);
     res.status(500).json({ error: 'Failed to get storage info.' });

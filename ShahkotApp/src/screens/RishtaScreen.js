@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator, FlatList, Modal, Image,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../config/constants';
@@ -319,110 +320,115 @@ export default function RishtaScreen({ navigation }) {
   // Application Form
   if (showApply) {
     return (
-      <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
-        <Text style={styles.formTitle}>Rishta Application</Text>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <Text style={styles.formTitle}>Rishta Application</Text>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Age *</Text>
-          <TextInput style={styles.input} placeholder="Enter age" value={age} onChangeText={setAge} keyboardType="numeric" placeholderTextColor={COLORS.textLight} />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Gender *</Text>
-          <View style={styles.genderRow}>
-            {['Male', 'Female'].map((g) => (
-              <TouchableOpacity
-                key={g}
-                style={[styles.genderChip, gender === g && styles.genderChipActive]}
-                onPress={() => setGender(g)}
-              >
-                <Text style={[styles.genderText, gender === g && styles.genderTextActive]}>
-                  {g === 'Male' ? '👨' : '👩'} {g}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Age *</Text>
+            <TextInput style={styles.input} placeholder="Enter age" value={age} onChangeText={setAge} keyboardType="numeric" placeholderTextColor={COLORS.textLight} />
           </View>
-        </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Education *</Text>
-          <TextInput style={styles.input} placeholder="e.g. Bachelor's, Master's" value={education} onChangeText={setEducation} placeholderTextColor={COLORS.textLight} />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Occupation *</Text>
-          <TextInput style={styles.input} placeholder="e.g. Engineer, Teacher" value={occupation} onChangeText={setOccupation} placeholderTextColor={COLORS.textLight} />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Family Details</Text>
-          <TextInput style={[styles.input, { height: 80 }]} placeholder="Describe your family" value={familyDetails} onChangeText={setFamilyDetails} multiline placeholderTextColor={COLORS.textLight} />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Preferences</Text>
-          <TextInput style={[styles.input, { height: 80 }]} placeholder="What are you looking for?" value={preferences} onChangeText={setPreferences} multiline placeholderTextColor={COLORS.textLight} />
-        </View>
-
-        {/* CNIC Upload */}
-        <Text style={styles.sectionLabel}>📋 CNIC Verification</Text>
-        <View style={styles.cnicRow}>
-          <TouchableOpacity style={styles.cnicButton} onPress={() => pickCNIC('front')}>
-            <Text style={styles.cnicButtonIcon}>{cnicFront ? '✅' : '📷'}</Text>
-            <Text style={styles.cnicButtonText}>{cnicFront ? 'Front Added' : 'CNIC Front'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.cnicButton} onPress={() => pickCNIC('back')}>
-            <Text style={styles.cnicButtonIcon}>{cnicBack ? '✅' : '📷'}</Text>
-            <Text style={styles.cnicButtonText}>{cnicBack ? 'Back Added' : 'CNIC Back'}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Personal Photos */}
-        <Text style={styles.sectionLabel}>📸 Personal Photos (Optional)</Text>
-        <TouchableOpacity style={[styles.cnicButton, { marginBottom: 8 }]} onPress={pickPersonalPhotos}>
-          <Text style={styles.cnicButtonIcon}>{personalPhotos.length > 0 ? '✅' : '📷'}</Text>
-          <Text style={styles.cnicButtonText}>{personalPhotos.length > 0 ? `${personalPhotos.length} photo(s) added` : 'Add Photos (max 3)'}</Text>
-        </TouchableOpacity>
-        {personalPhotos.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-            {personalPhotos.map((p, i) => (
-              <Image key={i} source={{ uri: p.uri }} style={{ width: 80, height: 80, borderRadius: 8, marginRight: 8 }} />
-            ))}
-          </ScrollView>
-        )}
-
-        {/* Agreement */}
-        <Text style={styles.sectionLabel}>✍️ Digital Agreement</Text>
-        <View style={styles.agreementBox}>
-          <Text style={styles.agreementText}>{agreement}</Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.agreeRow}
-          onPress={() => setAgreed(!agreed)}
-        >
-          <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
-            {agreed && <Text style={styles.checkmark}>✓</Text>}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Gender *</Text>
+            <View style={styles.genderRow}>
+              {['Male', 'Female'].map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.genderChip, gender === g && styles.genderChipActive]}
+                  onPress={() => setGender(g)}
+                >
+                  <Text style={[styles.genderText, gender === g && styles.genderTextActive]}>
+                    {g === 'Male' ? '👨' : '👩'} {g}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-          <Text style={styles.agreeText}>
-            I have read and agree to all terms above. I sign this agreement digitally.
-          </Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.submitButton, (!agreed || submitting) && styles.submitDisabled]}
-          onPress={submitApplication}
-          disabled={!agreed || submitting}
-        >
-          {submitting ? (
-            <ActivityIndicator color={COLORS.white} />
-          ) : (
-            <Text style={styles.submitText}>Submit Application</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Education *</Text>
+            <TextInput style={styles.input} placeholder="e.g. Bachelor's, Master's" value={education} onChangeText={setEducation} placeholderTextColor={COLORS.textLight} />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Occupation *</Text>
+            <TextInput style={styles.input} placeholder="e.g. Engineer, Teacher" value={occupation} onChangeText={setOccupation} placeholderTextColor={COLORS.textLight} />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Family Details</Text>
+            <TextInput style={[styles.input, { height: 80 }]} placeholder="Describe your family" value={familyDetails} onChangeText={setFamilyDetails} multiline placeholderTextColor={COLORS.textLight} />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Preferences</Text>
+            <TextInput style={[styles.input, { height: 80 }]} placeholder="What are you looking for?" value={preferences} onChangeText={setPreferences} multiline placeholderTextColor={COLORS.textLight} />
+          </View>
+
+          {/* CNIC Upload */}
+          <Text style={styles.sectionLabel}>📋 CNIC Verification</Text>
+          <View style={styles.cnicRow}>
+            <TouchableOpacity style={styles.cnicButton} onPress={() => pickCNIC('front')}>
+              <Text style={styles.cnicButtonIcon}>{cnicFront ? '✅' : '📷'}</Text>
+              <Text style={styles.cnicButtonText}>{cnicFront ? 'Front Added' : 'CNIC Front'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cnicButton} onPress={() => pickCNIC('back')}>
+              <Text style={styles.cnicButtonIcon}>{cnicBack ? '✅' : '📷'}</Text>
+              <Text style={styles.cnicButtonText}>{cnicBack ? 'Back Added' : 'CNIC Back'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Personal Photos */}
+          <Text style={styles.sectionLabel}>📸 Personal Photos (Optional)</Text>
+          <TouchableOpacity style={[styles.cnicButton, { marginBottom: 8 }]} onPress={pickPersonalPhotos}>
+            <Text style={styles.cnicButtonIcon}>{personalPhotos.length > 0 ? '✅' : '📷'}</Text>
+            <Text style={styles.cnicButtonText}>{personalPhotos.length > 0 ? `${personalPhotos.length} photo(s) added` : 'Add Photos (max 3)'}</Text>
+          </TouchableOpacity>
+          {personalPhotos.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+              {personalPhotos.map((p, i) => (
+                <Image key={i} source={{ uri: p.uri }} style={{ width: 80, height: 80, borderRadius: 8, marginRight: 8 }} />
+              ))}
+            </ScrollView>
           )}
-        </TouchableOpacity>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+          {/* Agreement */}
+          <Text style={styles.sectionLabel}>✍️ Digital Agreement</Text>
+          <View style={styles.agreementBox}>
+            <Text style={styles.agreementText}>{agreement}</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.agreeRow}
+            onPress={() => setAgreed(!agreed)}
+          >
+            <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
+              {agreed && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+            <Text style={styles.agreeText}>
+              I have read and agree to all terms above. I sign this agreement digitally.
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.submitButton, (!agreed || submitting) && styles.submitDisabled]}
+            onPress={submitApplication}
+            disabled={!agreed || submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <Text style={styles.submitText}>Submit Application</Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={{ height: 60 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
 

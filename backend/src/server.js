@@ -25,6 +25,7 @@ const bloodRoutes = require('./routes/blood');
 const chatRoutes = require('./routes/chat');
 const chatbotRoutes = require('./routes/chatbot');
 const dmRoutes = require('./routes/dm');
+const doctorRoutes = require('./routes/doctors');
 
 const app = express();
 
@@ -79,6 +80,7 @@ app.use('/api/blood', bloodRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/dm', dmRoutes);
+app.use('/api/doctors', doctorRoutes);
 
 // 404 handler
 app.use((req, res) => {

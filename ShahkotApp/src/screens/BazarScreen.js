@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Linking, RefreshControl, Modal, Alert, ScrollView,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { COLORS } from '../config/constants';
 import { shopsAPI } from '../services/api';
@@ -221,9 +222,12 @@ export default function BazarScreen() {
 
       {/* Add/Edit Shop Modal */}
       <Modal visible={showAddModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={styles.modalContent}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <Text style={styles.modalTitle}>{myShop ? '✏️ Edit Your Shop' : '🏪 Add Your Shop'}</Text>
               <Text style={styles.modalSubtitle}>Let people in Shahkot find your business</Text>
               
@@ -282,9 +286,10 @@ export default function BazarScreen() {
                   <Text style={styles.saveBtnText}>{saving ? 'Saving...' : myShop ? 'Update Shop' : 'Add Shop'}</Text>
                 </TouchableOpacity>
               </View>
+              <View style={{ height: 30 }} />
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Quick Suggestions */}

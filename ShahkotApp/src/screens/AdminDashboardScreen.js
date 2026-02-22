@@ -32,19 +32,31 @@ export default function AdminDashboardScreen({ navigation }) {
   const [dbStatus, setDbStatus] = useState([]);
   const [storageInfo, setStorageInfo] = useState(null);
   const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState({});
 
+  // Load data when tab changes or on initial mount
   useEffect(() => {
     loadData();
   }, [activeTab]);
+
+  // Also reload data when screen comes into focus
+  useEffect(() => {
+    // Reset loaded state when refreshing is triggered
+    if (refreshing) {
+      setDataLoaded({});
+    }
+  }, [refreshing]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       if (activeTab === 'Overview') {
         const res = await adminAPI.getDashboard();
+        console.log('Dashboard data:', res.data);
         setStats(res.data);
       } else if (activeTab === 'Users') {
         const res = await adminAPI.getUsers({ search: searchQuery || undefined });
+        console.log('Users data:', res.data);
         setUsers(res.data.users || []);
       } else if (activeTab === 'Rishta') {
         const res = await adminAPI.getPendingRishta();
@@ -56,12 +68,25 @@ export default function AdminDashboardScreen({ navigation }) {
         const res = await newsAPI.getAll({});
         setAllNews(res.data.news || []);
       } else if (activeTab === 'Storage') {
-        const [dbRes, storRes] = await Promise.all([
-          adminAPI.getDbStatus(),
-          adminAPI.getStorage(),
-        ]);
-        setDbStatus(Array.isArray(dbRes.data?.databases) ? dbRes.data.databases : []);
-        setStorageInfo(storRes.data || null);
+        try {
+          const [dbRes, storRes] = await Promise.all([
+            adminAPI.getDbStatus(),
+            adminAPI.getStorage(),
+          ]);
+          console.log('DB Status:', dbRes.data);
+          console.log('Storage:', storRes.data);
+          setDbStatus(Array.isArray(dbRes.data?.databases) ? dbRes.data.databases : []);
+          setStorageInfo(storRes.data || null);
+        } catch (storageError) {
+          console.log('Storage load error:', storageError);
+          // Try to load storage info even if db status fails
+          try {
+            const storRes = await adminAPI.getStorage();
+            setStorageInfo(storRes.data || null);
+          } catch (e) {
+            console.log('Could not load storage info:', e);
+          }
+        }
       }
     } catch (err) {
       console.log('Admin data load error:', err);
@@ -179,14 +204,15 @@ export default function AdminDashboardScreen({ navigation }) {
     <ScrollView style={styles.tabContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}>
       <Text style={styles.sectionTitle}>App Statistics</Text>
       <View style={styles.statsGrid}>
-        <StatCard icon="👥" label="Users" value={stats?.stats?.totalUsers || 0} color="#4CAF50" />
-        <StatCard icon="📝" label="Posts" value={stats?.stats?.totalPosts || 0} color="#2196F3" />
-        <StatCard icon="🛒" label="Listings" value={stats?.stats?.totalListings || 0} color="#FF9800" />
-        <StatCard icon="💍" label="Pending Rishta" value={stats?.stats?.pendingRishta || 0} color="#E91E63" />
-        <StatCard icon="🏆" label="Tournaments" value={stats?.stats?.totalTournaments || 0} color="#9C27B0" />
-        <StatCard icon="📰" label="News" value={stats?.stats?.totalNews || 0} color="#00BCD4" />
-        <StatCard icon="🏪" label="Shops" value={stats?.stats?.totalShops || 0} color="#795548" />
-        <StatCard icon="🏛" label="Offices" value={stats?.stats?.totalOffices || 0} color="#607D8B" />
+        <StatCard icon="👥" label="Users" value={stats?.stats?.totalUsers ?? 0} color="#4CAF50" />
+        <StatCard icon="📝" label="Posts" value={stats?.stats?.totalPosts ?? 0} color="#2196F3" />
+        <StatCard icon="🛒" label="Listings" value={stats?.stats?.totalListings ?? 0} color="#FF9800" />
+        <StatCard icon="💍" label="Pending Rishta" value={stats?.stats?.pendingRishta ?? 0} color="#E91E63" />
+        <StatCard icon="🏆" label="Tournaments" value={stats?.stats?.totalTournaments ?? 0} color="#9C27B0" />
+        <StatCard icon="📰" label="News" value={stats?.stats?.totalNews ?? 0} color="#00BCD4" />
+        <StatCard icon="🏪" label="Shops" value={stats?.stats?.totalShops ?? 0} color="#795548" />
+        <StatCard icon="🏛" label="Offices" value={stats?.stats?.totalOffices ?? 0} color="#607D8B" />
+        <StatCard icon="🏥" label="Doctors" value={stats?.stats?.totalDoctors ?? 0} color="#E11D48" />
       </View>
 
       {stats?.stats?.pendingRishta > 0 && (
@@ -373,14 +399,15 @@ export default function AdminDashboardScreen({ navigation }) {
         <>
           <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Record Counts</Text>
           <View style={styles.statsGrid}>
-            <StatCard icon="👥" label="Users" value={storageInfo.totals.users || 0} color="#4CAF50" />
-            <StatCard icon="📝" label="Posts" value={storageInfo.totals.posts || 0} color="#2196F3" />
-            <StatCard icon="🛒" label="Listings" value={storageInfo.totals.listings || 0} color="#FF9800" />
-            <StatCard icon="💬" label="Comments" value={storageInfo.totals.comments || 0} color="#9C27B0" />
-            <StatCard icon="🔔" label="Notifications" value={storageInfo.totals.notifications || 0} color="#00BCD4" />
-            <StatCard icon="💬" label="Chat Msgs" value={storageInfo.totals.chatMessages || 0} color="#795548" />
-            <StatCard icon="📰" label="News" value={storageInfo.totals.news || 0} color="#E91E63" />
-            <StatCard icon="🏆" label="Tournaments" value={storageInfo.totals.tournaments || 0} color="#607D8B" />
+            <StatCard icon="👥" label="Users" value={storageInfo.totals.users ?? 0} color="#4CAF50" />
+            <StatCard icon="📝" label="Posts" value={storageInfo.totals.posts ?? 0} color="#2196F3" />
+            <StatCard icon="🛒" label="Listings" value={storageInfo.totals.listings ?? 0} color="#FF9800" />
+            <StatCard icon="💬" label="Comments" value={storageInfo.totals.comments ?? 0} color="#9C27B0" />
+            <StatCard icon="🔔" label="Notifications" value={storageInfo.totals.notifications ?? 0} color="#00BCD4" />
+            <StatCard icon="💬" label="Chat Msgs" value={storageInfo.totals.chatMessages ?? 0} color="#795548" />
+            <StatCard icon="📰" label="News" value={storageInfo.totals.news ?? 0} color="#E91E63" />
+            <StatCard icon="🏆" label="Tournaments" value={storageInfo.totals.tournaments ?? 0} color="#607D8B" />
+            <StatCard icon="🏥" label="Doctors" value={storageInfo.totals.doctors ?? 0} color="#E11D48" />
           </View>
         </>
       )}

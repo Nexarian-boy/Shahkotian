@@ -7,6 +7,7 @@ import { COLORS } from '../config/constants';
 const SERVICES = [
   { key: 'GovtOffices', label: 'Govt Offices', icon: '🏛️', desc: 'Directory & Helplines', color: '#F59E0B' },
   { key: 'Bazar', label: 'Bazar Finder', icon: '🏪', desc: 'Find Shops & Products', color: '#3B82F6' },
+  { key: 'Doctors', label: 'Doctors & Clinics', icon: '🏥', desc: 'Find Healthcare', color: '#E11D48' },
   { key: 'Tournaments', label: 'Tournaments', icon: '🏆', desc: 'Sports Events', color: '#10B981' },
   { key: 'News & Articles', label: 'News & Articles', icon: '📰', desc: 'Local Updates', color: '#8B5CF6' },
   { key: 'BloodDonation', label: 'Blood Bank', icon: '🩸', desc: 'Donate & Find Donors', color: '#B91C1C' },
