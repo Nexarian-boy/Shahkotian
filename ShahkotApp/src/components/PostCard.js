@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { Video, ResizeMode } from 'expo-av';
 import { COLORS, ANIMATIONS } from '../config/constants';
+import ImageViewer from './ImageViewer';
 
 const { width } = Dimensions.get('window');
 const MAX_TEXT_LENGTH = 200;
@@ -20,6 +21,8 @@ export default function PostCard({
 }) {
     const [expanded, setExpanded] = useState(false);
     const [likeAnim] = useState(new Animated.Value(1));
+    const [imageViewerVisible, setImageViewerVisible] = useState(false);
+    const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
     const isOwner = post.user?.id === currentUserId;
     const canDelete = isAdmin; // Only admin can delete posts
@@ -127,7 +130,16 @@ export default function PostCard({
             {post.images?.length > 0 && !isRepost && (
                 <View style={styles.mediaContainer}>
                     {post.images.map((uri, idx) => (
-                        <Image key={idx} source={{ uri }} style={styles.postImage} resizeMode="cover" />
+                        <TouchableOpacity 
+                            key={idx} 
+                            onPress={() => {
+                                setSelectedImageIndex(idx);
+                                setImageViewerVisible(true);
+                            }}
+                            activeOpacity={0.9}
+                        >
+                            <Image source={{ uri }} style={styles.postImage} resizeMode="cover" />
+                        </TouchableOpacity>
                     ))}
                 </View>
             )}
@@ -181,6 +193,14 @@ export default function PostCard({
                     <Text style={styles.actionLabel}>Share</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Image Viewer Modal */}
+            <ImageViewer
+                images={post.images || []}
+                visible={imageViewerVisible}
+                initialIndex={selectedImageIndex}
+                onClose={() => setImageViewerVisible(false)}
+            />
         </View>
     );
 }
@@ -271,7 +291,7 @@ const styles = StyleSheet.create({
     counterText: { fontSize: 13, color: COLORS.textSecondary },
     actions: {
         flexDirection: 'row',
-        paddingTop: 10,
+        paddingTop: 6,
         paddingHorizontal: 8,
     },
     actionBtn: {
@@ -279,9 +299,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 6,
+        paddingVertical: 4,
     },
-    actionIcon: { fontSize: 18, marginRight: 4 },
-    actionLabel: { fontSize: 13, color: COLORS.textSecondary },
+    actionIcon: { fontSize: 16, marginRight: 4 },
+    actionLabel: { fontSize: 12, color: COLORS.textSecondary },
     likedLabel: { color: COLORS.secondary },
 });

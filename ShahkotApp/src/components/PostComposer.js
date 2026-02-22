@@ -94,8 +94,9 @@ export default function PostComposer({
                 mediaTypes: ImagePicker.MediaTypeOptions.Videos,
                 allowsMultipleSelection: true,
                 selectionLimit: 3 - videos.length,
-                quality: 0.5,
+                quality: 0.3, // Lower quality for better compression
                 videoMaxDuration: MAX_VIDEO_DURATION_SECONDS, // 3 minutes
+                videoQuality: 0, // 0 = low quality (smaller file size)
             });
 
             if (!result.canceled) {
@@ -104,12 +105,20 @@ export default function PostComposer({
                     // asset.duration may be in seconds or milliseconds depending on platform
                     const dur = asset.duration || 0;
                     const durationSeconds = dur > 10000 ? Math.round(dur / 1000) : Math.round(dur);
+                    const fileSizeMB = asset.fileSize ? (asset.fileSize / (1024 * 1024)).toFixed(1) : 'Unknown';
+                    
                     if (durationSeconds > MAX_VIDEO_DURATION_SECONDS) {
-                        Alert.alert('⏱️ Video Too Long', `Video is ${durationSeconds}s. Maximum is ${MAX_VIDEO_DURATION_SECONDS}s. Please trim and try again.`);
+                        Alert.alert(
+                            '⏱️ Video Too Long', 
+                            `This video is ${durationSeconds} seconds long. Maximum is ${MAX_VIDEO_DURATION_SECONDS} seconds (3 minutes).\n\nPlease trim it and try again.`
+                        );
                         continue;
                     }
                     if (asset.fileSize && asset.fileSize > MAX_VIDEO_SIZE_MB * 1024 * 1024) {
-                        Alert.alert('📦 Video Too Large', `Video is ${(asset.fileSize / (1024 * 1024)).toFixed(1)}MB. Max ${MAX_VIDEO_SIZE_MB}MB.`);
+                        Alert.alert(
+                            '📦 Video File Too Large', 
+                            `This video is ${fileSizeMB}MB. Maximum file size is ${MAX_VIDEO_SIZE_MB}MB.\n\nTip: Record videos at lower quality (720p instead of 4K) to reduce file size, or use a video compressor app.`
+                        );
                         continue;
                     }
                     validVideos.push(asset);

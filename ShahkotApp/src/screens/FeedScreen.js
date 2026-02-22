@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, Image,
   StyleSheet, RefreshControl, Alert, ActivityIndicator, Modal, Share,
-  KeyboardAvoidingView, Platform, Dimensions, ScrollView, Linking,
+  KeyboardAvoidingView, Platform, Dimensions, ScrollView, Linking, Animated,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
@@ -19,6 +19,12 @@ export default function FeedScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+
+  // Scroll animation states
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const lastScrollY = useRef(0);
+  const [headerVisible, setHeaderVisible] = useState(true);
+  const headerHeight = useRef(new Animated.Value(1)).current;
 
   // Create post state
   const [showCreate, setShowCreate] = useState(false);
@@ -71,6 +77,36 @@ export default function FeedScreen({ navigation }) {
       loadPosts(page + 1);
     }
   };
+
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: false,
+      listener: (event) => {
+        const currentScrollY = event.nativeEvent.contentOffset.y;
+        const scrollingDown = currentScrollY > lastScrollY.current && currentScrollY > 50;
+        const scrollingUp = currentScrollY < lastScrollY.current;
+
+        if (scrollingDown && headerVisible) {
+          Animated.timing(headerHeight, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: false,
+          }).start();
+          setHeaderVisible(false);
+        } else if (scrollingUp && !headerVisible) {
+          Animated.timing(headerHeight, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: false,
+          }).start();
+          setHeaderVisible(true);
+        }
+
+        lastScrollY.current = currentScrollY;
+      },
+    }
+  );
 
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -336,23 +372,53 @@ export default function FeedScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {/* Create Post Button */}
-      <TouchableOpacity style={styles.createBar} onPress={() => setShowCreate(!showCreate)}>
-        <View style={styles.miniAvatar}>
-          <Text style={styles.miniAvatarText}>{user?.name?.[0] || '?'}</Text>
-        </View>
-        <Text style={styles.createPlaceholder}>What's on your mind?</Text>
-        <Text style={styles.cameraIcon}>📷</Text>
-      </TouchableOpacity>
-
-      {/* Watch Videos Button */}
-      <TouchableOpacity
-        style={styles.watchVideosBtn}
-        onPress={() => navigation.navigate('VideoFeed')}
+      {/* Create Post Button - Animated */}
+      <Animated.View
+        style={[
+          styles.createBar,
+          {
+            opacity: headerHeight,
+            maxHeight: headerHeight.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 100],
+            }),
+            overflow: 'hidden',
+          },
+        ]}
       >
-        <Text style={styles.watchVideosIcon}>🎬</Text>
-        <Text style={styles.watchVideosText}>Watch Videos</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
+          onPress={() => setShowCreate(!showCreate)}
+        >
+          <View style={styles.miniAvatar}>
+            <Text style={styles.miniAvatarText}>{user?.name?.[0] || '?'}</Text>
+          </View>
+          <Text style={styles.createPlaceholder}>What's on your mind?</Text>
+          <Text style={styles.cameraIcon}>📷</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Watch Videos Button - Animated */}
+      <Animated.View
+        style={[
+          {
+            opacity: headerHeight,
+            maxHeight: headerHeight.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0, 100],
+            }),
+            overflow: 'hidden',
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.watchVideosBtn}
+          onPress={() => navigation.navigate('VideoFeed')}
+        >
+          <Text style={styles.watchVideosIcon}>🎬</Text>
+          <Text style={styles.watchVideosText}>Watch Videos</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
       {/* Create Post Form */}
       {showCreate && (
@@ -416,6 +482,8 @@ export default function FeedScreen({ navigation }) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         ListEmptyComponent={
           !loading && (
             <View style={styles.emptyContainer}>

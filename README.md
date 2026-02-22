@@ -134,9 +134,11 @@ Then scan the QR code with **Expo Go** app, or press `a` to launch Android emula
 - Users outside the radius cannot register or access the app
 
 ### 2. Social Feed (Posts)
-- Create text + image posts (NO videos)
+- Create text + image + video posts (max 5 images or 3 videos)
+- Videos up to 3 minutes, max 100MB each
 - Like, comment, share
 - Paginated feed, newest first
+- Separate video feed for video-only posts
 
 ### 3. Buy & Sell (Marketplace)
 - Post listings with images, price, description
@@ -218,7 +220,7 @@ Then scan the QR code with **Expo Go** app, or press `a` to launch Android emula
 - **Backend**: Node.js + Express.js
 - **Database**: PostgreSQL + Prisma ORM
 - **Auth**: JWT (30-day tokens)
-- **Images**: Cloudinary (videos blocked)
+- **Images & Videos**: Cloudinary
 - **Email**: Nodemailer/Gmail
 - **Geofencing**: Haversine formula
 
@@ -247,7 +249,7 @@ npx expo start --android  # Start with Android
 
 ## ⚠️ Important Notes
 
-1. **No Videos**: The app explicitly blocks video uploads everywhere
+1. **Video Limits**: Posts can have up to 3 videos (max 3 minutes, 100MB each). Other features (Rishta, Marketplace, Open Chat) do not support videos for safety and moderation.
 2. **First User = Admin**: The first user to register with `ADMIN_PHONE` from `.env` becomes the admin
 3. **WhatsApp Required**: Marketplace listings require a WhatsApp number for buyer contact
 4. **CNIC Verification**: Rishta profiles require CNIC images — admin manually reviews before approval

@@ -6,9 +6,9 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
-import { rishtaAPI } from '../services/api';
+import { rishtaAPI, dmAPI } from '../services/api';
 
-export default function RishtaScreen() {
+export default function RishtaScreen({ navigation }) {
   const { user, isVerified } = useAuth();
   const [myProfile, setMyProfile] = useState(null);
   const [profiles, setProfiles] = useState([]);
@@ -110,8 +110,24 @@ export default function RishtaScreen() {
   const respondToInterest = async (interestId, accept) => {
     try {
       if (accept) {
-        await rishtaAPI.acceptInterest(interestId);
-        Alert.alert('Accepted! 🎉', 'You can now contact each other.');
+        const res = await rishtaAPI.acceptInterest(interestId);
+        const chatId = res.data?.chatId;
+        Alert.alert('Accepted! 🎉', 'A private chat has been created. You can now message each other.', [
+          {
+            text: 'Open Chat',
+            onPress: () => {
+              if (chatId) {
+                const interest = interests.find(i => i.id === interestId);
+                navigation.navigate('DMChat', {
+                  chatId,
+                  otherUser: interest?.fromUser,
+                  source: 'RISHTA',
+                });
+              }
+            },
+          },
+          { text: 'Later', style: 'cancel' },
+        ]);
       } else {
         await rishtaAPI.rejectInterest(interestId);
         Alert.alert('Declined', 'Interest has been declined.');
@@ -590,7 +606,23 @@ export default function RishtaScreen() {
                 </View>
               )}
               {item.status === 'ACCEPTED' && (
-                <Text style={styles.contactInfo}>📞 Contact: {item.fromUser?.phone}</Text>
+                <TouchableOpacity
+                  style={styles.chatBtn}
+                  onPress={async () => {
+                    try {
+                      const res = await dmAPI.startChat(item.fromUser.id, 'RISHTA');
+                      navigation.navigate('DMChat', {
+                        chatId: res.data.id,
+                        otherUser: item.fromUser,
+                        source: 'RISHTA',
+                      });
+                    } catch (err) {
+                      Alert.alert('Error', 'Could not open chat');
+                    }
+                  }}
+                >
+                  <Text style={styles.chatBtnText}>💬 Open Private Chat</Text>
+                </TouchableOpacity>
               )}
             </View>
           )}
@@ -866,6 +898,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  chatBtn: {
+    marginTop: 10,
+    padding: 12,
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  chatBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   shortlistStar: { fontSize: 24 },
   sendInterestFullBtn: {
     backgroundColor: COLORS.secondary,

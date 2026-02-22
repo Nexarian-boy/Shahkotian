@@ -6,6 +6,11 @@ const { isWithinShahkot } = require('../utils/geolocation');
  * Requires latitude and longitude in request body or user profile
  */
 function geofenceCheck(req, res, next) {
+  // Skip geofence check if disabled via env variable
+  if (process.env.SKIP_GEOFENCE === 'true') {
+    return next();
+  }
+
   // Get location from request body (during registration) or from user profile
   const latitude = req.body.latitude || (req.user && req.user.latitude);
   const longitude = req.body.longitude || (req.user && req.user.longitude);

@@ -167,9 +167,16 @@ export const chatbotAPI = {
 
 // ============ DM API ============
 export const dmAPI = {
-  getConversations: () => api.get('/dm/conversations'),
-  getMessages: (recipientId, page = 1) => api.get(`/dm/messages/${recipientId}?page=${page}`),
-  sendMessage: (recipientId, text) => api.post('/dm/send', { recipientId, text }),
+  startChat: (userId, source) => api.post(`/dm/start/${userId}`, { source }),
+  getChats: () => api.get('/dm/chats'),
+  getMessages: (chatId, page = 1) => api.get(`/dm/${chatId}/messages?page=${page}`),
+  sendMessage: (chatId, data) => api.post(`/dm/${chatId}/messages`, data),
+  uploadImages: (chatId, formData) => api.post(`/dm/${chatId}/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  blockUser: (chatId) => api.post(`/dm/${chatId}/block`),
+  unblockUser: (chatId) => api.post(`/dm/${chatId}/unblock`),
+  report: (chatId, data) => api.post(`/dm/${chatId}/report`, data),
 };
 
 // ============ BLOOD DONATION API ============

@@ -9,10 +9,10 @@ export default function SplashScreen() {
     <View style={styles.container}>
       <View style={styles.logoContainer}>
         <View style={styles.iconCircle}>
-          <Text style={styles.icon}>🐅</Text>
+          <Text style={styles.icon}>{'🐯'}</Text>
         </View>
-        <Text style={styles.title}>Shahkot Tiger</Text>
-        <Text style={styles.subtitle}>شاہکوٹ ٹائیگر</Text>
+        <Text style={styles.title}>Shahkot Tigers</Text>
+        <Text style={styles.subtitle}>شاہکوٹ ٹائیگرز</Text>
         <Text style={styles.taglineSmall}>Your City, Your Pride</Text>
       </View>
       <View style={styles.bottom}>

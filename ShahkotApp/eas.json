@@ -19,7 +19,7 @@
             },
             "env": {
                 "EXPO_PUBLIC_API_URL": "https://shahkotian.onrender.com/api",
-                "EXPO_PUBLIC_SKIP_GEOFENCE": "false"
+                "EXPO_PUBLIC_SKIP_GEOFENCE": "true"
             }
         }
     }
