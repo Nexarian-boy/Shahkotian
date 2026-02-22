@@ -93,8 +93,8 @@ router.post('/apply', authenticate, (req, res) => {
       }
 
       // Upload CNIC images
-      const cnicFrontUrl = await uploadToCloudinary(req.files.cnicFront[0].buffer, 'rishta/cnic');
-      const cnicBackUrl = await uploadToCloudinary(req.files.cnicBack[0].buffer, 'rishta/cnic');
+      const cnicFrontUrl = await uploadToCloudinary(req.files.cnicFront[0], 'rishta/cnic');
+      const cnicBackUrl = await uploadToCloudinary(req.files.cnicBack[0], 'rishta/cnic');
 
       // Upload optional personal photos
       let personalPhotoUrls = [];
@@ -287,7 +287,7 @@ router.get('/interests', authenticate, verifiedOnly, async (req, res) => {
 
 /**
  * PUT /api/rishta/interest/:interestId/accept
- * Accept a received interest
+ * Accept a received interest — auto-creates a private DM chat
  */
 router.put('/interest/:interestId/accept', authenticate, verifiedOnly, async (req, res) => {
   try {
@@ -301,7 +301,30 @@ router.put('/interest/:interestId/accept', authenticate, verifiedOnly, async (re
     }
 
     await prisma.rishtaInterest.update({ where: { id: interestId }, data: { status: 'ACCEPTED' } });
-    res.json({ message: 'Interest accepted!' });
+
+    // Auto-create a private DM chat between the two users (source: RISHTA)
+    let chat = await prisma.dMChat.findFirst({
+      where: {
+        OR: [
+          { user1Id: req.user.id, user2Id: interest.fromUserId },
+          { user1Id: interest.fromUserId, user2Id: req.user.id },
+        ],
+      },
+    });
+    if (!chat) {
+      chat = await prisma.dMChat.create({
+        data: {
+          user1Id: req.user.id,
+          user2Id: interest.fromUserId,
+          source: 'RISHTA',
+        },
+      });
+    }
+
+    res.json({
+      message: 'Interest accepted! A private chat has been created.',
+      chatId: chat.id,
+    });
   } catch (error) {
     console.error('Accept interest error:', error);
     res.status(500).json({ error: 'Failed to accept interest.' });

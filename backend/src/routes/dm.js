@@ -1,18 +1,39 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
+const { upload } = require('../utils/upload');
+const { uploadMultipleToCloudinary } = require('../utils/cloudinaryUpload');
+
+// Helper: Check if user is blocked by the other user
+async function isBlockedByOther(userId, otherUserId) {
+    const block = await prisma.block.findUnique({
+        where: { blockerId_blockedId: { blockerId: otherUserId, blockedId: userId } },
+    });
+    return !!block;
+}
 
 // Start a DM chat with a user
 router.post('/start/:userId', authenticate, async (req, res) => {
     try {
         const otherUserId = req.params.userId;
+        const { source } = req.body; // RISHTA or GENERAL
         if (otherUserId === req.user.id) {
             return res.status(400).json({ error: 'Cannot start chat with yourself' });
         }
 
-        // Check if chat already exists
+        // Check blocks
+        const blocked = await prisma.block.findFirst({
+            where: {
+                OR: [
+                    { blockerId: req.user.id, blockedId: otherUserId },
+                    { blockerId: otherUserId, blockedId: req.user.id },
+                ],
+            },
+        });
+        if (blocked) return res.status(403).json({ error: 'Chat blocked' });
+
+        // Check if chat already exists (either direction)
         const existing = await prisma.dMChat.findFirst({
             where: {
                 OR: [
@@ -32,6 +53,7 @@ router.post('/start/:userId', authenticate, async (req, res) => {
             data: {
                 user1Id: req.user.id,
                 user2Id: otherUserId,
+                source: source || 'GENERAL',
             },
             include: {
                 user1: { select: { id: true, name: true, photoUrl: true } },
@@ -55,6 +77,7 @@ router.get('/chats', authenticate, async (req, res) => {
                     { user1Id: req.user.id },
                     { user2Id: req.user.id },
                 ],
+                isBlocked: false,
             },
             include: {
                 user1: { select: { id: true, name: true, photoUrl: true } },
@@ -62,7 +85,7 @@ router.get('/chats', authenticate, async (req, res) => {
                 messages: {
                     orderBy: { createdAt: 'desc' },
                     take: 1,
-                    select: { text: true, createdAt: true },
+                    select: { text: true, images: true, createdAt: true },
                 },
             },
             orderBy: { updatedAt: 'desc' },
@@ -110,7 +133,7 @@ router.get('/:chatId/messages', authenticate, async (req, res) => {
     }
 });
 
-// Send DM message
+// Send DM message (text + optional images)
 router.post('/:chatId/messages', authenticate, async (req, res) => {
     try {
         const { text, images = [] } = req.body;
@@ -119,10 +142,10 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
             return res.status(400).json({ error: 'Message cannot be empty' });
         }
 
-        // Check if user is blocked
+        // Check if user is blocked globally
         const user = await prisma.user.findUnique({ where: { id: req.user.id } });
         if (user.isBlocked) {
-            return res.status(403).json({ error: 'You have been blocked' });
+            return res.status(403).json({ error: 'Your account has been blocked' });
         }
 
         // Verify user is part of this chat
@@ -136,6 +159,19 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
             },
         });
         if (!chat) return res.status(403).json({ error: 'Access denied' });
+        if (chat.isBlocked) return res.status(403).json({ error: 'This chat has been blocked' });
+
+        // Check if blocked by other user
+        const otherUserId = chat.user1Id === req.user.id ? chat.user2Id : chat.user1Id;
+        const blocked = await prisma.block.findFirst({
+            where: {
+                OR: [
+                    { blockerId: req.user.id, blockedId: otherUserId },
+                    { blockerId: otherUserId, blockedId: req.user.id },
+                ],
+            },
+        });
+        if (blocked) return res.status(403).json({ error: 'Chat blocked' });
 
         const message = await prisma.dMMessage.create({
             data: {
@@ -162,22 +198,119 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
     }
 });
 
-// Report in DM → can lead to user block
+// Upload images for DM (returns URLs to then send in message)
+router.post('/:chatId/upload', authenticate, upload.array('images', 3), async (req, res) => {
+    try {
+        // Verify user is part of this chat
+        const chat = await prisma.dMChat.findFirst({
+            where: {
+                id: req.params.chatId,
+                OR: [
+                    { user1Id: req.user.id },
+                    { user2Id: req.user.id },
+                ],
+            },
+        });
+        if (!chat) return res.status(403).json({ error: 'Access denied' });
+
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: 'No images provided' });
+        }
+
+        const imageUrls = await uploadMultipleToCloudinary(req.files, 'dm/images');
+        res.json({ images: imageUrls });
+    } catch (error) {
+        console.error('DM image upload error:', error);
+        res.status(500).json({ error: 'Failed to upload images' });
+    }
+});
+
+// Block a user in DM
+router.post('/:chatId/block', authenticate, async (req, res) => {
+    try {
+        const chat = await prisma.dMChat.findFirst({
+            where: {
+                id: req.params.chatId,
+                OR: [
+                    { user1Id: req.user.id },
+                    { user2Id: req.user.id },
+                ],
+            },
+        });
+        if (!chat) return res.status(403).json({ error: 'Access denied' });
+
+        const otherUserId = chat.user1Id === req.user.id ? chat.user2Id : chat.user1Id;
+
+        // Check if already blocked
+        const existing = await prisma.block.findUnique({
+            where: { blockerId_blockedId: { blockerId: req.user.id, blockedId: otherUserId } },
+        });
+        if (existing) {
+            return res.json({ message: 'User already blocked' });
+        }
+
+        await prisma.block.create({
+            data: { blockerId: req.user.id, blockedId: otherUserId },
+        });
+
+        res.json({ message: 'User blocked successfully. You will no longer receive messages from them.' });
+    } catch (error) {
+        console.error('Block user error:', error);
+        res.status(500).json({ error: 'Failed to block user' });
+    }
+});
+
+// Unblock a user
+router.post('/:chatId/unblock', authenticate, async (req, res) => {
+    try {
+        const chat = await prisma.dMChat.findFirst({
+            where: {
+                id: req.params.chatId,
+                OR: [
+                    { user1Id: req.user.id },
+                    { user2Id: req.user.id },
+                ],
+            },
+        });
+        if (!chat) return res.status(403).json({ error: 'Access denied' });
+
+        const otherUserId = chat.user1Id === req.user.id ? chat.user2Id : chat.user1Id;
+
+        await prisma.block.deleteMany({
+            where: { blockerId: req.user.id, blockedId: otherUserId },
+        });
+
+        res.json({ message: 'User unblocked' });
+    } catch (error) {
+        console.error('Unblock user error:', error);
+        res.status(500).json({ error: 'Failed to unblock user' });
+    }
+});
+
+// Report in DM
 router.post('/:chatId/report', authenticate, async (req, res) => {
     try {
         const { messageId, reason } = req.body;
 
-        const message = await prisma.dMMessage.findUnique({
-            where: { id: messageId },
+        const chat = await prisma.dMChat.findFirst({
+            where: {
+                id: req.params.chatId,
+                OR: [
+                    { user1Id: req.user.id },
+                    { user2Id: req.user.id },
+                ],
+            },
         });
-        if (!message) return res.status(404).json({ error: 'Message not found' });
+        if (!chat) return res.status(403).json({ error: 'Access denied' });
+
+        const otherUserId = chat.user1Id === req.user.id ? chat.user2Id : chat.user1Id;
 
         await prisma.report.create({
             data: {
                 reporterUserId: req.user.id,
-                targetUserId: message.senderId,
-                targetType: 'DM_MESSAGE',
-                targetId: messageId,
+                targetUserId: messageId ? (await prisma.dMMessage.findUnique({ where: { id: messageId } }))?.senderId || otherUserId : otherUserId,
+                targetType: messageId ? 'DM_MESSAGE' : 'DM_USER',
+                targetId: messageId || req.params.chatId,
                 reason: reason || 'Vulgar/inappropriate language',
             },
         });

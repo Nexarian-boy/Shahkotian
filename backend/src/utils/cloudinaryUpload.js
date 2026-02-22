@@ -17,7 +17,9 @@ async function uploadToCloudinary(file, folder = 'shahkot') {
         resolve(result.secure_url);
       }
     );
-    stream.end(file.buffer);
+    // Support both multer file object (has .buffer) and raw Buffer
+    const buffer = Buffer.isBuffer(file) ? file : file.buffer;
+    stream.end(buffer);
   });
 }
 

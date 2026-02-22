@@ -275,7 +275,7 @@ router.post('/profile/photo', authenticate, uploadPhoto, async (req, res) => {
       return res.status(400).json({ error: 'No photo uploaded.' });
     }
 
-    const photoUrl = await uploadToCloudinary(req.file.buffer, 'profiles');
+    const photoUrl = await uploadToCloudinary(req.file, 'profiles');
 
     const user = await prisma.user.update({
       where: { id: req.user.id },

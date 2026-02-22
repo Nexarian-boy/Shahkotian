@@ -13,7 +13,10 @@ const router = express.Router();
  */
 router.get('/', authenticate, async (req, res) => {
   try {
-    const { sport, includeExpired } = req.query;
+    const { sport, includeExpired, page = 1, limit = 20 } = req.query;
+    const take = Math.min(parseInt(limit) || 20, 50);
+    const skip = (Math.max(parseInt(page) || 1, 1) - 1) * take;
+
     const where = { 
       ...(sport ? { sport } : {}),
       // Auto-hide expired tournaments unless explicitly requested
@@ -25,15 +28,20 @@ router.get('/', authenticate, async (req, res) => {
       } : {})
     };
 
-    const tournaments = await prisma.tournament.findMany({
-      where,
-      orderBy: { startDate: 'desc' },
-      include: {
-        _count: { select: { matches: true } },
-      },
-    });
+    const [tournaments, total] = await Promise.all([
+      prisma.tournament.findMany({
+        where,
+        orderBy: { startDate: 'desc' },
+        include: {
+          _count: { select: { matches: true } },
+        },
+        skip,
+        take,
+      }),
+      prisma.tournament.count({ where }),
+    ]);
 
-    res.json({ tournaments });
+    res.json({ tournaments, total, page: parseInt(page) || 1, totalPages: Math.ceil(total / take) });
   } catch (error) {
     console.error('Tournaments error:', error);
     res.status(500).json({ error: 'Failed to load tournaments.' });
@@ -102,6 +110,29 @@ router.post('/', authenticate, async (req, res) => {
       });
     }
 
+    // Validate dates
+    const startDateObj = new Date(startDate);
+    if (isNaN(startDateObj.getTime())) {
+      return res.status(400).json({
+        error: 'Invalid start date. Please use YYYY-MM-DD format (e.g., 2026-03-30)',
+      });
+    }
+
+    let endDateObj = null;
+    if (endDate) {
+      endDateObj = new Date(endDate);
+      if (isNaN(endDateObj.getTime())) {
+        return res.status(400).json({
+          error: 'Invalid end date. Please use YYYY-MM-DD format (e.g., 2026-04-15)',
+        });
+      }
+      if (endDateObj < startDateObj) {
+        return res.status(400).json({
+          error: 'End date cannot be before start date.',
+        });
+      }
+    }
+
     // Parse teams array
     let teamsArr = [];
     if (Array.isArray(teams)) teamsArr = teams.filter(Boolean);
@@ -116,8 +147,8 @@ router.post('/', authenticate, async (req, res) => {
         description,
         image: null,
         venue: tournVenue,
-        startDate: new Date(startDate),
-        endDate: endDate ? new Date(endDate) : null,
+        startDate: startDateObj,
+        endDate: endDateObj,
         createdById: req.user.id,
         teams: teamsArr,
         prize: prize || null,
