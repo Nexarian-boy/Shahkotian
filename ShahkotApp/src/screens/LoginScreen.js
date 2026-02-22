@@ -20,6 +20,7 @@ export default function LoginScreen({ navigation }) {
   // Form fields
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
 
@@ -67,13 +68,19 @@ export default function LoginScreen({ navigation }) {
       return;
     }
 
-    if (isRegistering && (!name.trim() || !phone.trim())) {
-      Alert.alert('Required', 'Please enter your name and phone number.');
+    if (isRegistering && (!name.trim() || !phone.trim() || !password.trim())) {
+      Alert.alert('Required', 'Please enter your name, phone number, and password.');
       return;
     }
 
-    if (!isRegistering && !phone.trim()) {
-      Alert.alert('Required', 'Please enter your phone number.');
+    if (!isRegistering && (!phone.trim() || !password.trim())) {
+      Alert.alert('Required', 'Please enter your phone number and password.');
+      return;
+    }
+
+    // Validate password is 8 digits
+    if (!/^\d{8}$/.test(password)) {
+      Alert.alert('Invalid Password', 'Password must be exactly 8 digits (numbers only).');
       return;
     }
 
@@ -87,6 +94,7 @@ export default function LoginScreen({ navigation }) {
         await register({
           name: name.trim(),
           phone: phone.trim(),
+          password: password.trim(),
           email: email.trim() || undefined,
           whatsapp: whatsapp.trim() || phone.trim(),
           firebaseUid,
@@ -95,7 +103,13 @@ export default function LoginScreen({ navigation }) {
         });
         Alert.alert('Welcome!', `Welcome to ${APP_NAME}, ${name}!`);
       } else {
-        await login(firebaseUid, location.latitude, location.longitude);
+        await login({
+          phone: phone.trim(),
+          password: password.trim(),
+          firebaseUid,
+          latitude: location.latitude,
+          longitude: location.longitude,
+        });
       }
     } catch (error) {
       const message =
@@ -179,6 +193,21 @@ export default function LoginScreen({ navigation }) {
               keyboardType="phone-pad"
               placeholderTextColor={COLORS.textLight}
             />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Password (8 digits) *</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter 8-digit password"
+              value={password}
+              onChangeText={setPassword}
+              keyboardType="number-pad"
+              maxLength={8}
+              secureTextEntry
+              placeholderTextColor={COLORS.textLight}
+            />
+            <Text style={styles.hint}>Password must be exactly 8 digits</Text>
           </View>
 
           {isRegistering && (
@@ -320,6 +349,12 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     borderWidth: 1,
     borderColor: COLORS.border,
+  },
+  hint: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   button: {
     backgroundColor: COLORS.primary,

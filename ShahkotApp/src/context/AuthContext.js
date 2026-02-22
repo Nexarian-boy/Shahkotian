@@ -31,8 +31,8 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (firebaseUid, latitude, longitude) => {
-    const response = await authAPI.login({ firebaseUid, latitude, longitude });
+  const login = async (loginData) => {
+    const response = await authAPI.login(loginData);
     const { token: newToken, user: newUser } = response.data;
 
     await Promise.all([

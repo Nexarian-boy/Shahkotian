@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { geofenceCheck } = require('../middleware/geofence');
@@ -25,11 +26,16 @@ const router = express.Router();
  */
 router.post('/register', async (req, res) => {
   try {
-    const { name, phone, email, whatsapp, firebaseUid, latitude, longitude } = req.body;
+    const { name, phone, email, whatsapp, password, firebaseUid, latitude, longitude } = req.body;
 
     // Validate required fields
-    if (!name || !phone || !firebaseUid) {
-      return res.status(400).json({ error: 'Name, phone, and Firebase UID are required.' });
+    if (!name || !phone || !password || !firebaseUid) {
+      return res.status(400).json({ error: 'Name, phone, password, and Firebase UID are required.' });
+    }
+
+    // Validate password is exactly 8 digits
+    if (!/^\d{8}$/.test(password)) {
+      return res.status(400).json({ error: 'Password must be exactly 8 digits (numbers only).' });
     }
 
     // Geofence disabled - allow registration from anywhere
@@ -37,7 +43,7 @@ router.post('/register', async (req, res) => {
     const userLat = latitude ? parseFloat(latitude) : null;
     const userLng = longitude ? parseFloat(longitude) : null;
 
-    // Check if user already exists
+    // Check if user already exists (phone or firebaseUid)
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
@@ -50,6 +56,23 @@ router.post('/register', async (req, res) => {
     if (existingUser) {
       return res.status(409).json({ error: 'User with this phone number already exists.' });
     }
+
+    // Check if email is already in use (only if email is provided)
+    if (email) {
+      const existingEmail = await prisma.user.findFirst({
+        where: { 
+          email: email,
+          NOT: { email: null }
+        },
+      });
+
+      if (existingEmail) {
+        return res.status(409).json({ error: 'This email is already registered.' });
+      }
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     // Determine role (first user or predefined admin phone/email becomes admin)
     const userCount = await prisma.user.count();
@@ -64,6 +87,7 @@ router.post('/register', async (req, res) => {
         phone,
         email: email || null,
         whatsapp: whatsapp || phone,
+        password: hashedPassword,
         firebaseUid,
         latitude: userLat,
         longitude: userLng,
@@ -103,20 +127,31 @@ router.post('/register', async (req, res) => {
  */
 router.post('/login', async (req, res) => {
   try {
-    const { firebaseUid, latitude, longitude } = req.body;
+    const { phone, password, firebaseUid, latitude, longitude } = req.body;
 
-    if (!firebaseUid) {
-      return res.status(400).json({ error: 'Firebase UID is required.' });
+    if (!phone || !password) {
+      return res.status(400).json({ error: 'Phone number and password are required.' });
+    }
+
+    // Validate password format
+    if (!/^\d{8}$/.test(password)) {
+      return res.status(400).json({ error: 'Password must be 8 digits.' });
     }
 
     // Geofence disabled - location check removed
 
     const user = await prisma.user.findUnique({
-      where: { firebaseUid },
+      where: { phone },
     });
 
     if (!user) {
       return res.status(404).json({ error: 'User not found. Please register first.' });
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid password. Please try again.' });
     }
 
     if (!user.isActive) {
