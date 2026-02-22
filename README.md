@@ -129,10 +129,12 @@ Then scan the QR code with **Expo Go** app, or press `a` to launch Android emula
 
 ## 📱 Features
 
-### 1. Location Restriction (Geofencing) - CURRENTLY DISABLED
-- **Geofencing is disabled** - App is accessible from anywhere in Pakistan
-- To enable: Set `SKIP_GEOFENCE=false` in `backend/.env` and update `isWithinShahkot()` in `ShahkotApp/src/utils/geolocation.js`
-- When enabled: Haversine formula checks user is within 50KM of Shahkot center (31.5709°N, 73.4853°E)
+### 1. Location Restriction (Geofencing)
+> ⚠️ **CURRENTLY DISABLED FOR TESTING** - See "Re-enabling Geofencing" section below
+
+- Haversine formula checks user is within 50KM of Shahkot center (31.9712°N, 73.4818°E)
+- When enabled, users outside the radius cannot register or access the app
+- Currently disabled to allow testing from any location
 
 ### 2. Social Feed (Posts)
 - Create text + image + video posts (max 5 images or 3 videos)
@@ -250,11 +252,11 @@ npx expo start --android  # Start with Android
 
 ## ⚠️ Important Notes
 
-1. **Geofencing Disabled**: Location restriction is currently DISABLED. The app can be used from anywhere. Set `SKIP_GEOFENCE=false` in backend/.env to re-enable.
-2. **Video Limits**: Posts can have up to 3 videos (max 3 minutes, 100MB each). Other features (Rishta, Marketplace, Open Chat) do not support videos for safety and moderation.
-3. **First User = Admin**: The first user to register with `ADMIN_PHONE` from `.env` becomes the admin
-4. **WhatsApp Required**: Marketplace listings require a WhatsApp number for buyer contact
-5. **CNIC Verification**: Rishta profiles require CNIC images — admin manually reviews before approval
+1. **Video Limits**: Posts can have up to 3 videos (max 3 minutes, 100MB each). Other features (Rishta, Marketplace, Open Chat) do not support videos for safety and moderation.
+2. **First User = Admin**: The first user to register with `ADMIN_PHONE` from `.env` becomes the admin
+3. **WhatsApp Required**: Marketplace listings require a WhatsApp number for buyer contact
+4. **CNIC Verification**: Rishta profiles require CNIC images — admin manually reviews before approval
+5. **Location Check**: App checks location on every launch — users who move outside Shahkot radius lose access
 6. **Rate Limiting**: API is rate-limited to 100 requests per 15 minutes per IP
 
 ---
@@ -272,6 +274,75 @@ npx eas build --platform android
 ```
 
 Update `PROD_API_URL` in `src/config/constants.js` before building.
+
+---
+
+## 🔒 Re-enabling Geofencing (After Testing)
+
+Geofencing is currently **DISABLED** for testing. To re-enable location restrictions:
+
+### Step 1: Frontend - `ShahkotApp/src/utils/geolocation.js`
+
+**Change FROM:**
+```javascript
+export function isWithinShahkot(latitude, longitude) {
+  // GEOFENCING DISABLED FOR TESTING
+  return { isWithin: true, distance: 0, maxRadius: GEOFENCE_RADIUS_KM };
+  // ... commented original code
+}
+```
+
+**Change TO:**
+```javascript
+export function isWithinShahkot(latitude, longitude) {
+  const distance = haversineDistance(
+    SHAHKOT_CENTER.lat,
+    SHAHKOT_CENTER.lng,
+    latitude,
+    longitude
+  );
+
+  return {
+    isWithin: distance <= GEOFENCE_RADIUS_KM,
+    distance: Math.round(distance * 100) / 100,
+    maxRadius: GEOFENCE_RADIUS_KM,
+  };
+}
+```
+
+### Step 2: Frontend - `ShahkotApp/src/screens/LoginScreen.js`
+
+Find the `checkLocation` function and:
+1. **Remove** the bypass code that always sets location valid
+2. **Uncomment** the original geofence checking code (marked with "ORIGINAL CODE")
+
+### Step 3: Backend - `backend/.env`
+
+**Change:**
+```env
+SKIP_GEOFENCE=true
+```
+
+**To:**
+```env
+SKIP_GEOFENCE=false
+```
+
+### Step 4: Rebuild and Redeploy
+
+```bash
+# Push changes to GitHub
+cd E:\Shahkot
+git add .
+git commit -m "Re-enable geofencing for production"
+git push origin master
+
+# Rebuild app
+cd ShahkotApp
+eas build --platform android --profile production
+
+# Redeploy backend on Render (automatic if connected to GitHub)
+```
 
 ---
 
