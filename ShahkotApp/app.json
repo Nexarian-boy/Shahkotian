@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Apna Shahkot",
-    "slug": "apna-shahkot",
+    "slug": "shahkot-tigers",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,6 +15,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.salman38.shahkotapp",
       "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Shahkot App needs your location to verify you are within the Shahkot area.",
         "NSLocationAlwaysUsageDescription": "Shahkot App needs your location to verify you are within the Shahkot area.",
         "NSCameraUsageDescription": "Shahkot App needs camera access to upload profile photos and post images.",
