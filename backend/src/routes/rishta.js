@@ -254,6 +254,19 @@ router.post('/interest/:profileId', authenticate, verifiedOnly, async (req, res)
       data: { fromUserId: req.user.id, profileId, status: 'PENDING' },
     });
 
+    // Notify the profile owner
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: profile.userId,
+          title: '💝 New Rishta Interest',
+          body: `${req.user.name} has sent you a rishta interest. Check your Interests tab!`,
+        },
+      });
+    } catch (notifErr) {
+      console.error('Notification error (interest sent):', notifErr);
+    }
+
     res.json({ message: 'Interest sent successfully!' });
   } catch (error) {
     console.error('Send interest error:', error);
@@ -345,6 +358,19 @@ router.put('/interest/:interestId/accept', authenticate, verifiedOnly, async (re
           source: 'RISHTA',
         },
       });
+    }
+
+    // Notify the person whose interest was accepted
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: interest.fromUserId,
+          title: '✅ Rishta Interest Accepted!',
+          body: `${req.user.name} accepted your rishta interest! A private chat has been created.`,
+        },
+      });
+    } catch (notifErr) {
+      console.error('Notification error (interest accepted):', notifErr);
     }
 
     res.json({
