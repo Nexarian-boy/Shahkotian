@@ -229,6 +229,19 @@ router.post('/:id/apply', authenticate, async (req, res) => {
       },
     });
 
+    // Notify the job poster
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: job.userId,
+          title: '📋 New Job Application',
+          body: `${req.user.name} applied to your job posting "${job.title}".`,
+        },
+      });
+    } catch (notifErr) {
+      console.error('Notification error (job apply):', notifErr);
+    }
+
     res.status(201).json(application);
   } catch (error) {
     console.error('Apply job error:', error);

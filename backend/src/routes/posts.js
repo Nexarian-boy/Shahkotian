@@ -203,6 +203,10 @@ router.post('/:id/like', authenticate, async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Fetch post to get owner info
+    const post = await prisma.post.findUnique({ where: { id }, select: { id: true, userId: true } });
+    if (!post) return res.status(404).json({ error: 'Post not found.' });
+
     // Check if already liked
     const existingLike = await prisma.like.findUnique({
       where: {
@@ -225,6 +229,22 @@ router.post('/:id/like', authenticate, async (req, res) => {
           userId: req.user.id,
         },
       });
+
+      // Notify post owner (skip self-likes)
+      if (post.userId !== req.user.id) {
+        try {
+          await prisma.notification.create({
+            data: {
+              userId: post.userId,
+              title: '❤️ Someone liked your post',
+              body: `${req.user.name} liked your post.`,
+            },
+          });
+        } catch (notifErr) {
+          console.error('Notification error (post like):', notifErr);
+        }
+      }
+
       res.json({ message: 'Post liked!', liked: true });
     }
   } catch (error) {

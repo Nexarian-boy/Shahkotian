@@ -66,8 +66,11 @@ export default function RishtaScreen({ navigation }) {
       if (filters.gender) params.gender = filters.gender;
       if (filters.minAge) params.minAge = filters.minAge;
       if (filters.maxAge) params.maxAge = filters.maxAge;
-      const response = await rishtaAPI.getProfiles(params);
-      setProfiles(response.data.profiles);
+      const [profilesRes] = await Promise.all([
+        rishtaAPI.getProfiles(params),
+        rishtaAPI.getSentInterests().then(r => setSentInterests(r.data.sentInterests || [])).catch(() => {}),
+      ]);
+      setProfiles(profilesRes.data.profiles);
     } catch (error) {
       console.error('Rishta profiles error:', error);
     }
@@ -574,20 +577,31 @@ export default function RishtaScreen({ navigation }) {
                 {item.familyDetails && <Text style={styles.detailItem}>👨‍👩‍👧 {item.familyDetails}</Text>}
                 {item.preferences && <Text style={styles.detailItem}>💝 Looking for: {item.preferences}</Text>}
               </View>
-              {item.images && item.images.length > 0 && (
-                <View style={{ marginBottom: 8 }}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {item.images.map((uri, i) => (
-                      <View key={i} style={{ marginRight: 6, borderRadius: 8, overflow: 'hidden' }}>
-                        <Image source={{ uri }} style={{ width: 70, height: 70 }} blurRadius={20} />
-                      </View>
-                    ))}
-                  </ScrollView>
-                  <Text style={{ fontSize: 11, color: COLORS.textLight, marginTop: 4, fontStyle: 'italic' }}>
-                    🔒 Photos visible after interest accepted
-                  </Text>
-                </View>
-              )}
+              {item.images && item.images.length > 0 && (() => {
+                const interestAccepted = sentInterests.some(
+                  si => si.profile?.id === item.id && si.status === 'ACCEPTED'
+                );
+                return (
+                  <View style={{ marginBottom: 8 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {item.images.map((uri, i) => (
+                        <View key={i} style={{ marginRight: 6, borderRadius: 8, overflow: 'hidden' }}>
+                          <Image
+                            source={{ uri }}
+                            style={{ width: 70, height: 70 }}
+                            blurRadius={interestAccepted ? 0 : 20}
+                          />
+                        </View>
+                      ))}
+                    </ScrollView>
+                    {!interestAccepted && (
+                      <Text style={{ fontSize: 11, color: COLORS.textLight, marginTop: 4, fontStyle: 'italic' }}>
+                        🔒 Photos visible after interest accepted
+                      </Text>
+                    )}
+                  </View>
+                );
+              })()}
               <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.shortlistBtn} onPress={() => addToShortlist(item.id)}>
                   <Text style={styles.shortlistText}>⭐ Shortlist</Text>
