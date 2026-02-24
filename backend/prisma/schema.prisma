@@ -98,6 +98,7 @@ model User {
   notifications Notification[]
   bloodDonors   BloodDonor[]
   shops         Shop[]
+  newsArticles  News[]
   chatMessages  ChatMessage[]
   sentInterests RishtaInterest[]  @relation("SentInterests")
   shortlists    RishtaShortlist[] @relation("UserShortlists")
@@ -319,6 +320,7 @@ model NewsReporter {
 model News {
   id         String       @id @default(uuid())
   reporterId String?
+  userId     String?      // Allow regular users to post news
   title      String
   content    String
   images     String[]
@@ -327,9 +329,11 @@ model News {
   updatedAt  DateTime     @updatedAt
 
   reporter NewsReporter? @relation(fields: [reporterId], references: [id], onDelete: SetNull)
+  user     User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([createdAt(sort: Desc)])
   @@index([category])
+  @@index([userId])
 }
 
 model Notification {

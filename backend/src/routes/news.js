@@ -76,6 +76,9 @@ router.get('/', authenticate, async (req, res) => {
           reporter: {
             select: { name: true },
           },
+          user: {
+            select: { name: true, photoUrl: true },
+          },
         },
       }),
       prisma.news.count({ where }),
@@ -125,6 +128,9 @@ router.get('/:id', authenticate, async (req, res) => {
         reporter: {
           select: { name: true },
         },
+        user: {
+          select: { name: true, photoUrl: true },
+        },
       },
     });
 
@@ -138,42 +144,10 @@ router.get('/:id', authenticate, async (req, res) => {
 
 /**
  * POST /api/news
- * Create news article (REPORTERS or ADMIN)
+ * Create news article (ALL AUTHENTICATED USERS)
  */
-router.post('/', upload.array('images', 5), async (req, res) => {
+router.post('/', authenticate, upload.array('images', 5), async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Access denied.' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    let reporterId = null;
-    let authorName = 'Admin';
-
-    // Check if reporter token
-    if (decoded.reporterId) {
-      const reporter = await prisma.newsReporter.findUnique({
-        where: { id: decoded.reporterId },
-      });
-      if (!reporter || !reporter.isActive) {
-        return res.status(403).json({ error: 'Reporter account not found or disabled.' });
-      }
-      reporterId = reporter.id;
-      authorName = reporter.name;
-    } else if (decoded.userId) {
-      // Check if admin user (decoded.userId is correct – auth.js signs with userId)
-      const adminUser = await prisma.user.findUnique({ where: { id: decoded.userId } });
-      if (!adminUser || adminUser.role !== 'ADMIN') {
-        return res.status(403).json({ error: 'Only reporters and admins can post news.' });
-      }
-      authorName = adminUser.name;
-    } else {
-      return res.status(403).json({ error: 'Invalid token.' });
-    }
-
     const { title, content, category } = req.body;
 
     if (!title || !content || !category) {
@@ -186,20 +160,27 @@ router.post('/', upload.array('images', 5), async (req, res) => {
       imageUrls = await uploadMultipleImages(req.files);
     }
 
+    // Create news article linked to authenticated user
     const article = await prisma.news.create({
       data: {
-        reporterId,
+        userId: req.user.id,  // Link to authenticated user
         title,
         content,
         images: imageUrls,
         category,
       },
       include: {
-        reporter: { select: { name: true } },
+        user: { select: { name: true, photoUrl: true } },
       },
     });
 
-    res.status(201).json({ message: 'News article published!', article: { ...article, authorName } });
+    res.status(201).json({ 
+      message: 'News article published!', 
+      article: { 
+        ...article, 
+        authorName: req.user.name 
+      } 
+    });
   } catch (error) {
     console.error('Create news error:', error);
     res.status(500).json({ error: 'Failed to publish news.' });

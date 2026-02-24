@@ -13,6 +13,7 @@ export default function NewsScreen() {
   const { isAdmin } = useAuth();
   const [news, setNews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedArticle, setSelectedArticle] = useState(null);
 
@@ -38,6 +39,7 @@ export default function NewsScreen() {
       console.error('News error:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -111,7 +113,7 @@ export default function NewsScreen() {
         <Text style={styles.articleTitle}>{item.title}</Text>
         <Text style={styles.articleContent} numberOfLines={3}>{item.content}</Text>
         <View style={styles.articleFooter}>
-          <Text style={styles.reporterName}>✍️ {item.reporter?.name || 'Admin'}</Text>
+          <Text style={styles.reporterName}>✍️ {item.user?.name || item.reporter?.name || 'Admin'}</Text>
           <Text style={styles.articleDate}>
             {new Date(item.createdAt).toLocaleDateString('en-PK', {
               day: 'numeric', month: 'short', year: 'numeric',
@@ -189,7 +191,7 @@ export default function NewsScreen() {
                 <Text style={styles.categoryBadgeText}>{selectedArticle.category}</Text>
               </View>
               <Text style={[styles.articleTitle, { fontSize: 22 }]}>{selectedArticle.title}</Text>
-              <Text style={styles.reporterName}>✍️ {selectedArticle.reporter?.name || 'Admin'}</Text>
+              <Text style={styles.reporterName}>✍️ {selectedArticle.user?.name || selectedArticle.reporter?.name || 'Admin'}</Text>
               <Text style={styles.articleDate}>
                 {new Date(selectedArticle.createdAt).toLocaleDateString('en-PK', {
                   day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
