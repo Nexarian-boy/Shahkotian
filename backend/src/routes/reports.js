@@ -43,7 +43,7 @@ router.get('/', authenticate, adminOnly, async (req, res) => {
                 orderBy: { createdAt: 'desc' },
                 include: {
                     reporter: { select: { id: true, name: true } },
-                    targetUser: { select: { id: true, name: true } },
+                    target: { select: { id: true, name: true } },
                 },
             }),
             prisma.report.count({
@@ -69,7 +69,7 @@ router.put('/:id/action', authenticate, adminOnly, async (req, res) => {
         if (!report) return res.status(404).json({ error: 'Report not found' });
 
         const act = (action || '').toUpperCase();
-        if ((act === 'BLOCK' || act === 'block') && report.targetUserId) {
+        if (act === 'BLOCK' && report.targetUserId) {
             await prisma.user.update({
                 where: { id: report.targetUserId },
                 data: { isBlocked: true, isActive: false },
