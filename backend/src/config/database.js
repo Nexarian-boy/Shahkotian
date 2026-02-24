@@ -209,30 +209,181 @@ class DatabaseManager {
 
 const dbManager = new DatabaseManager();
 
+// ─── Read methods vs Write methods ───────────────────────────────────────────
+const READ_METHODS = new Set([
+  'findMany', 'findFirst', 'findUnique',
+  'findFirstOrThrow', 'findUniqueOrThrow',
+  'count', 'aggregate', 'groupBy',
+]);
+const WRITE_METHODS = new Set([
+  'create', 'createMany', 'createManyAndReturn',
+  'update', 'updateMany', 'updateManyAndReturn',
+  'delete', 'deleteMany',
+  'upsert',
+]);
+
+// Returns all DB clients that are connected and available (including full/read-only ones)
+function getAllClients(manager) {
+  return manager.databases
+    .filter(db => db.client && db.isAvailable !== false)
+    .map(db => db.client);
+}
+
+// Create a smart model proxy that:
+//   - For WRITEs: uses only the active (non-full) DB
+//   - For findMany: queries ALL DBs, merges + deduplicates + re-sorts
+//   - For findFirst/findUnique: tries active first, then fallback to other DBs
+//   - For count: sums across all DBs
+//   - For other reads: uses active DB only
+function createModelProxy(modelName, manager) {
+  return new Proxy({}, {
+    get(target, method) {
+      if (typeof method !== 'string') return undefined;
+
+      return async (...args) => {
+        // ── WRITES: active DB only ──────────────────────────────────────────
+        if (WRITE_METHODS.has(method)) {
+          const activeClient = await manager.getActiveClient();
+          return activeClient[modelName][method](...args);
+        }
+
+        const allClients = getAllClients(manager);
+
+        // ── count: sum from all DBs ──────────────────────────────────────────
+        if (method === 'count') {
+          if (allClients.length <= 1) {
+            const c = await manager.getActiveClient();
+            return c[modelName].count(...args);
+          }
+          const counts = await Promise.allSettled(
+            allClients.map(c => c[modelName].count(...args))
+          );
+          return counts.reduce((sum, r) => sum + (r.status === 'fulfilled' ? (r.value || 0) : 0), 0);
+        }
+
+        // ── aggregate / groupBy: active DB only (too complex to merge) ──────
+        if (method === 'aggregate' || method === 'groupBy') {
+          const c = await manager.getActiveClient();
+          return c[modelName][method](...args);
+        }
+
+        // ── findMany: merge from ALL DBs ─────────────────────────────────────
+        if (method === 'findMany') {
+          if (allClients.length <= 1) {
+            const c = await manager.getActiveClient();
+            return c[modelName].findMany(...args);
+          }
+
+          const opts = args[0] || {};
+          const { take, skip, orderBy, ...restOpts } = opts;
+
+          // Query each DB without take/skip so we get everything to merge
+          const settled = await Promise.allSettled(
+            allClients.map(c => c[modelName].findMany({ ...restOpts, take: undefined, skip: undefined }))
+          );
+
+          const seen = new Set();
+          const merged = [];
+          for (const res of settled) {
+            if (res.status !== 'fulfilled') continue;
+            for (const item of res.value) {
+              const key = item.id || JSON.stringify(item);
+              if (!seen.has(key)) {
+                seen.add(key);
+                merged.push(item);
+              }
+            }
+          }
+
+          // Re-sort by the original orderBy (supports simple single-field orderBy)
+          if (orderBy) {
+            const ob = Array.isArray(orderBy) ? orderBy[0] : orderBy;
+            const [field, dir] = Object.entries(ob)[0];
+            const order = (typeof dir === 'string' ? dir : dir?.sort || 'asc').toLowerCase();
+            merged.sort((a, b) => {
+              const av = a[field], bv = b[field];
+              if (av == null && bv == null) return 0;
+              if (av == null) return 1;
+              if (bv == null) return -1;
+              const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+              return order === 'desc' ? -cmp : cmp;
+            });
+          } else if (merged.length > 0 && merged[0]?.createdAt) {
+            // Default: newest first
+            merged.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+          }
+
+          // Apply skip/take
+          const s = skip || 0;
+          const sliced = merged.slice(s);
+          return take ? sliced.slice(0, take) : sliced;
+        }
+
+        // ── findFirst / findUnique: active DB first, fallback to others ──────
+        if (method === 'findFirst' || method === 'findFirstOrThrow' ||
+            method === 'findUnique' || method === 'findUniqueOrThrow') {
+          const activeClient = await manager.getActiveClient();
+          try {
+            const result = await activeClient[modelName][method](...args);
+            if (result !== null && result !== undefined) return result;
+          } catch (e) {
+            if (method.endsWith('OrThrow')) {
+              // Try other DBs before throwing
+            } else {
+              throw e;
+            }
+          }
+
+          // Not found in active DB — check other DBs (item may be in an old full DB)
+          for (const db of manager.databases) {
+            if (db.index === manager.activeIndex || !db.client || db.isAvailable === false) continue;
+            try {
+              const baseMethod = method.replace('OrThrow', '');
+              const result = await db.client[modelName][baseMethod](...args);
+              if (result !== null && result !== undefined) return result;
+            } catch (_) {}
+          }
+
+          // If OrThrow and still not found, let active client throw the proper error
+          if (method.endsWith('OrThrow')) {
+            return activeClient[modelName][method](...args);
+          }
+          return null;
+        }
+
+        // ── Default: use active DB ────────────────────────────────────────────
+        const c = await manager.getActiveClient();
+        const fn = c[modelName][method];
+        if (typeof fn === 'function') return fn.call(c[modelName], ...args);
+        return fn;
+      };
+    },
+  });
+}
+
+// ─── Main Prisma Proxy ────────────────────────────────────────────────────────
 const prismaProxy = new Proxy({}, {
   get(target, prop) {
     if (prop === '__dbManager') return dbManager;
     if (prop === '$connect') return () => dbManager.initialize();
     if (prop === '$disconnect') return () => dbManager.disconnectAll();
 
-    // Try active database client first
-    const active = dbManager.databases[dbManager.activeIndex];
-    if (active && active.client) {
-      const val = active.client[prop];
-      if (val !== undefined && val !== null) {
-        // Prisma model delegates (prisma.user, prisma.post etc.) are objects, not functions.
-        // Only bind if it's actually a function, otherwise return as-is.
-        return typeof val === 'function' ? val.bind(active.client) : val;
-      }
+    // Special Prisma client methods — route to active client
+    if (typeof prop === 'string' && prop.startsWith('$')) {
+      return async (...args) => {
+        const c = await dbManager.getActiveClient();
+        const fn = c[prop];
+        return typeof fn === 'function' ? fn.call(c, ...args) : fn;
+      };
     }
 
-    // Fallback to single-DB client
-    if (!dbManager._fallback) {
-      dbManager._fallback = new PrismaClient({ log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'] });
+    // Model delegates — return a smart read/write proxy
+    if (typeof prop === 'string') {
+      return createModelProxy(prop, dbManager);
     }
-    const fval = dbManager._fallback[prop];
-    return typeof fval === 'function' ? fval.bind(dbManager._fallback) : fval;
-  }
+
+    return undefined;
+  },
 });
 
 module.exports = prismaProxy;

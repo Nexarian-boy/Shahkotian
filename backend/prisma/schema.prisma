@@ -75,13 +75,13 @@ enum BloodGroup {
 model User {
   id            String   @id @default(uuid())
   name          String
-  phone         String   @unique
-  email         String?
+  phone         String?  @unique
+  email         String?  @unique
   whatsapp      String?
-  password      String?  // Hashed password (8 digits) - required for new users
+  password      String?  // Hashed password - required for new users
   photoUrl      String?
   role          Role     @default(USER)
-  firebaseUid   String   @unique
+  firebaseUid   String?  @unique
   latitude      Float?
   longitude     Float?
   isActive      Boolean  @default(true)
@@ -110,6 +110,8 @@ model User {
   reportsReceived  Report[]   @relation("ReportTarget")
   blockedUsers     Block[]    @relation("Blocker")
   blockedByUsers   Block[]    @relation("Blocked")
+  jobs             Job[]
+  jobApplications  JobApplication[]
 
   @@index([latitude, longitude])
 }
@@ -343,40 +345,6 @@ model Notification {
   @@index([userId, isRead])
 }
 
-model PoliceAnnouncement {
-  id          String   @id @default(uuid())
-  title       String
-  content     String
-  category    String   @default("GENERAL") // GENERAL, SAFETY, MISSING_PERSON, WANTED, TRAFFIC, EMERGENCY
-  images      String[]
-  isUrgent    Boolean  @default(false)
-  contactNumber String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([createdAt(sort: Desc)])
-}
-
-model LiveEvent {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  streamUrl   String?  // YouTube/Facebook live URL, or RTMP URL
-  videoUrl    String?  // Saved video URL (uploaded/recorded)
-  thumbnailUrl String?
-  category    String   @default("GENERAL") // SPORTS, RELIGIOUS, CULTURAL, POLITICAL, GENERAL
-  isLive      Boolean  @default(false)
-  scheduledAt DateTime?
-  endedAt     DateTime?
-  venue       String?
-  createdBy   String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([isLive])
-  @@index([createdAt(sort: Desc)])
-}
-
 model ChatMessage {
   id        String   @id @default(uuid())
   userId    String
@@ -484,6 +452,86 @@ model Block {
   @@unique([blockerId, blockedId])
   @@index([blockerId])
   @@index([blockedId])
+}
+
+// ============ EMAIL OTP ============
+
+model EmailOtp {
+  id        String   @id @default(uuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// ============ JOBS ============
+
+enum JobType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERNSHIP
+  DAILY_WAGE
+}
+
+enum JobCategory {
+  TEACHING
+  MEDICAL
+  IT
+  DRIVING
+  LABOUR
+  SHOP_WORK
+  OFFICE
+  COOKING
+  TAILORING
+  AGRICULTURE
+  OTHER
+}
+
+model Job {
+  id           String      @id @default(uuid())
+  userId       String
+  title        String
+  company      String
+  description  String
+  category     JobCategory
+  type         JobType     @default(FULL_TIME)
+  salary       String?     // e.g., "20,000 - 30,000 PKR" or "Negotiable"
+  location     String      @default("Shahkot")
+  phone        String
+  whatsapp     String?
+  requirements String?
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications JobApplication[]
+
+  @@index([category])
+  @@index([type])
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([isActive, createdAt(sort: Desc)])
+}
+
+model JobApplication {
+  id        String   @id @default(uuid())
+  jobId     String
+  userId    String
+  message   String?
+  phone     String
+  createdAt DateTime @default(now())
+
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, userId])
+  @@index([jobId])
+  @@index([userId])
 }
 
 // ============ DOCTORS & CLINICS ============

@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
 const { authenticate, adminOnly } = require('../middleware/auth');
 const { upload } = require('../utils/upload');
-const { uploadMultipleToCloudinary } = require('../utils/cloudinaryUpload');
+const { uploadMultipleImages } = require('../utils/imageUpload');
 
 const router = express.Router();
 
@@ -183,7 +183,7 @@ router.post('/', upload.array('images', 5), async (req, res) => {
     // Upload images
     let imageUrls = [];
     if (req.files && req.files.length > 0) {
-      imageUrls = await uploadMultipleToCloudinary(req.files, 'news');
+      imageUrls = await uploadMultipleImages(req.files);
     }
 
     const article = await prisma.news.create({

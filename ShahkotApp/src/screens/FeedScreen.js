@@ -212,11 +212,11 @@ export default function FeedScreen({ navigation }) {
   const handleShare = async (post) => {
     try {
       const message = post.text
-        ? `${post.text}\n\n- Shared from Shahkot App`
-        : 'Check out this post from Shahkot App!';
+        ? `${post.text}\n\n- Shared from Apna Shahkot`
+        : 'Check out this post from Apna Shahkot!';
       await Share.share({
         message,
-        title: 'Shahkot App',
+        title: 'Apna Shahkot',
       });
     } catch (error) {
       console.error('Share error:', error);
@@ -390,9 +390,13 @@ export default function FeedScreen({ navigation }) {
           style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}
           onPress={() => setShowCreate(!showCreate)}
         >
-          <View style={styles.miniAvatar}>
-            <Text style={styles.miniAvatarText}>{user?.name?.[0] || '?'}</Text>
-          </View>
+          {user?.photoUrl ? (
+            <Image source={{ uri: user.photoUrl }} style={styles.miniAvatar} />
+          ) : (
+            <View style={styles.miniAvatar}>
+              <Text style={styles.miniAvatarText}>{user?.name?.[0] || '?'}</Text>
+            </View>
+          )}
           <Text style={styles.createPlaceholder}>What's on your mind?</Text>
           <Text style={styles.cameraIcon}>📷</Text>
         </TouchableOpacity>
@@ -516,9 +520,13 @@ export default function FeedScreen({ navigation }) {
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <View style={styles.commentItem}>
-                  <View style={styles.commentAvatar}>
-                    <Text style={styles.commentAvatarText}>{item.user?.name?.[0] || '?'}</Text>
-                  </View>
+                  {item.user?.photoUrl ? (
+                    <Image source={{ uri: item.user.photoUrl }} style={styles.commentAvatar} />
+                  ) : (
+                    <View style={styles.commentAvatar}>
+                      <Text style={styles.commentAvatarText}>{item.user?.name?.[0] || '?'}</Text>
+                    </View>
+                  )}
                   <View style={styles.commentContent}>
                     <Text style={styles.commentUser}>{item.user?.name}</Text>
                     <Text style={styles.commentText}>{item.text}</Text>

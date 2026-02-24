@@ -2,7 +2,7 @@ const express = require('express');
 const prisma = require('../config/database');
 const { authenticate, adminOnly } = require('../middleware/auth');
 const { uploadSingle } = require('../utils/upload');
-const { uploadToCloudinary } = require('../utils/cloudinaryUpload');
+// Images no longer needed for tournaments (handled by freeimage.host if required)
 
 const router = express.Router();
 

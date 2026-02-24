@@ -19,6 +19,8 @@ export default function RishtaScreen({ navigation }) {
   const [agreed, setAgreed] = useState(false);
   const [activeTab, setActiveTab] = useState('browse'); // browse, interests, shortlist
   const [interests, setInterests] = useState([]);
+  const [sentInterests, setSentInterests] = useState([]);
+  const [interestSubTab, setInterestSubTab] = useState('received'); // received, sent
   const [shortlisted, setShortlisted] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({ gender: '', minAge: '', maxAge: '' });
@@ -77,6 +79,15 @@ export default function RishtaScreen({ navigation }) {
       setInterests(response.data.interests || []);
     } catch (error) {
       console.error('Load interests error:', error);
+    }
+  };
+
+  const loadSentInterests = async () => {
+    try {
+      const response = await rishtaAPI.getSentInterests();
+      setSentInterests(response.data.sentInterests || []);
+    } catch (error) {
+      console.error('Load sent interests error:', error);
     }
   };
 
@@ -435,6 +446,14 @@ export default function RishtaScreen({ navigation }) {
   // Approved - Show profiles with tabs
   return (
     <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.rishtaHeader}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.rishtaBackBtn}>
+          <Text style={styles.rishtaBackIcon}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.rishtaHeaderTitle}>💍 Rishta</Text>
+        <View style={{ width: 38 }} />
+      </View>
       {/* Tabs */}
       <View style={styles.tabsRow}>
         {[
@@ -447,7 +466,7 @@ export default function RishtaScreen({ navigation }) {
             style={[styles.tab, activeTab === tab.key && styles.tabActive]}
             onPress={() => {
               setActiveTab(tab.key);
-              if (tab.key === 'interests') loadInterests();
+              if (tab.key === 'interests') { loadInterests(); loadSentInterests(); }
               if (tab.key === 'shortlist') loadShortlisted();
             }}
           >
@@ -556,11 +575,18 @@ export default function RishtaScreen({ navigation }) {
                 {item.preferences && <Text style={styles.detailItem}>💝 Looking for: {item.preferences}</Text>}
               </View>
               {item.images && item.images.length > 0 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
-                  {item.images.map((uri, i) => (
-                    <Image key={i} source={{ uri }} style={{ width: 70, height: 70, borderRadius: 8, marginRight: 6 }} />
-                  ))}
-                </ScrollView>
+                <View style={{ marginBottom: 8 }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {item.images.map((uri, i) => (
+                      <View key={i} style={{ marginRight: 6, borderRadius: 8, overflow: 'hidden' }}>
+                        <Image source={{ uri }} style={{ width: 70, height: 70 }} blurRadius={20} />
+                      </View>
+                    ))}
+                  </ScrollView>
+                  <Text style={{ fontSize: 11, color: COLORS.textLight, marginTop: 4, fontStyle: 'italic' }}>
+                    🔒 Photos visible after interest accepted
+                  </Text>
+                </View>
               )}
               <View style={styles.actionRow}>
                 <TouchableOpacity style={styles.shortlistBtn} onPress={() => addToShortlist(item.id)}>
@@ -584,61 +610,138 @@ export default function RishtaScreen({ navigation }) {
 
       {/* Interests Tab */}
       {activeTab === 'interests' && (
-        <FlatList
-          data={interests}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 12 }}
-          renderItem={({ item }) => (
-            <View style={styles.interestCard}>
-              <View style={styles.profileHeader}>
-                <View style={styles.profileAvatar}>
-                  <Text style={styles.profileAvatarText}>{item.fromUser?.name?.[0]}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.profileName}>{item.fromUser?.name}</Text>
-                  <Text style={styles.interestStatus}>
-                    {item.status === 'PENDING' ? '⏳ Pending' : item.status === 'ACCEPTED' ? '✅ Accepted' : '❌ Declined'}
-                  </Text>
-                </View>
-              </View>
-              {item.status === 'PENDING' && (
-                <View style={styles.responseRow}>
-                  <TouchableOpacity style={styles.rejectBtn} onPress={() => respondToInterest(item.id, false)}>
-                    <Text style={styles.rejectText}>✗ Decline</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.acceptBtn} onPress={() => respondToInterest(item.id, true)}>
-                    <Text style={styles.acceptText}>✓ Accept</Text>
-                  </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          {/* Sub-tabs: Received / Sent */}
+          <View style={styles.subTabRow}>
+            <TouchableOpacity
+              style={[styles.subTab, interestSubTab === 'received' && styles.subTabActive]}
+              onPress={() => { setInterestSubTab('received'); loadInterests(); }}
+            >
+              <Text style={[styles.subTabText, interestSubTab === 'received' && styles.subTabTextActive]}>
+                Received ({interests.length})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.subTab, interestSubTab === 'sent' && styles.subTabActive]}
+              onPress={() => { setInterestSubTab('sent'); loadSentInterests(); }}
+            >
+              <Text style={[styles.subTabText, interestSubTab === 'sent' && styles.subTabTextActive]}>
+                Sent ({sentInterests.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Received Interests */}
+          {interestSubTab === 'received' && (
+            <FlatList
+              data={interests}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ padding: 12 }}
+              renderItem={({ item }) => (
+                <View style={styles.interestCard}>
+                  <View style={styles.profileHeader}>
+                    <View style={styles.profileAvatar}>
+                      <Text style={styles.profileAvatarText}>{item.fromUser?.name?.[0]}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.profileName}>{item.fromUser?.name}</Text>
+                      <Text style={styles.interestStatus}>
+                        {item.status === 'PENDING' ? '⏳ Pending' : item.status === 'ACCEPTED' ? '✅ Accepted' : '❌ Declined'}
+                      </Text>
+                    </View>
+                  </View>
+                  {item.status === 'PENDING' && (
+                    <View style={styles.responseRow}>
+                      <TouchableOpacity style={styles.rejectBtn} onPress={() => respondToInterest(item.id, false)}>
+                        <Text style={styles.rejectText}>✗ Decline</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.acceptBtn} onPress={() => respondToInterest(item.id, true)}>
+                        <Text style={styles.acceptText}>✓ Accept</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  {item.status === 'ACCEPTED' && (
+                    <TouchableOpacity
+                      style={styles.chatBtn}
+                      onPress={async () => {
+                        try {
+                          const res = await dmAPI.startChat(item.fromUser.id, 'RISHTA');
+                          navigation.navigate('DMChat', {
+                            chatId: res.data.id,
+                            otherUser: item.fromUser,
+                            source: 'RISHTA',
+                          });
+                        } catch (err) {
+                          Alert.alert('Error', 'Could not open chat');
+                        }
+                      }}
+                    >
+                      <Text style={styles.chatBtnText}>💬 Open Private Chat</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
-              {item.status === 'ACCEPTED' && (
-                <TouchableOpacity
-                  style={styles.chatBtn}
-                  onPress={async () => {
-                    try {
-                      const res = await dmAPI.startChat(item.fromUser.id, 'RISHTA');
-                      navigation.navigate('DMChat', {
-                        chatId: res.data.id,
-                        otherUser: item.fromUser,
-                        source: 'RISHTA',
-                      });
-                    } catch (err) {
-                      Alert.alert('Error', 'Could not open chat');
-                    }
-                  }}
-                >
-                  <Text style={styles.chatBtnText}>💬 Open Private Chat</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Text style={styles.emptyIcon}>💝</Text>
+                  <Text style={styles.emptyText}>No interests received yet</Text>
+                </View>
+              }
+            />
           )}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>💝</Text>
-              <Text style={styles.emptyText}>No interests yet</Text>
-            </View>
-          }
-        />
+
+          {/* Sent Interests */}
+          {interestSubTab === 'sent' && (
+            <FlatList
+              data={sentInterests}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ padding: 12 }}
+              renderItem={({ item }) => {
+                const profileUser = item.profile?.user;
+                return (
+                  <View style={styles.interestCard}>
+                    <View style={styles.profileHeader}>
+                      <View style={[styles.profileAvatar, { backgroundColor: '#8B5CF6' }]}>
+                        <Text style={styles.profileAvatarText}>{profileUser?.name?.[0] || '?'}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.profileName}>{profileUser?.name || 'User'}</Text>
+                        <Text style={styles.interestStatus}>
+                          {item.status === 'PENDING' ? '⏳ Waiting for response' : item.status === 'ACCEPTED' ? '✅ Accepted!' : '❌ Declined'}
+                        </Text>
+                      </View>
+                    </View>
+                    {item.status === 'ACCEPTED' && profileUser && (
+                      <TouchableOpacity
+                        style={styles.chatBtn}
+                        onPress={async () => {
+                          try {
+                            const res = await dmAPI.startChat(profileUser.id, 'RISHTA');
+                            navigation.navigate('DMChat', {
+                              chatId: res.data.id,
+                              otherUser: profileUser,
+                              source: 'RISHTA',
+                            });
+                          } catch (err) {
+                            Alert.alert('Error', 'Could not open chat');
+                          }
+                        }}
+                      >
+                        <Text style={styles.chatBtnText}>💬 Open Private Chat</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <Text style={styles.emptyIcon}>💌</Text>
+                  <Text style={styles.emptyText}>No interests sent yet</Text>
+                </View>
+              }
+            />
+          )}
+        </View>
       )}
 
       {/* Shortlist Tab */}
@@ -678,6 +781,18 @@ export default function RishtaScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  rishtaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.primary,
+    paddingTop: 48,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+  },
+  rishtaBackBtn: { padding: 4 },
+  rishtaBackIcon: { fontSize: 32, color: COLORS.white, lineHeight: 36 },
+  rishtaHeaderTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.white },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 30, backgroundColor: COLORS.background },
   bigIcon: { fontSize: 64, marginBottom: 16 },
   title: { fontSize: 24, fontWeight: '700', color: COLORS.text, marginBottom: 8 },
@@ -714,7 +829,7 @@ const styles = StyleSheet.create({
   approvedHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   approvedIcon: { fontSize: 18, marginRight: 6 },
   approvedText: { fontSize: 14, color: COLORS.success, fontWeight: '700' },
-  profileCard: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 16, marginBottom: 10, elevation: 2 },
+  profileCard: { backgroundColor: COLORS.surface, borderRadius: 14, padding: 16, marginBottom: 10, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6 },
   profileHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   profileAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.secondary, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   profileAvatarText: { color: COLORS.white, fontSize: 22, fontWeight: 'bold' },
@@ -764,7 +879,7 @@ const styles = StyleSheet.create({
   tabsRow: {
     flexDirection: 'row',
     backgroundColor: COLORS.surface,
-    paddingVertical: 8,
+    paddingVertical: 4,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
@@ -874,7 +989,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 10,
-    elevation: 2,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
   interestStatus: { fontSize: 12, marginTop: 2 },
   responseRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
@@ -923,4 +1042,27 @@ const styles = StyleSheet.create({
   sendInterestFullText: { color: COLORS.white, fontWeight: '700', fontSize: 14 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptySubtext: { fontSize: 13, color: COLORS.textLight, marginTop: 4 },
+  subTabRow: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  subTab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  subTabActive: {
+    borderBottomWidth: 3,
+    borderBottomColor: COLORS.secondary,
+  },
+  subTabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textLight,
+  },
+  subTabTextActive: {
+    color: COLORS.secondary,
+  },
 });

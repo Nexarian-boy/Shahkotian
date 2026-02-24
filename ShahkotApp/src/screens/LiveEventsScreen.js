@@ -326,7 +326,8 @@ const styles = StyleSheet.create({
   categoryList: { paddingHorizontal: 12, paddingVertical: 10 },
   categoryChip: {
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    height: 36,
+    justifyContent: 'center',
     borderRadius: 20,
     backgroundColor: COLORS.surface,
     marginRight: 8,

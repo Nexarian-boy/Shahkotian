@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { COLORS } from './src/config/constants';
 
@@ -24,15 +25,16 @@ import RishtaScreen from './src/screens/RishtaScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
-import PoliceAnnouncementsScreen from './src/screens/PoliceAnnouncementsScreen';
 import WeatherScreen from './src/screens/WeatherScreen';
 import VideoFeedScreen from './src/screens/VideoFeedScreen';
 import BloodDonationScreen from './src/screens/BloodDonationScreen';
 import AIChatbotScreen from './src/screens/AIChatbotScreen';
 import DMChatScreen from './src/screens/DMChatScreen';
+import DMListScreen from './src/screens/DMListScreen';
 import OpenChatScreen from './src/screens/OpenChatScreen';
 import HelplineScreen from './src/screens/HelplineScreen';
 import DoctorsScreen from './src/screens/DoctorsScreen';
+import JobsScreen from './src/screens/JobsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -67,14 +69,14 @@ function MainTabs() {
         name="Home"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabIcon emoji="🏠" />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={24} color={color} />,
         }}
       />
       <Tab.Screen
         name="Market"
         component={MarketplaceScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabIcon emoji="🛒" />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="cart" size={24} color={color} />,
           tabBarLabel: 'Buy & Sell',
         }}
       />
@@ -82,32 +84,24 @@ function MainTabs() {
         name="Explore"
         component={ExploreScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabIcon emoji="🧭" />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="compass" size={24} color={color} />,
         }}
       />
       <Tab.Screen
         name="Community"
         component={CommunityScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabIcon emoji="👥" />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="people" size={24} color={color} />,
         }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabIcon emoji="👤" />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="person" size={24} color={color} />,
         }}
       />
     </Tab.Navigator>
-  );
-}
-
-function TabIcon({ emoji }) {
-  return (
-    <View>
-      <Text style={{ fontSize: 22 }}>{emoji}</Text>
-    </View>
   );
 }
 
@@ -138,7 +132,6 @@ function AppNavigator() {
           <Stack.Screen name="Bazar" component={BazarScreen} />
           <Stack.Screen name="News & Articles" component={NewsScreen} />
           <Stack.Screen name="Rishta" component={RishtaScreen} />
-          <Stack.Screen name="Police" component={PoliceAnnouncementsScreen} />
           <Stack.Screen name="Weather" component={WeatherScreen} />
           <Stack.Screen name="VideoFeed" component={VideoFeedScreen} />
           <Stack.Screen name="BloodDonation" component={BloodDonationScreen} />
@@ -146,10 +139,12 @@ function AppNavigator() {
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="Feed" component={FeedScreen} />
           <Stack.Screen name="AIChatbot" component={AIChatbotScreen} />
+          <Stack.Screen name="DMList" component={DMListScreen} />
           <Stack.Screen name="DMChat" component={DMChatScreen} />
           <Stack.Screen name="OpenChat" component={OpenChatScreen} />
           <Stack.Screen name="Helpline" component={HelplineScreen} />
           <Stack.Screen name="Doctors" component={DoctorsScreen} />
+          <Stack.Screen name="Jobs" component={JobsScreen} />
         </>
       )}
     </Stack.Navigator>

@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 20, fontWeight: '800', color: COLORS.text, marginBottom: 14 },
   label: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary, marginBottom: 4, marginTop: 10 },
   input: { backgroundColor: COLORS.background, borderRadius: 10, padding: 12, fontSize: 14, color: COLORS.text, borderWidth: 1, borderColor: COLORS.border, marginBottom: 4 },
-  sportChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: COLORS.border, marginRight: 8, backgroundColor: COLORS.surface },
+  sportChip: { paddingHorizontal: 12, height: 34, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: COLORS.border, marginRight: 8, backgroundColor: COLORS.surface },
   sportChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   sportChipText: { fontSize: 13, color: COLORS.textSecondary },
   sportChipTextActive: { color: '#fff', fontWeight: '700' },

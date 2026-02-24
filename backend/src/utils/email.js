@@ -19,7 +19,7 @@ const transporter = nodemailer.createTransport({
 async function sendEmail(to, subject, html) {
   try {
     await transporter.sendMail({
-      from: `"Shahkot App" <${process.env.EMAIL_USER}>`,
+      from: `"Apna Shahkot" <${process.env.EMAIL_USER}>`,
       to,
       subject,
       html,
@@ -39,7 +39,7 @@ async function sendRishtaApprovalEmail(email, name) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-        <h1 style="color: white; margin: 0; text-align: center;">Shahkot App</h1>
+        <h1 style="color: white; margin: 0; text-align: center;">Apna Shahkot</h1>
         <p style="color: #e8e8e8; text-align: center; margin-top: 10px;">Rishta Service</p>
       </div>
       <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -48,19 +48,19 @@ async function sendRishtaApprovalEmail(email, name) {
           Your Rishta profile has been <strong style="color: #27ae60;">APPROVED</strong> by our admin team.
         </p>
         <p style="color: #555; line-height: 1.6;">
-          You can now browse and connect with other verified profiles on the Shahkot App Rishta section.
+          You can now browse and connect with other verified profiles on the Apna Shahkot Rishta section.
         </p>
         <div style="background: #fff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
           <p style="color: #555; margin: 0;"><strong>Remember:</strong> All profiles are verified. Any misuse or illegal activity will result in strict action.</p>
         </div>
         <p style="color: #999; font-size: 12px; margin-top: 30px;">
-          This is an automated email from Shahkot App. Do not reply to this email.
+          This is an automated email from Apna Shahkot. Do not reply to this email.
         </p>
       </div>
     </div>
   `;
 
-  return sendEmail(email, '✅ Your Rishta Profile is Approved - Shahkot App', html);
+  return sendEmail(email, '✅ Your Rishta Profile is Approved - Apna Shahkot', html);
 }
 
 /**
@@ -70,7 +70,7 @@ async function sendRishtaRejectionEmail(email, name, reason) {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
       <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0;">
-        <h1 style="color: white; margin: 0; text-align: center;">Shahkot App</h1>
+        <h1 style="color: white; margin: 0; text-align: center;">Apna Shahkot</h1>
         <p style="color: #e8e8e8; text-align: center; margin-top: 10px;">Rishta Service</p>
       </div>
       <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
@@ -89,7 +89,7 @@ async function sendRishtaRejectionEmail(email, name, reason) {
     </div>
   `;
 
-  return sendEmail(email, '❌ Rishta Profile Update - Shahkot App', html);
+  return sendEmail(email, '❌ Rishta Profile Update - Apna Shahkot', html);
 }
 
 module.exports = {

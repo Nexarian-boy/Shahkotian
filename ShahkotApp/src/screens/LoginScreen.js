@@ -1,168 +1,270 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
+  Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image,
 } from 'react-native';
-import * as Location from 'expo-location';
 import { COLORS, APP_NAME } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
-import { isWithinShahkot } from '../utils/geolocation';
+import { authAPI } from '../services/api';
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen() {
   const { register, login } = useAuth();
 
-  const [isRegistering, setIsRegistering] = useState(false);
+  // mode: 'LOGIN' | 'REGISTER' | 'OTP' | 'FORGOT' | 'RESET_OTP' | 'NEW_PASSWORD'
+  const [mode, setMode] = useState('LOGIN');
   const [loading, setLoading] = useState(false);
-  const [locationLoading, setLocationLoading] = useState(true);
-  const [location, setLocation] = useState(null);
-  const [locationError, setLocationError] = useState(null);
+  const [otpSending, setOtpSending] = useState(false);
 
   // Form fields
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
   const [email, setEmail] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
+  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
 
-  useEffect(() => {
-    checkLocation();
-  }, []);
+  const resetForm = () => {
+    setName(''); setEmail(''); setPassword(''); setPhone(''); setOtp(''); setNewPassword('');
+  };
 
-  const checkLocation = async () => {
-    // ============================================
-    // GEOFENCING DISABLED FOR TESTING
-    // To re-enable, uncomment the original location check code below
-    // and remove the "setLocation" block
-    // ============================================
+  // ── Step 1 (Register): send OTP to email ──────────────────────────────
+  const handleSendOtp = async () => {
+    if (!name.trim()) return Alert.alert('Required', 'Please enter your full name.');
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return Alert.alert('Invalid Email', 'Please enter a valid email address.');
+    }
+    if (password.length < 6) {
+      return Alert.alert('Weak Password', 'Password must be at least 6 characters.');
+    }
+    setOtpSending(true);
     try {
-      setLocationLoading(true);
-      
-      // Try to get location but don't block if it fails
-      let coords = { latitude: 31.9712, longitude: 73.4818 }; // Default to Shahkot center
-      
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const loc = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          coords = loc.coords;
-        }
-      } catch (e) {
-        // Location failed, use default - don't block user
-        console.log('Location unavailable, using default');
-      }
-      
-      // Always allow access (geofencing disabled)
-      setLocation(coords);
-      
-      // ORIGINAL CODE (uncomment to re-enable geofencing):
-      // const { status } = await Location.requestForegroundPermissionsAsync();
-      // if (status !== 'granted') {
-      //   setLocationError('Location permission is required to use this app. Only Shahkot area residents can access it.');
-      //   return;
-      // }
-      // const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      // const result = isWithinShahkot(loc.coords.latitude, loc.coords.longitude);
-      // if (!result.isWithin) {
-      //   setLocationError(`You are ${result.distance}KM away from Shahkot.\n\nThis app is only available for residents within ${result.maxRadius}KM of Shahkot city.`);
-      //   return;
-      // }
-      // setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-      
+      await authAPI.sendOtp(email.trim());
+      setMode('OTP');
+      Alert.alert('OTP Sent ✅', `A 6-digit code has been sent to ${email.trim()}. Check your inbox.`);
     } catch (error) {
-      // Don't block user even if location fails
-      setLocation({ latitude: 31.9712, longitude: 73.4818 });
+      const msg = error.response?.data?.error || 'Failed to send OTP. Please try again.';
+      Alert.alert('Error', msg);
     } finally {
-      setLocationLoading(false);
+      setOtpSending(false);
     }
   };
 
-  const handleAuth = async () => {
-    if (!location) {
-      Alert.alert('Location Required', 'Please wait for location verification.');
-      return;
-    }
-
-    if (isRegistering && (!name.trim() || !phone.trim() || !password.trim())) {
-      Alert.alert('Required', 'Please enter your name, phone number, and password.');
-      return;
-    }
-
-    if (!isRegistering && (!phone.trim() || !password.trim())) {
-      Alert.alert('Required', 'Please enter your phone number and password.');
-      return;
-    }
-
-    // Validate password is 8 digits
-    if (!/^\d{8}$/.test(password)) {
-      Alert.alert('Invalid Password', 'Password must be exactly 8 digits (numbers only).');
-      return;
-    }
-
+  // ── Step 2 (Register): verify OTP + create account ────────────────────
+  const handleRegister = async () => {
+    if (otp.trim().length !== 6) return Alert.alert('Invalid OTP', 'Please enter the 6-digit code.');
     setLoading(true);
     try {
-      // In production, use Firebase Auth phone verification
-      // For now, using phone as firebaseUid placeholder
-      const firebaseUid = `phone_${phone.replace(/\D/g, '')}`;
-
-      if (isRegistering) {
-        await register({
-          name: name.trim(),
-          phone: phone.trim(),
-          password: password.trim(),
-          email: email.trim() || undefined,
-          whatsapp: whatsapp.trim() || phone.trim(),
-          firebaseUid,
-          latitude: location.latitude,
-          longitude: location.longitude,
-        });
-        Alert.alert('Welcome!', `Welcome to ${APP_NAME}, ${name}!`);
-      } else {
-        await login({
-          phone: phone.trim(),
-          password: password.trim(),
-          firebaseUid,
-          latitude: location.latitude,
-          longitude: location.longitude,
-        });
-      }
+      await register({
+        name: name.trim(),
+        email: email.trim(),
+        password: password.trim(),
+        otp: otp.trim(),
+        phone: phone.trim() || undefined,
+        whatsapp: phone.trim() || undefined,
+      });
+      Alert.alert('Welcome! 🎉', `Your account has been created. Welcome to ${APP_NAME}!`);
     } catch (error) {
-      const message =
-        error.response?.data?.error ||
-        (error.request
-          ? 'Cannot reach server. Please try again in a moment.'
-          : 'Something went wrong. Please try again.');
-      Alert.alert('Error', message);
+      const msg = error.response?.data?.error || 'Registration failed. Please try again.';
+      Alert.alert('Error', msg);
     } finally {
       setLoading(false);
     }
   };
 
-  // Location loading state
-  if (locationLoading) {
+  // ── Login: email + password ────────────────────────────────────────────
+  const handleLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      return Alert.alert('Required', 'Please enter your email and password.');
+    }
+    setLoading(true);
+    try {
+      await login({ email: email.trim(), password: password.trim() });
+    } catch (error) {
+      const msg =
+        error.response?.data?.error ||
+        (error.request
+          ? 'Cannot reach server. Please check your connection.'
+          : 'Something went wrong. Please try again.');
+      Alert.alert('Login Failed', msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Forgot Password: send OTP ─────────────────────────────────────────
+  const handleForgotSendOtp = async () => {
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return Alert.alert('Invalid Email', 'Please enter your registered email.');
+    }
+    setOtpSending(true);
+    try {
+      await authAPI.forgotPassword(email.trim());
+      setMode('RESET_OTP');
+      Alert.alert('OTP Sent ✅', `A code has been sent to ${email.trim()}`);
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to send OTP.');
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  // ── Reset Password: verify OTP + new password ─────────────────────────
+  const handleResetPassword = async () => {
+    if (otp.trim().length !== 6) return Alert.alert('Invalid OTP', 'Please enter the 6-digit code.');
+    if (newPassword.length < 6) return Alert.alert('Weak Password', 'Password must be at least 6 characters.');
+    setLoading(true);
+    try {
+      await authAPI.resetPassword({ email: email.trim(), otp: otp.trim(), newPassword });
+      Alert.alert('Success ✅', 'Password reset! You can now login with your new password.');
+      setOtp(''); setNewPassword('');
+      setMode('LOGIN');
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to reset password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Forgot Password screen ──────────────────────────────────────────
+  if (mode === 'FORGOT') {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.locationText}>Checking your location...</Text>
-        <Text style={styles.subText}>Verifying you are in Shahkot area</Text>
-      </View>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <View style={styles.iconCircle}><Text style={styles.icon}>🔑</Text></View>
+            <Text style={styles.title}>Forgot Password</Text>
+            <Text style={styles.subtitle}>Enter your registered email to receive a reset code</Text>
+          </View>
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email Address *</Text>
+              <TextInput style={styles.input} placeholder="your@gmail.com" value={email} onChangeText={setEmail}
+                keyboardType="email-address" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
+            </View>
+            <TouchableOpacity style={[styles.button, otpSending && styles.buttonDisabled]}
+              onPress={handleForgotSendOtp} disabled={otpSending}>
+              {otpSending ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.buttonText}>Send Reset Code</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.switchButton} onPress={() => { setMode('LOGIN'); }}>
+              <Text style={[styles.switchText, { color: COLORS.textSecondary }]}>← Back to Login</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
 
-  // Location denied state
-  if (locationError) {
+  // ── Reset OTP + New Password screen ────────────────────────────────────
+  if (mode === 'RESET_OTP') {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorIcon}>📍</Text>
-        <Text style={styles.errorTitle}>Location Restricted</Text>
-        <Text style={styles.errorText}>{locationError}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={checkLocation}>
-          <Text style={styles.retryText}>Retry Location Check</Text>
-        </TouchableOpacity>
-      </View>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <View style={styles.iconCircle}><Text style={styles.icon}>🔐</Text></View>
+            <Text style={styles.title}>Reset Password</Text>
+            <Text style={styles.subtitle}>Enter the code sent to</Text>
+            <Text style={[styles.subtitle, { color: COLORS.primary, fontWeight: '700', marginTop: 2 }]}>{email}</Text>
+          </View>
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>OTP Code *</Text>
+              <TextInput style={[styles.input, styles.otpInput]} placeholder="000000" value={otp}
+                onChangeText={setOtp} keyboardType="number-pad" maxLength={6}
+                placeholderTextColor={COLORS.textLight} textAlign="center" />
+            </View>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>New Password *</Text>
+              <TextInput style={styles.input} placeholder="Min 6 characters" value={newPassword}
+                onChangeText={setNewPassword} secureTextEntry placeholderTextColor={COLORS.textLight} />
+            </View>
+            <TouchableOpacity style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleResetPassword} disabled={loading}>
+              {loading ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.buttonText}>Reset Password</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.switchButton}
+              onPress={() => { setOtp(''); handleForgotSendOtp(); }} disabled={otpSending}>
+              <Text style={styles.switchText}>{otpSending ? 'Resending...' : "Didn't receive it? Resend Code"}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.switchButton, { marginTop: 4 }]} onPress={() => setMode('FORGOT')}>
+              <Text style={[styles.switchText, { color: COLORS.textSecondary }]}>← Back</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   }
+
+  // ── OTP verification screen ────────────────────────────────────────────
+  if (mode === 'OTP') {
+    return (
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.header}>
+            <View style={styles.iconCircle}>
+              <Text style={styles.icon}>📧</Text>
+            </View>
+            <Text style={styles.title}>Verify Email</Text>
+            <Text style={styles.subtitle}>Enter the 6-digit code sent to</Text>
+            <Text style={[styles.subtitle, { color: COLORS.primary, fontWeight: '700', marginTop: 2 }]}>
+              {email}
+            </Text>
+          </View>
+
+          <View style={styles.form}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>OTP Code *</Text>
+              <TextInput
+                style={[styles.input, styles.otpInput]}
+                placeholder="000000"
+                value={otp}
+                onChangeText={setOtp}
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholderTextColor={COLORS.textLight}
+                textAlign="center"
+              />
+              <Text style={styles.hint}>Check your Gmail inbox (and spam folder)</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.button, loading && styles.buttonDisabled]}
+              onPress={handleRegister}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.buttonText}>Create Account</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.switchButton}
+              onPress={() => { setOtp(''); handleSendOtp(); }}
+              disabled={otpSending}
+            >
+              <Text style={styles.switchText}>
+                {otpSending ? 'Resending...' : "Didn't receive it? Resend OTP"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.switchButton, { marginTop: 4 }]}
+              onPress={() => { setOtp(''); setMode('REGISTER'); }}
+            >
+              <Text style={[styles.switchText, { color: COLORS.textSecondary }]}>← Back</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ── Login / Register form ──────────────────────────────────────────────
+  const isRegister = mode === 'REGISTER';
 
   return (
     <KeyboardAvoidingView
@@ -172,109 +274,115 @@ export default function LoginScreen({ navigation }) {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.iconCircle}>
-            <Text style={styles.icon}>🏘️</Text>
-          </View>
+          <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.title}>{APP_NAME}</Text>
           <Text style={styles.subtitle}>
-            {isRegistering ? 'Create your account' : 'Welcome back!'}
+            {isRegister ? 'Create your account' : 'Welcome back!'}
           </Text>
           <View style={styles.locationBadge}>
-            <Text style={styles.locationBadgeText}>📍 Shahkot Area Verified ✓</Text>
+            <Text style={styles.locationBadgeText}>📍 Shahkot Community App</Text>
           </View>
         </View>
 
         {/* Form */}
         <View style={styles.form}>
-          {isRegistering && (
+          {isRegister && (
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Full Name *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter your name"
+                placeholder="Enter your full name"
                 value={name}
                 onChangeText={setName}
+                autoCapitalize="words"
                 placeholderTextColor={COLORS.textLight}
               />
             </View>
           )}
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Phone Number *</Text>
+            <Text style={styles.label}>Email Address *</Text>
             <TextInput
               style={styles.input}
-              placeholder="+92 300 1234567"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
+              placeholder="your@gmail.com"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
               placeholderTextColor={COLORS.textLight}
             />
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password (8 digits) *</Text>
+            <Text style={styles.label}>Password *</Text>
             <TextInput
               style={styles.input}
-              placeholder="Enter 8-digit password"
+              placeholder={isRegister ? 'Min 6 characters' : 'Enter your password'}
               value={password}
               onChangeText={setPassword}
-              keyboardType="number-pad"
-              maxLength={8}
               secureTextEntry
               placeholderTextColor={COLORS.textLight}
             />
-            <Text style={styles.hint}>Password must be exactly 8 digits</Text>
+            {isRegister && (
+              <Text style={styles.hint}>At least 6 characters</Text>
+            )}
           </View>
 
-          {isRegistering && (
-            <>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Email (Optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="your@email.com"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  placeholderTextColor={COLORS.textLight}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>WhatsApp Number</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Same as phone if empty"
-                  value={whatsapp}
-                  onChangeText={setWhatsapp}
-                  keyboardType="phone-pad"
-                  placeholderTextColor={COLORS.textLight}
-                />
-              </View>
-            </>
+          {isRegister && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Phone / WhatsApp (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="+92 300 1234567"
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                placeholderTextColor={COLORS.textLight}
+              />
+            </View>
           )}
 
+          {/* Primary button */}
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleAuth}
-            disabled={loading}
+            style={[styles.button, (loading || otpSending) && styles.buttonDisabled]}
+            onPress={isRegister ? handleSendOtp : handleLogin}
+            disabled={loading || otpSending}
           >
-            {loading ? (
+            {loading || otpSending ? (
               <ActivityIndicator color={COLORS.white} />
             ) : (
               <Text style={styles.buttonText}>
-                {isRegistering ? 'Create Account' : 'Login'}
+                {isRegister ? 'Send OTP to Email' : 'Login'}
               </Text>
             )}
           </TouchableOpacity>
 
+          {isRegister && (
+            <View style={styles.otpNote}>
+              <Text style={styles.otpNoteText}>
+                📧 An OTP will be sent to your Gmail to verify your email address.
+              </Text>
+            </View>
+          )}
+
+          {/* Forgot Password (login mode only) */}
+          {!isRegister && (
+            <TouchableOpacity
+              style={[styles.switchButton, { marginTop: 8 }]}
+              onPress={() => { setOtp(''); setNewPassword(''); setMode('FORGOT'); }}
+            >
+              <Text style={[styles.switchText, { color: COLORS.primary }]}>Forgot Password?</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Toggle login / register */}
           <TouchableOpacity
             style={styles.switchButton}
-            onPress={() => setIsRegistering(!isRegistering)}
+            onPress={() => { resetForm(); setMode(isRegister ? 'LOGIN' : 'REGISTER'); }}
           >
             <Text style={styles.switchText}>
-              {isRegistering
+              {isRegister
                 ? 'Already have an account? Login'
                 : "Don't have an account? Register"}
             </Text>
@@ -295,13 +403,6 @@ const styles = StyleSheet.create({
     padding: 24,
     justifyContent: 'center',
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-    backgroundColor: COLORS.background,
-  },
   header: {
     alignItems: 'center',
     marginBottom: 32,
@@ -315,6 +416,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  logoImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 16,
+  },
   icon: { fontSize: 40 },
   title: {
     fontSize: 28,
@@ -323,18 +430,20 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     color: COLORS.textSecondary,
-    marginBottom: 12,
+    textAlign: 'center',
+    marginBottom: 2,
   },
   locationBadge: {
-    backgroundColor: COLORS.success + '15',
+    backgroundColor: COLORS.primary + '15',
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 20,
+    marginTop: 10,
   },
   locationBadgeText: {
-    color: COLORS.success,
+    color: COLORS.primary,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -366,6 +475,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
   },
+  otpInput: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: 8,
+    color: COLORS.primary,
+  },
   hint: {
     fontSize: 12,
     color: COLORS.textSecondary,
@@ -380,12 +495,23 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   buttonDisabled: {
-    opacity: 0.7,
+    opacity: 0.65,
   },
   buttonText: {
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '700',
+  },
+  otpNote: {
+    backgroundColor: COLORS.info + '12',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 12,
+  },
+  otpNoteText: {
+    color: COLORS.info,
+    fontSize: 13,
+    lineHeight: 18,
   },
   switchButton: {
     marginTop: 16,
@@ -396,40 +522,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  locationText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: COLORS.text,
-    fontWeight: '600',
-  },
-  subText: {
-    marginTop: 4,
-    fontSize: 13,
-    color: COLORS.textSecondary,
-  },
-  errorIcon: { fontSize: 60, marginBottom: 16 },
-  errorTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: COLORS.error,
-    marginBottom: 12,
-  },
-  errorText: {
-    fontSize: 15,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-  },
-  retryText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
 });
+

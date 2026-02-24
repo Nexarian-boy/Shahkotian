@@ -2,7 +2,8 @@ const express = require('express');
 const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { uploadMedia } = require('../utils/upload');
-const { uploadMultipleToCloudinary, uploadMultipleVideosToCloudinary } = require('../utils/cloudinaryUpload');
+const { uploadMultipleImages } = require('../utils/imageUpload');
+const { uploadMultipleVideosToCloudinary } = require('../utils/cloudinaryUpload');
 
 const router = express.Router();
 
@@ -153,10 +154,10 @@ router.post('/', authenticate, (req, res, next) => {
       }
     }
 
-    // Upload images to Cloudinary
+    // Upload images to freeimage.host
     let imageUrls = [];
     if (imageFiles.length > 0) {
-      imageUrls = await uploadMultipleToCloudinary(imageFiles, 'posts');
+      imageUrls = await uploadMultipleImages(imageFiles);
     }
 
     // Upload videos to Cloudinary

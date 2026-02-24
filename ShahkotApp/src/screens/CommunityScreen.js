@@ -32,7 +32,7 @@ export default function CommunityScreen({ navigation }) {
               } else if (tab.key === 'openchat') {
                 navigation.navigate('OpenChat');
               } else if (tab.key === 'dm') {
-                navigation.navigate('DMChat');
+                navigation.navigate('DMList');
               } else if (tab.key === 'ai') {
                 navigation.navigate('AIChatbot');
               }

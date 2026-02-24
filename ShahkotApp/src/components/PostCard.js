@@ -40,16 +40,16 @@ export default function PostCard({
     const handleShare = async () => {
         try {
             const message = post.text
-                ? `${post.text}\n\n- Shared from Shahkot Tigers`
-                : 'Check out this post from Shahkot Tigers!';
-            await Share.share({ message, title: 'Shahkot Tigers' });
+                ? `${post.text}\n\n- Shared from Apna Shahkot`
+                : 'Check out this post from Apna Shahkot!';
+            await Share.share({ message, title: 'Apna Shahkot' });
         } catch (error) {
             console.error('Share error:', error);
         }
     };
 
     const shareToWhatsApp = () => {
-        const text = encodeURIComponent(post.text || 'Check out this post from Shahkot Tigers!');
+        const text = encodeURIComponent(post.text || 'Check out this post from Apna Shahkot!');
         Linking.openURL(`whatsapp://send?text=${text}`);
     };
 

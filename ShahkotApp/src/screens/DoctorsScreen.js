@@ -4,6 +4,7 @@ import {
   StyleSheet, Linking, RefreshControl, Modal, ScrollView,
   Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, DOCTOR_SPECIALTIES } from '../config/constants';
 import { doctorsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -186,8 +187,9 @@ export default function DoctorsScreen({ navigation }) {
       <Modal visible={true} animationType="slide" onRequestClose={() => setSelectedDoctor(null)}>
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setSelectedDoctor(null)}>
-              <Text style={styles.backBtn}>{'<'} Back</Text>
+            <TouchableOpacity onPress={() => setSelectedDoctor(null)} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="chevron-back" size={22} color={COLORS.white} />
+              <Text style={styles.backBtn}>Back</Text>
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Doctor Details</Text>
             <View style={{ width: 50 }} />
@@ -429,8 +431,9 @@ export default function DoctorsScreen({ navigation }) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.headerBackBtn}>{'<'} Back</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons name="chevron-back" size={22} color={COLORS.white} />
+          <Text style={styles.headerBackBtn}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Doctors & Clinics</Text>
         {isAdmin ? (
@@ -454,7 +457,7 @@ export default function DoctorsScreen({ navigation }) {
           placeholderTextColor={COLORS.textLight}
         />
         <TouchableOpacity style={styles.searchButton} onPress={loadDoctors}>
-          <Text style={{ fontSize: 18 }}>🔍</Text>
+          <Ionicons name="search" size={20} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
 
@@ -546,17 +549,18 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, padding: 14, fontSize: 15, color: COLORS.text },
   searchButton: { padding: 14, justifyContent: 'center' },
-  specialtyList: { paddingHorizontal: 12, marginBottom: 8 },
+  specialtyList: { paddingHorizontal: 12, marginBottom: 8, paddingRight: 20 },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    height: 38,
     borderRadius: 20,
     marginRight: 8,
     borderWidth: 1,
     borderColor: COLORS.border,
+    flexShrink: 0,
   },
   filterChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   filterIcon: { marginRight: 4, fontSize: 14 },
@@ -568,7 +572,11 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
-    elevation: 2,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
   doctorHeader: { flexDirection: 'row', marginBottom: 10 },
   doctorIcon: {
