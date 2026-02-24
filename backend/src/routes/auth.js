@@ -165,8 +165,8 @@ router.post('/register', async (req, res) => {
     // Generate JWT
     const token = jwt.sign(
       { userId: user.id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+      process.env.JWT_SECRET
+      // No expiration - token never expires
     );
 
     res.status(201).json({
@@ -235,8 +235,8 @@ router.post('/login', async (req, res) => {
     // Generate JWT
     const token = jwt.sign(
       { userId: user.id, role: userRole },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+      process.env.JWT_SECRET
+      // No expiration - token never expires
     );
 
     res.json({
