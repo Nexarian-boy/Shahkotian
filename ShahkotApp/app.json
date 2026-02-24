@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Shahkot Tigers",
-    "slug": "shahkot-tigers",
+    "name": "Apna Shahkot",
+    "slug": "apna-shahkot",
     "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -29,6 +29,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0C8A43"
       },
+      "softwareKeyboardLayoutMode": "pan",
       "edgeToEdgeEnabled": true,
       "permissions": [
         "ACCESS_FINE_LOCATION",

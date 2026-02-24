@@ -69,14 +69,15 @@ router.put('/:id/action', authenticate, adminOnly, async (req, res) => {
         const report = await prisma.report.findUnique({ where: { id: req.params.id } });
         if (!report) return res.status(404).json({ error: 'Report not found' });
 
-        if (action === 'block' && report.targetUserId) {
+        const act = (action || '').toUpperCase();
+        if ((act === 'BLOCK' || act === 'block') && report.targetUserId) {
             await prisma.user.update({
                 where: { id: report.targetUserId },
-                data: { isBlocked: true },
+                data: { isBlocked: true, isActive: false },
             });
             await prisma.report.update({
                 where: { id: req.params.id },
-                data: { status: 'BLOCKED' },
+                data: { status: 'RESOLVED' },
             });
             res.json({ message: 'User has been blocked' });
         } else {

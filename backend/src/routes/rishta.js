@@ -2,7 +2,7 @@ const express = require('express');
 const prisma = require('../config/database');
 const { authenticate, verifiedOnly, adminOnly } = require('../middleware/auth');
 const { upload, uploadRishta } = require('../utils/upload');
-const { uploadToCloudinary, uploadMultipleToCloudinary } = require('../utils/cloudinaryUpload');
+const { uploadImageFile, uploadMultipleImages } = require('../utils/imageUpload');
 const { sendRishtaApprovalEmail, sendRishtaRejectionEmail } = require('../utils/email');
 
 const router = express.Router();
@@ -93,13 +93,13 @@ router.post('/apply', authenticate, (req, res) => {
       }
 
       // Upload CNIC images
-      const cnicFrontUrl = await uploadToCloudinary(req.files.cnicFront[0], 'rishta/cnic');
-      const cnicBackUrl = await uploadToCloudinary(req.files.cnicBack[0], 'rishta/cnic');
+      const cnicFrontUrl = await uploadImageFile(req.files.cnicFront[0]);
+      const cnicBackUrl = await uploadImageFile(req.files.cnicBack[0]);
 
       // Upload optional personal photos
       let personalPhotoUrls = [];
       if (req.files.photos && req.files.photos.length > 0) {
-        personalPhotoUrls = await uploadMultipleToCloudinary(req.files.photos, 'rishta/photos');
+        personalPhotoUrls = await uploadMultipleImages(req.files.photos);
       }
 
       // Create Rishta profile
@@ -153,7 +153,7 @@ router.post('/upload-photos', authenticate, verifiedOnly, upload.array('images',
       return res.status(400).json({ error: 'At least one image is required.' });
     }
 
-    const imageUrls = await uploadMultipleToCloudinary(req.files, 'rishta/photos');
+    const imageUrls = await uploadMultipleImages(req.files);
 
     const updated = await prisma.rishtaProfile.update({
       where: { userId: req.user.id },
@@ -282,6 +282,32 @@ router.get('/interests', authenticate, verifiedOnly, async (req, res) => {
   } catch (error) {
     console.error('Get interests error:', error);
     res.status(500).json({ error: 'Failed to get interests.' });
+  }
+});
+
+/**
+ * GET /api/rishta/sent-interests
+ * Get interests I have sent to other profiles
+ */
+router.get('/sent-interests', authenticate, verifiedOnly, async (req, res) => {
+  try {
+    const sentInterests = await prisma.rishtaInterest.findMany({
+      where: { fromUserId: req.user.id },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        profile: {
+          select: {
+            id: true, age: true, gender: true, education: true, occupation: true,
+            user: { select: { id: true, name: true, phone: true, photoUrl: true } },
+          },
+        },
+      },
+    });
+
+    res.json({ sentInterests });
+  } catch (error) {
+    console.error('Get sent interests error:', error);
+    res.status(500).json({ error: 'Failed to get sent interests.' });
   }
 });
 

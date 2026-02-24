@@ -103,7 +103,9 @@ export default function NotificationsScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <Text style={styles.headerTitle}>
+          Notifications{notifications.filter(n => !n.read).length > 0 ? ` (${notifications.filter(n => !n.read).length})` : ''}
+        </Text>
         {notifications.some(n => !n.read) && (
           <TouchableOpacity onPress={markAllRead}>
             <Text style={styles.markAll}>Mark all read</Text>

@@ -288,7 +288,8 @@ const styles = StyleSheet.create({
   categoryList: { paddingHorizontal: 12, paddingVertical: 12 },
   catChip: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    height: 36,
+    justifyContent: 'center',
     borderRadius: 20,
     marginRight: 8,
     backgroundColor: COLORS.surface,

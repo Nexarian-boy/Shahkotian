@@ -13,13 +13,16 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../config/constants';
-import { adminAPI, newsAPI, listingsAPI } from '../services/api';
+import { adminAPI, newsAPI, listingsAPI, reportsAPI } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
-const TABS = ['Overview', 'Users', 'Rishta', 'Content', 'News', 'Storage'];
+const TABS = ['Overview', 'Users', 'Rishta', 'Reports', 'News', 'Storage'];
 
 export default function AdminDashboardScreen({ navigation }) {
+  const { loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('Overview');
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
@@ -33,15 +36,18 @@ export default function AdminDashboardScreen({ navigation }) {
   const [storageInfo, setStorageInfo] = useState(null);
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState({});
+  const [reports, setReports] = useState([]);
+  const [reportFilter, setReportFilter] = useState('PENDING');
 
-  // Load data when tab changes or on initial mount
+  // Wait for auth token to load before fetching
   useEffect(() => {
-    loadData();
-  }, [activeTab]);
+    if (!authLoading) {
+      loadData();
+    }
+  }, [activeTab, reportFilter, authLoading]);
 
-  // Also reload data when screen comes into focus
+  // Reset loaded state when pull-to-refresh triggers
   useEffect(() => {
-    // Reset loaded state when refreshing is triggered
     if (refreshing) {
       setDataLoaded({});
     }
@@ -61,12 +67,12 @@ export default function AdminDashboardScreen({ navigation }) {
       } else if (activeTab === 'Rishta') {
         const res = await adminAPI.getPendingRishta();
         setRishtaProfiles(res.data.profiles || []);
-      } else if (activeTab === 'Content') {
-        const res = await listingsAPI.getAll({});
-        setAllListings(res.data.listings || []);
       } else if (activeTab === 'News') {
         const res = await newsAPI.getAll({});
         setAllNews(res.data.news || []);
+      } else if (activeTab === 'Reports') {
+        const res = await reportsAPI.getAll({ status: reportFilter });
+        setReports(res.data.reports || []);
       } else if (activeTab === 'Storage') {
         try {
           const [dbRes, storRes] = await Promise.all([
@@ -202,24 +208,33 @@ export default function AdminDashboardScreen({ navigation }) {
 
   const renderOverview = () => (
     <ScrollView style={styles.tabContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}>
+      {/* Welcome Card */}
+      <View style={styles.welcomeCard}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.welcomeTitle}>Welcome, Admin</Text>
+          <Text style={styles.welcomeSub}>Here's your app at a glance</Text>
+        </View>
+        <Ionicons name="shield-checkmark" size={40} color={COLORS.white} style={{ opacity: 0.7 }} />
+      </View>
+
       <Text style={styles.sectionTitle}>App Statistics</Text>
       <View style={styles.statsGrid}>
-        <StatCard icon="👥" label="Users" value={stats?.stats?.totalUsers ?? 0} color="#4CAF50" />
-        <StatCard icon="📝" label="Posts" value={stats?.stats?.totalPosts ?? 0} color="#2196F3" />
-        <StatCard icon="🛒" label="Listings" value={stats?.stats?.totalListings ?? 0} color="#FF9800" />
-        <StatCard icon="💍" label="Pending Rishta" value={stats?.stats?.pendingRishta ?? 0} color="#E91E63" />
-        <StatCard icon="🏆" label="Tournaments" value={stats?.stats?.totalTournaments ?? 0} color="#9C27B0" />
-        <StatCard icon="📰" label="News" value={stats?.stats?.totalNews ?? 0} color="#00BCD4" />
-        <StatCard icon="🏪" label="Shops" value={stats?.stats?.totalShops ?? 0} color="#795548" />
-        <StatCard icon="🏛" label="Offices" value={stats?.stats?.totalOffices ?? 0} color="#607D8B" />
-        <StatCard icon="🏥" label="Doctors" value={stats?.stats?.totalDoctors ?? 0} color="#E11D48" />
+        <StatCard icon="people" label="Users" value={stats?.stats?.totalUsers ?? 0} color="#4CAF50" />
+        <StatCard icon="document-text" label="Posts" value={stats?.stats?.totalPosts ?? 0} color="#2196F3" />
+        <StatCard icon="cart" label="Listings" value={stats?.stats?.totalListings ?? 0} color="#FF9800" />
+        <StatCard icon="heart" label="Pending Rishta" value={stats?.stats?.pendingRishta ?? 0} color="#E91E63" />
+        <StatCard icon="trophy" label="Tournaments" value={stats?.stats?.totalTournaments ?? 0} color="#9C27B0" />
+        <StatCard icon="newspaper" label="News" value={stats?.stats?.totalNews ?? 0} color="#00BCD4" />
+        <StatCard icon="storefront" label="Shops" value={stats?.stats?.totalShops ?? 0} color="#795548" />
+        <StatCard icon="business" label="Offices" value={stats?.stats?.totalOffices ?? 0} color="#607D8B" />
+        <StatCard icon="medkit" label="Doctors" value={stats?.stats?.totalDoctors ?? 0} color="#E11D48" />
       </View>
 
       {stats?.stats?.pendingRishta > 0 && (
         <TouchableOpacity style={styles.alertCard} onPress={() => setActiveTab('Rishta')}>
-          <Text style={styles.alertIcon}>⚠️</Text>
+          <Ionicons name="warning" size={22} color="#E65100" />
           <Text style={styles.alertText}>{stats.stats.pendingRishta} pending rishta approvals</Text>
-          <Text style={styles.alertArrow}>></Text>
+          <Ionicons name="chevron-forward" size={18} color="#E65100" />
         </TouchableOpacity>
       )}
 
@@ -227,16 +242,20 @@ export default function AdminDashboardScreen({ navigation }) {
       <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Quick Actions</Text>
       <View style={styles.quickActions}>
         <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('News & Articles')}>
-          <Text style={styles.quickBtnIcon}>📰</Text>
+          <Ionicons name="newspaper-outline" size={28} color={COLORS.primary} />
           <Text style={styles.quickBtnText}>Publish News</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('Tournaments')}>
-          <Text style={styles.quickBtnIcon}>🏆</Text>
+          <Ionicons name="trophy-outline" size={28} color={COLORS.primary} />
           <Text style={styles.quickBtnText}>Tournaments</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('GovtOffices')}>
-          <Text style={styles.quickBtnIcon}>🏛</Text>
+          <Ionicons name="business-outline" size={28} color={COLORS.primary} />
           <Text style={styles.quickBtnText}>Govt Offices</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('Doctors')}>
+          <Ionicons name="medkit-outline" size={28} color={COLORS.primary} />
+          <Text style={styles.quickBtnText}>Doctors</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -463,13 +482,67 @@ export default function AdminDashboardScreen({ navigation }) {
     />
   );
 
+  const handleReportAction = async (id, action) => {
+    try {
+      await reportsAPI.takeAction(id, action);
+      Alert.alert('Done', action === 'BLOCK' ? 'User blocked' : 'Report dismissed');
+      setReports(prev => prev.filter(r => r.id !== id));
+    } catch { Alert.alert('Error', 'Action failed'); }
+  };
+
+  const renderReports = () => (
+    <FlatList
+      data={reports}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={{ padding: 16 }}
+      ListHeaderComponent={
+        <View>
+          <Text style={styles.sectionTitle}>Reports ({reports.length})</Text>
+          <View style={{ flexDirection: 'row', marginBottom: 12, gap: 8 }}>
+            {['PENDING', 'RESOLVED', 'DISMISSED'].map(s => (
+              <TouchableOpacity key={s} onPress={() => { setReportFilter(s); setDataLoaded(prev => ({ ...prev, Reports: false })); }}
+                style={[styles.filterChip, reportFilter === s && styles.filterChipActive]}>
+                <Text style={[styles.filterChipText, reportFilter === s && styles.filterChipTextActive]}>{s}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      }
+      renderItem={({ item }) => (
+        <View style={styles.contentCard}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.contentTitle}>Report #{item.id.slice(-6)}</Text>
+            <Text style={styles.contentSub}>By: {item.reporter?.name || 'Unknown'}</Text>
+            <Text style={styles.contentSub}>Type: {item.targetType} • Target: {item.targetId?.slice(-6)}</Text>
+            <Text style={[styles.contentSub, { marginTop: 4 }]}>Reason: {item.reason}</Text>
+            {item.description ? <Text style={styles.contentSub}>Details: {item.description}</Text> : null}
+            <Text style={styles.contentSub}>
+              {new Date(item.createdAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
+            </Text>
+          </View>
+          {reportFilter === 'PENDING' && (
+            <View style={{ justifyContent: 'center', gap: 6 }}>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#dc3545' }]} onPress={() => handleReportAction(item.id, 'BLOCK')}>
+                <Text style={styles.actionBtnText}>Block</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#6c757d' }]} onPress={() => handleReportAction(item.id, 'DISMISS')}>
+                <Text style={styles.actionBtnText}>Dismiss</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      )}
+      ListEmptyComponent={<EmptyState icon="📋" text={`No ${reportFilter.toLowerCase()} reports`} />}
+    />
+  );
+
   const renderTab = () => {
     if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
     switch (activeTab) {
       case 'Overview': return renderOverview();
       case 'Users': return renderUsers();
       case 'Rishta': return renderRishta();
-      case 'Content': return renderContent();
+      case 'Reports': return renderReports();
       case 'News': return renderNews();
       case 'Storage': return renderStorage();
       default: return null;
@@ -479,8 +552,9 @@ export default function AdminDashboardScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtn}>{'<'} Back</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons name="chevron-back" size={22} color={COLORS.white} />
+          <Text style={styles.backBtn}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Admin Dashboard</Text>
         <View style={{ width: 50 }} />
@@ -506,7 +580,7 @@ export default function AdminDashboardScreen({ navigation }) {
 function StatCard({ icon, label, value, color }) {
   return (
     <View style={[styles.statCard, { borderLeftColor: color }]}>
-      <Text style={styles.statIcon}>{icon}</Text>
+      <Ionicons name={icon} size={24} color={color} />
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>
@@ -560,18 +634,32 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 14, color: COLORS.textLight, fontWeight: '600' },
   activeTabText: { color: COLORS.primary },
   tabContent: { flex: 1, padding: 16 },
+  welcomeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    elevation: 4,
+  },
+  welcomeTitle: { fontSize: 20, fontWeight: '800', color: COLORS.white },
+  welcomeSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 4 },
   sectionTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.text, marginBottom: 16 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   statCard: {
     width: '47%',
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 16,
     borderLeftWidth: 4,
-    elevation: 2,
+    elevation: 3,
     marginBottom: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
-  statIcon: { fontSize: 24 },
   statValue: { fontSize: 28, fontWeight: 'bold', color: COLORS.text, marginTop: 6 },
   statLabel: { fontSize: 13, color: COLORS.textLight, marginTop: 2 },
   alertCard: {
@@ -583,8 +671,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
     borderLeftWidth: 4,
     borderLeftColor: '#FF9800',
+    gap: 10,
   },
-  alertIcon: { fontSize: 20, marginRight: 10 },
   alertText: { flex: 1, fontSize: 14, fontWeight: '600', color: '#E65100' },
   alertArrow: { fontSize: 18, color: '#E65100' },
   quickActions: {
@@ -596,14 +684,14 @@ const styles = StyleSheet.create({
   quickBtn: {
     width: '47%',
     backgroundColor: COLORS.surface,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 14,
+    padding: 18,
     alignItems: 'center',
-    elevation: 1,
+    elevation: 2,
     borderWidth: 1,
     borderColor: COLORS.border,
+    gap: 8,
   },
-  quickBtnIcon: { fontSize: 28, marginBottom: 6 },
   quickBtnText: { fontSize: 13, fontWeight: '600', color: COLORS.text },
   searchBar: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: COLORS.surface },
   searchInput: {
@@ -682,8 +770,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 8,
   },
-  deleteSmallText: { fontSize: 16 },
-  addBtn: {
+  deleteSmallText: { fontSize: 16 },  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#f0f0f0', borderWidth: 1, borderColor: '#ddd' },
+  filterChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  filterChipText: { fontSize: 11, fontWeight: '600', color: '#666' },
+  filterChipTextActive: { color: '#fff' },
+  actionBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignItems: 'center' },
+  actionBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },  addBtn: {
     backgroundColor: COLORS.primary,
     padding: 14,
     borderRadius: 12,

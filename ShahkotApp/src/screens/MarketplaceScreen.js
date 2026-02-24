@@ -268,9 +268,13 @@ export default function MarketplaceScreen() {
 
               <Text style={styles.sectionLabel}>Seller</Text>
               <View style={styles.sellerRow}>
-                <View style={styles.sellerAvatar}>
-                  <Text style={styles.sellerAvatarText}>{item.user?.name?.[0] || '?'}</Text>
-                </View>
+                {item.user?.photoUrl ? (
+                  <Image source={{ uri: item.user.photoUrl }} style={styles.sellerAvatar} />
+                ) : (
+                  <View style={styles.sellerAvatar}>
+                    <Text style={styles.sellerAvatarText}>{item.user?.name?.[0] || '?'}</Text>
+                  </View>
+                )}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.sellerName}>{item.user?.name || 'Unknown'}</Text>
                   <Text style={styles.sellerSub}>Shahkot Seller</Text>
@@ -490,7 +494,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.surface,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    height: 36,
     borderRadius: 20,
     marginRight: 8,
     borderWidth: 1,

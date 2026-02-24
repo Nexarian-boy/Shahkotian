@@ -86,7 +86,7 @@ const VideoFeedScreen = ({ navigation }) => {
     const handleShare = async (video) => {
         try {
             await Share.share({
-                message: `Check out this video from ${video.user?.name || 'Shahkot Tigers'}!\n${video.text || ''}`,
+                message: `Check out this video from ${video.user?.name || 'Apna Shahkot'}!\n${video.text || ''}`,
             });
         } catch (error) {
             console.error('Share error:', error);
@@ -111,7 +111,7 @@ const VideoFeedScreen = ({ navigation }) => {
             const downloadResult = await FileSystem.downloadAsync(videoUrl, fileUri);
 
             const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
-            await MediaLibrary.createAlbumAsync('Shahkot Tigers', asset, false);
+            await MediaLibrary.createAlbumAsync('Apna Shahkot', asset, false);
 
             Alert.alert('✅ Saved!', 'Video gallery mein save ho gaya.');
         } catch (error) {

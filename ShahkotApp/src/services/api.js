@@ -35,8 +35,11 @@ api.interceptors.response.use(
 
 // ============ AUTH API ============
 export const authAPI = {
+  sendOtp: (email) => api.post('/auth/send-otp', { email }),
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (data) => api.post('/auth/reset-password', data),
   getProfile: () => api.get('/auth/profile'),
   updateProfile: (data) => api.put('/auth/profile', data),
   checkLocation: (data) => api.post('/auth/check-location', data),
@@ -119,6 +122,7 @@ export const rishtaAPI = {
   getProfiles: (params) => api.get('/rishta/profiles', { params }),
   sendInterest: (profileId) => api.post(`/rishta/interest/${profileId}`),
   getInterests: () => api.get('/rishta/interests'),
+  getSentInterests: () => api.get('/rishta/sent-interests'),
   acceptInterest: (interestId) => api.put(`/rishta/interest/${interestId}/accept`),
   rejectInterest: (interestId) => api.put(`/rishta/interest/${interestId}/reject`),
   shortlist: (profileId) => api.post(`/rishta/shortlist/${profileId}`),
@@ -218,6 +222,12 @@ export const adminAPI = {
   cleanup: (target, olderThanDays = 30) => api.post('/admin/cleanup', { target, olderThanDays }),
 };
 
+// ============ REPORTS API ============
+export const reportsAPI = {
+  getAll: (params) => api.get('/reports', { params }),
+  takeAction: (id, action) => api.put(`/reports/${id}/action`, { action }),
+};
+
 // ============ DOCTORS API ============
 export const doctorsAPI = {
   getAll: (params) => api.get('/doctors', { params }),
@@ -226,6 +236,19 @@ export const doctorsAPI = {
   create: (data) => api.post('/doctors', data),
   update: (id, data) => api.put(`/doctors/${id}`, data),
   delete: (id) => api.delete(`/doctors/${id}`),
+};
+
+// ============ JOBS API ============
+export const jobsAPI = {
+  getAll: (params) => api.get('/jobs', { params }),
+  getCategories: () => api.get('/jobs/categories'),
+  getOne: (id) => api.get(`/jobs/${id}`),
+  getMine: () => api.get('/jobs/my'),
+  create: (data) => api.post('/jobs', data),
+  update: (id, data) => api.put(`/jobs/${id}`, data),
+  delete: (id) => api.delete(`/jobs/${id}`),
+  apply: (id, data) => api.post(`/jobs/${id}/apply`, data),
+  getApplications: (id) => api.get(`/jobs/${id}/applications`),
 };
 
 // ============ ALIASES FOR BACKWARDS COMPATIBILITY ============

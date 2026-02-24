@@ -1,27 +1,53 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions, Animated } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Dimensions, Animated, Image } from 'react-native';
 import { COLORS } from '../config/constants';
 
 const { width } = Dimensions.get('window');
 
 export default function SplashScreen() {
+  const scaleAnim = useRef(new Animated.Value(0.6)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  const dotAnim1 = useRef(new Animated.Value(0.3)).current;
+  const dotAnim2 = useRef(new Animated.Value(0.3)).current;
+  const dotAnim3 = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    // Logo entrance animation
+    Animated.parallel([
+      Animated.spring(scaleAnim, { toValue: 1, friction: 4, tension: 60, useNativeDriver: true }),
+      Animated.timing(opacityAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+    ]).start();
+
+    // Pulsing dots
+    const animateDots = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(dotAnim1, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(dotAnim2, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(dotAnim3, { toValue: 1, duration: 300, useNativeDriver: true }),
+          Animated.timing(dotAnim1, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+          Animated.timing(dotAnim2, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+          Animated.timing(dotAnim3, { toValue: 0.3, duration: 300, useNativeDriver: true }),
+        ])
+      ).start();
+    };
+    animateDots();
+  }, []);
+
   return (
     <View style={styles.container}>
-      <View style={styles.logoContainer}>
-        <View style={styles.iconCircle}>
-          <Text style={styles.icon}>{'🐯'}</Text>
-        </View>
-        <Text style={styles.title}>Shahkot Tigers</Text>
-        <Text style={styles.subtitle}>شاہکوٹ ٹائیگرز</Text>
-        <Text style={styles.taglineSmall}>Your City, Your Pride</Text>
-      </View>
+      <Animated.View style={[styles.logoContainer, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
+        <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
+        <Text style={styles.title}>APNA SHAHKOT</Text>
+        <Text style={styles.taglineSmall}>Your City, Your Community</Text>
+      </Animated.View>
       <View style={styles.bottom}>
         <View style={styles.loadingDots}>
-          <View style={[styles.dot, styles.dotActive]} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
+          <Animated.View style={[styles.dot, { opacity: dotAnim1 }]} />
+          <Animated.View style={[styles.dot, { opacity: dotAnim2 }]} />
+          <Animated.View style={[styles.dot, { opacity: dotAnim3 }]} />
         </View>
-        <Text style={styles.tagline}>Connecting Shahkot Together</Text>
+        <Text style={styles.tagline}>Connecting Shahkot Together 🇵🇰</Text>
       </View>
     </View>
   );
@@ -38,37 +64,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+    paddingHorizontal: 30,
   },
-  iconCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoImage: {
+    width: 160,
+    height: 160,
     marginBottom: 24,
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.3)',
-  },
-  icon: {
-    fontSize: 70,
+    borderRadius: 80,
   },
   title: {
-    fontSize: 38,
-    fontWeight: 'bold',
+    fontSize: 36,
+    fontWeight: '900',
     color: COLORS.white,
-    marginBottom: 6,
-    letterSpacing: 1,
-  },
-  subtitle: {
-    fontSize: 24,
-    color: 'rgba(255,255,255,0.9)',
-    fontWeight: '600',
     marginBottom: 8,
+    letterSpacing: 3,
   },
   taglineSmall: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.75)',
     fontStyle: 'italic',
   },
   bottom: {
@@ -81,12 +94,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  dotActive: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: 'rgba(255,255,255,0.9)',
   },
   tagline: {

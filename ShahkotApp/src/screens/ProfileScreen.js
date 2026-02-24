@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ActivityIndicator, ScrollView, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
@@ -143,6 +144,30 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.actionArrow}>></Text>
         </TouchableOpacity>
 
+        {/* Contact Admin */}
+        <View style={styles.contactAdminCard}>
+          <View style={styles.contactAdminHeader}>
+            <Ionicons name="shield-checkmark" size={20} color={COLORS.primary} />
+            <Text style={styles.contactAdminTitle}>Contact Admin</Text>
+          </View>
+          <Text style={styles.contactAdminSub}>Need help? Reach out to the admin</Text>
+          <View style={styles.contactAdminRow}>
+            <TouchableOpacity style={[styles.contactBtn, { backgroundColor: '#10B98112' }]} onPress={() => Linking.openURL('tel:03160623838')}>
+              <Ionicons name="call" size={18} color="#10B981" />
+              <Text style={[styles.contactBtnText, { color: '#10B981' }]}>Call</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.contactBtn, { backgroundColor: '#25D36612' }]} onPress={() => Linking.openURL('https://wa.me/923160623838')}>
+              <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+              <Text style={[styles.contactBtnText, { color: '#25D366' }]}>WhatsApp</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.contactBtn, { backgroundColor: '#2563EB12' }]} onPress={() => Linking.openURL('mailto:salmanmalhig@gmail.com')}>
+              <Ionicons name="mail" size={18} color="#2563EB" />
+              <Text style={[styles.contactBtnText, { color: '#2563EB' }]}>Email</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.contactAdminInfo}>📱 03160623838  •  📧 salmanmalhig@gmail.com</Text>
+        </View>
+
         <TouchableOpacity style={[styles.actionButton, styles.logoutButton]} onPress={handleLogout}>
           <Text style={styles.actionIcon}>🚪</Text>
           <Text style={[styles.actionText, { color: COLORS.error }]}>Logout</Text>
@@ -276,4 +301,20 @@ const styles = StyleSheet.create({
   actionArrow: { fontSize: 18, color: COLORS.textLight },
   adminAction: { borderWidth: 1, borderColor: COLORS.primary + '30' },
   logoutButton: { borderWidth: 1, borderColor: COLORS.error + '30' },
+  contactAdminCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '20',
+  },
+  contactAdminHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  contactAdminTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  contactAdminSub: { fontSize: 12, color: COLORS.textLight, marginBottom: 12 },
+  contactAdminRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
+  contactBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10 },
+  contactBtnText: { fontSize: 13, fontWeight: '700' },
+  contactAdminInfo: { fontSize: 11, color: COLORS.textLight, textAlign: 'center' },
 });

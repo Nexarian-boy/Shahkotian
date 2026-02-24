@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   },
   catList: { maxHeight: 44, marginBottom: 6 },
   catChip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8,
+    paddingHorizontal: 14, height: 36, justifyContent: 'center', borderRadius: 20, marginRight: 8,
     backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border,
   },
   catChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },

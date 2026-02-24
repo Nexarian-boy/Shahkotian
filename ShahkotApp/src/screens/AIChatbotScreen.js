@@ -8,7 +8,7 @@ import { chatbotAPI } from '../services/api';
 
 const WELCOME_MESSAGE = {
     id: 'welcome',
-    text: '🤖 Assalam-o-Alaikum! Main Shahkot Tigers ka AI Helper hoon.\n\nAap mujhse app ke baare mein kuch bhi pooch sakte hain:\n\n• "Buy & Sell kaise kare?"\n• "Rishta feature kya hai?"\n• "Tournament kaise banaye?"\n• "Blood donor kaise dhundhe?"\n\nBas poochiye! 💬',
+    text: '🤖 Assalam-o-Alaikum! Main Apna Shahkot ka AI Helper hoon.\n\nAap mujhse app ke baare mein kuch bhi pooch sakte hain:\n\n• "Buy & Sell kaise kare?"\n• "Rishta feature kya hai?"\n• "Tournament kaise banaye?"\n• "Blood donor kaise dhundhe?"\n\nBas poochiye! 💬',
     isBot: true,
 };
 

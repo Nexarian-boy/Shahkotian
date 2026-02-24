@@ -20,11 +20,12 @@ const rishtaRoutes = require('./routes/rishta');
 const newsRoutes = require('./routes/news');
 const adminRoutes = require('./routes/admin');
 const notificationRoutes = require('./routes/notifications');
-const policeRoutes = require('./routes/police');
 const bloodRoutes = require('./routes/blood');
 const chatRoutes = require('./routes/chat');
 const chatbotRoutes = require('./routes/chatbot');
 const dmRoutes = require('./routes/dm');
+const jobRoutes = require('./routes/jobs');
+const reportRoutes = require('./routes/reports');
 const doctorRoutes = require('./routes/doctors');
 
 const app = express();
@@ -47,7 +48,7 @@ app.use('/api/', limiter);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Shahkot App API is running', timestamp: new Date() });
+  res.json({ status: 'ok', message: 'Apna Shahkot API is running', timestamp: new Date() });
 });
 
 // Database status endpoint
@@ -75,12 +76,13 @@ app.use('/api/rishta', rishtaRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/police', policeRoutes);
 app.use('/api/blood', bloodRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/dm', dmRoutes);
 app.use('/api/doctors', doctorRoutes);
+app.use('/api/jobs', jobRoutes);
+app.use('/api/reports', reportRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -107,7 +109,7 @@ async function startServer() {
     }
 
     const server = app.listen(PORT, () => {
-      console.log(`🚀 Shahkot App API running on port ${PORT}`);
+      console.log(`🚀 Apna Shahkot API running on port ${PORT}`);
       console.log(`📍 Geofence: ${process.env.SHAHKOT_LAT}, ${process.env.SHAHKOT_LNG} (${process.env.GEOFENCE_RADIUS_KM}km radius)`);
     });
 

@@ -3,7 +3,7 @@ const router = express.Router();
 const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { upload } = require('../utils/upload');
-const { uploadMultipleToCloudinary } = require('../utils/cloudinaryUpload');
+const { uploadMultipleImages } = require('../utils/imageUpload');
 
 // Helper: Check if user is blocked by the other user
 async function isBlockedByOther(userId, otherUserId) {
@@ -217,7 +217,7 @@ router.post('/:chatId/upload', authenticate, upload.array('images', 3), async (r
             return res.status(400).json({ error: 'No images provided' });
         }
 
-        const imageUrls = await uploadMultipleToCloudinary(req.files, 'dm/images');
+        const imageUrls = await uploadMultipleImages(req.files);
         res.json({ images: imageUrls });
     } catch (error) {
         console.error('DM image upload error:', error);

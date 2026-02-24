@@ -13,7 +13,7 @@ export const SHAHKOT_CENTER = {
 export const GEOFENCE_RADIUS_KM = 50;
 
 // App Constants
-export const APP_NAME = 'Shahkot Tigers';
+export const APP_NAME = 'APNA SHAHKOT';
 export const APP_VERSION = '1.0.0';
 
 // Listing Categories
@@ -84,11 +84,42 @@ export const COLORS = {
 export const FONTS = {
   regular: 'System',
   bold: 'System',
+  h1: { fontSize: 28, fontWeight: '800' },
+  h2: { fontSize: 22, fontWeight: '700' },
+  h3: { fontSize: 18, fontWeight: '700' },
+  body: { fontSize: 15, fontWeight: '400' },
+  bodyBold: { fontSize: 15, fontWeight: '600' },
+  small: { fontSize: 13, fontWeight: '400' },
+  caption: { fontSize: 11, fontWeight: '500' },
 };
 
 // Video Limits
 export const MAX_VIDEO_DURATION_SECONDS = 180; // 3 minutes
 export const MAX_VIDEO_SIZE_MB = 100;
+
+// Job Categories
+export const JOB_CATEGORIES = [
+  { key: 'TEACHING', label: 'Teaching', icon: '📚' },
+  { key: 'MEDICAL', label: 'Medical', icon: '🏥' },
+  { key: 'IT', label: 'IT / Computer', icon: '💻' },
+  { key: 'DRIVING', label: 'Driving', icon: '🚗' },
+  { key: 'LABOUR', label: 'Labour', icon: '🔨' },
+  { key: 'SHOP_WORK', label: 'Shop Work', icon: '🏪' },
+  { key: 'OFFICE', label: 'Office', icon: '🏢' },
+  { key: 'COOKING', label: 'Cooking', icon: '🍳' },
+  { key: 'TAILORING', label: 'Tailoring', icon: '🧵' },
+  { key: 'AGRICULTURE', label: 'Agriculture', icon: '🌾' },
+  { key: 'OTHER', label: 'Other', icon: '📦' },
+];
+
+// Job Types
+export const JOB_TYPES = [
+  { key: 'FULL_TIME', label: 'Full Time' },
+  { key: 'PART_TIME', label: 'Part Time' },
+  { key: 'CONTRACT', label: 'Contract' },
+  { key: 'INTERNSHIP', label: 'Internship' },
+  { key: 'DAILY_WAGE', label: 'Daily Wage' },
+];
 
 // Privacy Options
 export const PRIVACY_OPTIONS = [

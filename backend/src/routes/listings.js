@@ -2,7 +2,7 @@ const express = require('express');
 const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { upload } = require('../utils/upload');
-const { uploadMultipleToCloudinary } = require('../utils/cloudinaryUpload');
+const { uploadMultipleImages } = require('../utils/imageUpload');
 
 const router = express.Router();
 
@@ -104,7 +104,7 @@ router.post('/', authenticate, upload.array('images', 5), async (req, res) => {
     // Upload images
     let imageUrls = [];
     if (req.files && req.files.length > 0) {
-      imageUrls = await uploadMultipleToCloudinary(req.files, 'listings');
+      imageUrls = await uploadMultipleImages(req.files);
     }
 
     const listing = await prisma.listing.create({
