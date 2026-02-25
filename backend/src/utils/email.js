@@ -1,44 +1,48 @@
-// Uses Resend HTTP API — works on all cloud hosts (no SMTP ports needed)
-// Sign up free at https://resend.com → API Keys → copy key → set RESEND_API_KEY on Render
-// Free tier: 3000 emails/month, 100/day — more than enough for this app.
+// Uses Brevo (ex-Sendinblue) HTTP API — works on all cloud hosts, no domain needed.
+// Free tier: 300 emails/day. Only requires verifying sender email address.
+// Sign up at https://app.brevo.com → set BREVO_API_KEY on Render.
 
-const RESEND_API_URL = 'https://api.resend.com/emails';
-
-// From address: use your verified domain email, or keep onboarding@resend.dev
-// for testing (Resend allows sending to any address with their default sender).
-const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL || 'Apna Shahkot <onboarding@resend.dev>';
+const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
 
 /**
- * Send email via Resend HTTP API
+ * Send email via Brevo transactional API
  * @param {string} to - Recipient email
  * @param {string} subject - Email subject
  * @param {string} html - Email HTML content
  */
 async function sendEmail(to, subject, html) {
   try {
-    const apiKey = process.env.RESEND_API_KEY;
+    const apiKey = process.env.BREVO_API_KEY;
     if (!apiKey) {
-      console.error('RESEND_API_KEY is not set in environment variables');
-      return { ok: false, error: 'RESEND_API_KEY not configured' };
+      console.error('BREVO_API_KEY is not set in environment variables');
+      return { ok: false, error: 'BREVO_API_KEY not configured' };
     }
 
-    const res = await fetch(RESEND_API_URL, {
+    const senderEmail = process.env.EMAIL_USER || 'mypcjnaab@gmail.com';
+
+    const res = await fetch(BREVO_API_URL, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'api-key': apiKey,
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
-      body: JSON.stringify({ from: FROM_ADDRESS, to, subject, html }),
+      body: JSON.stringify({
+        sender: { name: 'Apna Shahkot', email: senderEmail },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
     });
 
     const data = await res.json();
 
     if (!res.ok) {
-      console.error('Resend API error:', JSON.stringify(data));
+      console.error('Brevo API error:', JSON.stringify(data));
       return { ok: false, error: data.message || JSON.stringify(data) };
     }
 
-    console.log(`Email sent to ${to}: ${subject} (id: ${data.id})`);
+    console.log(`Email sent to ${to}: ${subject} (messageId: ${data.messageId})`);
     return { ok: true };
   } catch (error) {
     console.error('Email send error:', error.message);
