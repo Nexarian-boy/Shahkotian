@@ -1,42 +1,47 @@
-const nodemailer = require('nodemailer');
+// Uses Resend HTTP API — works on all cloud hosts (no SMTP ports needed)
+// Sign up free at https://resend.com → API Keys → copy key → set RESEND_API_KEY on Render
+// Free tier: 3000 emails/month, 100/day — more than enough for this app.
 
-// Force IPv4 to avoid ENETUNREACH on cloud hosts (Render resolves smtp.gmail.com
-// to an IPv6 address which is unreachable — family:4 forces the IPv4 path).
-const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true, // SSL on 465
-  family: 4,    // CRITICAL: force IPv4 — prevents ENETUNREACH on Render/Railway
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  connectionTimeout: 15000,
-  greetingTimeout: 15000,
-  socketTimeout: 15000,
-  tls: {
-    rejectUnauthorized: false,
-  },
-});
+const RESEND_API_URL = 'https://api.resend.com/emails';
+
+// From address: use your verified domain email, or keep onboarding@resend.dev
+// for testing (Resend allows sending to any address with their default sender).
+const FROM_ADDRESS = process.env.RESEND_FROM_EMAIL || 'Apna Shahkot <onboarding@resend.dev>';
 
 /**
- * Send email notification
+ * Send email via Resend HTTP API
  * @param {string} to - Recipient email
  * @param {string} subject - Email subject
  * @param {string} html - Email HTML content
  */
 async function sendEmail(to, subject, html) {
   try {
-    await transporter.sendMail({
-      from: `"Apna Shahkot" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html,
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      console.error('RESEND_API_KEY is not set in environment variables');
+      return { ok: false, error: 'RESEND_API_KEY not configured' };
+    }
+
+    const res = await fetch(RESEND_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from: FROM_ADDRESS, to, subject, html }),
     });
-    console.log(`Email sent to ${to}: ${subject}`);
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error('Resend API error:', JSON.stringify(data));
+      return { ok: false, error: data.message || JSON.stringify(data) };
+    }
+
+    console.log(`Email sent to ${to}: ${subject} (id: ${data.id})`);
     return { ok: true };
   } catch (error) {
-    console.error('Email send error:', error.message, '| code:', error.code, '| response:', error.response);
+    console.error('Email send error:', error.message);
     return { ok: false, error: error.message };
   }
 }
