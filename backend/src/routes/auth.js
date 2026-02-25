@@ -31,14 +31,14 @@ const router = express.Router();
  * Remove after confirming email works on Render
  */
 router.get('/test-smtp', async (req, res) => {
-  const testEmail = req.query.email || process.env.ADMIN_EMAIL || process.env.EMAIL_USER;
-  const result = await sendEmail(testEmail, '✅ SMTP Test — Apna Shahkot', '<p>SMTP is working!</p>');
+  const testEmail = req.query.email || process.env.ADMIN_EMAIL || 'test@example.com';
+  const result = await sendEmail(testEmail, '✅ Email Test — Apna Shahkot', '<p>Email (Resend API) is working!</p>');
   res.json({
     success: result.ok,
     error: result.error || null,
-    usedEmail: process.env.EMAIL_USER,
-    usedPass: process.env.EMAIL_PASS ? '****' + process.env.EMAIL_PASS.slice(-4) : 'NOT SET',
-    message: result.ok ? 'Email sent successfully!' : 'SMTP FAILED — see error above',
+    resendKeySet: !!process.env.RESEND_API_KEY,
+    resendKeyPreview: process.env.RESEND_API_KEY ? 're_****' + process.env.RESEND_API_KEY.slice(-4) : 'NOT SET',
+    message: result.ok ? 'Email sent successfully via Resend!' : 'Email FAILED — see error above',
   });
 });
 
