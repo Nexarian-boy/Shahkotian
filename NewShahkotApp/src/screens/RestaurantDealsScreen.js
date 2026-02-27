@@ -16,7 +16,7 @@ export default function RestaurantDealsScreen({ navigation }) {
   const [allDeals, setAllDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState('deals'); // deals, restaurants, admin
+  const [activeTab, setActiveTab] = useState('deals'); // deals, restaurants, admin, owner
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const [showAddRestaurant, setShowAddRestaurant] = useState(false);
   const [search, setSearch] = useState('');
@@ -31,6 +31,20 @@ export default function RestaurantDealsScreen({ navigation }) {
   const [formPassword, setFormPassword] = useState('');
   const [formImage, setFormImage] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Owner state
+  const [ownerToken, setOwnerToken] = useState(null);
+  const [ownerProfile, setOwnerProfile] = useState(null);
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerPassword, setOwnerPassword] = useState('');
+  const [ownerLoginLoading, setOwnerLoginLoading] = useState(false);
+  const [showAddDeal, setShowAddDeal] = useState(false);
+  const [dealTitle, setDealTitle] = useState('');
+  const [dealDesc, setDealDesc] = useState('');
+  const [dealPrice, setDealPrice] = useState('');
+  const [dealOriginalPrice, setDealOriginalPrice] = useState('');
+  const [dealImage, setDealImage] = useState(null);
+  const [dealSubmitting, setDealSubmitting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -143,6 +157,86 @@ export default function RestaurantDealsScreen({ navigation }) {
   const resetForm = () => {
     setFormName(''); setFormAddress(''); setFormPhone(''); setFormWhatsapp('');
     setFormDesc(''); setFormEmail(''); setFormPassword(''); setFormImage(null);
+  };
+
+  // ── Owner: login ─────────────────────────────────────────────────────────
+  const handleOwnerLogin = async () => {
+    if (!ownerEmail.trim() || !ownerPassword.trim()) {
+      return Alert.alert('Required', 'Please enter your email and password.');
+    }
+    setOwnerLoginLoading(true);
+    try {
+      const res = await restaurantsAPI.ownerLogin({ email: ownerEmail.trim(), password: ownerPassword.trim() });
+      setOwnerToken(res.data.token);
+      // Load profile
+      const profileRes = await restaurantsAPI.ownerProfile(res.data.token);
+      setOwnerProfile(profileRes.data);
+    } catch (err) {
+      Alert.alert('Login Failed', err.response?.data?.error || 'Invalid email or password.');
+    } finally {
+      setOwnerLoginLoading(false);
+    }
+  };
+
+  const handleOwnerLogout = () => {
+    setOwnerToken(null); setOwnerProfile(null);
+    setOwnerEmail(''); setOwnerPassword('');
+  };
+
+  const reloadOwnerProfile = async () => {
+    if (!ownerToken) return;
+    try {
+      const res = await restaurantsAPI.ownerProfile(ownerToken);
+      setOwnerProfile(res.data);
+    } catch {}
+  };
+
+  // ── Owner: add deal ───────────────────────────────────────────────────────
+  const handleAddDeal = async () => {
+    if (!dealTitle.trim()) return Alert.alert('Required', 'Deal title is required.');
+    setDealSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append('title', dealTitle.trim());
+      fd.append('description', dealDesc.trim());
+      fd.append('price', dealPrice.trim());
+      fd.append('originalPrice', dealOriginalPrice.trim());
+      if (dealImage) {
+        fd.append('image', { uri: dealImage.uri, type: 'image/jpeg', name: 'deal.jpg' });
+      }
+      await restaurantsAPI.ownerCreateDeal(ownerToken, fd);
+      Alert.alert('Done! 🎉', 'Deal added successfully.');
+      setShowAddDeal(false);
+      setDealTitle(''); setDealDesc(''); setDealPrice(''); setDealOriginalPrice(''); setDealImage(null);
+      reloadOwnerProfile();
+      loadData();
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.error || 'Failed to add deal.');
+    } finally {
+      setDealSubmitting(false);
+    }
+  };
+
+  const handleDeleteDeal = (dealId) => {
+    Alert.alert('Delete Deal', 'Remove this deal?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await restaurantsAPI.ownerDeleteDeal(ownerToken, dealId);
+            reloadOwnerProfile();
+            loadData();
+          } catch {
+            Alert.alert('Error', 'Failed to delete deal.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const pickDealImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    if (!result.canceled) setDealImage(result.assets[0]);
   };
 
   const callPhone = (phone) => {
@@ -265,6 +359,7 @@ export default function RestaurantDealsScreen({ navigation }) {
         {[
           { key: 'deals', label: '🔥 Deals', count: allDeals.length },
           { key: 'restaurants', label: '🍽️ Restaurants', count: restaurants.length },
+          { key: 'owner', label: '👤 Owner', count: 0 },
           ...(isAdmin ? [{ key: 'admin', label: '⚙️ Admin', count: 0 }] : []),
         ].map(tab => (
           <TouchableOpacity
@@ -312,6 +407,102 @@ export default function RestaurantDealsScreen({ navigation }) {
             </View>
           }
         />
+      )}
+
+      {/* Owner Tab */}
+      {activeTab === 'owner' && (
+        <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+          {!ownerToken ? (
+            // ── Login form ──────────────────────────────────────────────────
+            <View>
+              <Text style={styles.sectionTitle}>🔑 Restaurant Owner Login</Text>
+              <Text style={{ fontSize: 13, color: COLORS.textSecondary, marginBottom: 20, lineHeight: 18 }}>
+                Login with the email and password provided by the admin to manage your restaurant's deals.
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Email address"
+                value={ownerEmail}
+                onChangeText={setOwnerEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor={COLORS.textLight}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                value={ownerPassword}
+                onChangeText={setOwnerPassword}
+                secureTextEntry
+                placeholderTextColor={COLORS.textLight}
+              />
+              <TouchableOpacity
+                style={[styles.submitBtn, ownerLoginLoading && { opacity: 0.5 }]}
+                onPress={handleOwnerLogin}
+                disabled={ownerLoginLoading}
+              >
+                {ownerLoginLoading
+                  ? <ActivityIndicator color={COLORS.white} />
+                  : <Text style={styles.submitBtnText}>Login as Restaurant Owner</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          ) : (
+            // ── Owner dashboard ──────────────────────────────────────────────
+            <View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <View>
+                  <Text style={styles.sectionTitle}>🍽️ {ownerProfile?.name}</Text>
+                  <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>📍 {ownerProfile?.address}</Text>
+                </View>
+                <TouchableOpacity onPress={handleOwnerLogout} style={{ padding: 8, backgroundColor: '#FEE2E2', borderRadius: 8 }}>
+                  <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '700' }}>Logout</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddDeal(true)}>
+                <Ionicons name="add-circle" size={22} color={COLORS.white} />
+                <Text style={styles.addBtnText}>Add New Deal</Text>
+              </TouchableOpacity>
+
+              <Text style={[styles.sectionTitle, { marginTop: 8 }]}>
+                Your Deals ({ownerProfile?.deals?.length || 0})
+              </Text>
+
+              {(!ownerProfile?.deals || ownerProfile.deals.length === 0) ? (
+                <View style={styles.empty}>
+                  <Text style={{ fontSize: 40 }}>🏷️</Text>
+                  <Text style={styles.emptyText}>No deals yet</Text>
+                  <Text style={styles.emptySubText}>Tap "Add New Deal" to create your first deal</Text>
+                </View>
+              ) : (
+                ownerProfile.deals.map(deal => (
+                  <View key={deal.id} style={[styles.adminCard, { borderLeftWidth: 3, borderLeftColor: deal.isActive ? '#10B981' : '#EF4444' }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.adminCardName}>{deal.title}</Text>
+                        {deal.description ? <Text style={styles.adminCardSub}>{deal.description}</Text> : null}
+                        <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                          {deal.originalPrice ? <Text style={{ fontSize: 12, color: COLORS.textLight, textDecorationLine: 'line-through' }}>{deal.originalPrice}</Text> : null}
+                          {deal.price ? <Text style={{ fontSize: 13, fontWeight: '700', color: '#10B981' }}>{deal.price}</Text> : null}
+                        </View>
+                        <Text style={[styles.adminCardSub, { color: deal.isActive ? '#10B981' : '#EF4444', marginTop: 4 }]}>
+                          {deal.isActive ? '✅ Active' : '❌ Inactive'}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteDeal(deal.id)}
+                        style={{ padding: 8, backgroundColor: '#FEE2E2', borderRadius: 8, marginLeft: 8 }}
+                      >
+                        <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '700' }}>🗑️ Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          )}
+        </ScrollView>
       )}
 
       {/* Admin Tab */}
@@ -451,6 +642,40 @@ export default function RestaurantDealsScreen({ navigation }) {
                   ) : (
                     <Text style={styles.submitBtnText}>Create Restaurant</Text>
                   )}
+                </TouchableOpacity>
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* Add Deal Modal (Owner) */}
+      <Modal visible={showAddDeal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={styles.detailName}>Add New Deal</Text>
+                <TouchableOpacity onPress={() => setShowAddDeal(false)}>
+                  <Ionicons name="close" size={24} color={COLORS.text} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <TextInput style={styles.input} placeholder="Deal Title *" value={dealTitle} onChangeText={setDealTitle} placeholderTextColor={COLORS.textLight} />
+                <TextInput style={[styles.input, { height: 80 }]} placeholder="Description (optional)" value={dealDesc} onChangeText={setDealDesc} multiline placeholderTextColor={COLORS.textLight} />
+                <TextInput style={styles.input} placeholder="Price (e.g. Rs. 500 or 30% OFF)" value={dealPrice} onChangeText={setDealPrice} placeholderTextColor={COLORS.textLight} />
+                <TextInput style={styles.input} placeholder="Original Price (e.g. Rs. 800)" value={dealOriginalPrice} onChangeText={setDealOriginalPrice} placeholderTextColor={COLORS.textLight} />
+                <TouchableOpacity style={styles.imagePicker} onPress={pickDealImage}>
+                  <Text style={{ fontSize: 24 }}>{dealImage ? '✅' : '📷'}</Text>
+                  <Text style={styles.imagePickerText}>{dealImage ? 'Image Selected' : 'Add Deal Image (optional)'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.submitBtn, dealSubmitting && { opacity: 0.5 }]}
+                  onPress={handleAddDeal}
+                  disabled={dealSubmitting}
+                >
+                  {dealSubmitting ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.submitBtnText}>Add Deal</Text>}
                 </TouchableOpacity>
                 <View style={{ height: 40 }} />
               </ScrollView>
