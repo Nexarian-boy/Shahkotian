@@ -10,7 +10,7 @@ import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { restaurantsAPI } from '../services/api';
 
-export default function RestaurantDealsScreen({ navigation }) {
+export default function RestaurantDealsScreen({ navigation, route }) {
   const { isAdmin } = useAuth();
   const [restaurants, setRestaurants] = useState([]);
   const [allDeals, setAllDeals] = useState([]);
@@ -49,6 +49,13 @@ export default function RestaurantDealsScreen({ navigation }) {
 
   useEffect(() => {
     loadData();
+    // Auto-login owner if navigation params provided (from LoginScreen fallback)
+    const p = route?.params;
+    if (p?.ownerToken && p?.ownerProfile) {
+      setOwnerToken(p.ownerToken);
+      setOwnerProfile(p.ownerProfile);
+      setActiveTab('owner');
+    }
   }, []);
 
   const loadData = async () => {

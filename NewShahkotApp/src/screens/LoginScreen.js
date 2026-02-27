@@ -7,7 +7,7 @@ import * as Location from 'expo-location';
 import { COLORS, APP_NAME, GEOFENCE_RADIUS_KM } from '../config/constants';
 import { isWithinShahkot } from '../utils/geolocation';
 import { useAuth } from '../context/AuthContext';
-import { authAPI } from '../services/api';
+import { authAPI, restaurantsAPI } from '../services/api';
 
 export default function LoginScreen({ navigation }) {
   const { register, login } = useAuth();
@@ -154,6 +154,17 @@ export default function LoginScreen({ navigation }) {
         longitude: userCoords?.longitude,
       });
     } catch (error) {
+      // If regular user login fails, silently try restaurant owner login as fallback
+      try {
+        const ownerRes = await restaurantsAPI.ownerLogin({ email: email.trim(), password: password.trim() });
+        const token = ownerRes.data.token;
+        const profileRes = await restaurantsAPI.ownerProfile(token);
+        // Navigate directly to restaurant owner dashboard
+        navigation.navigate('RestaurantDeals', { ownerToken: token, ownerProfile: profileRes.data });
+        return;
+      } catch (_) {
+        // Not a restaurant owner either — show original error
+      }
       const msg =
         error.response?.data?.error ||
         (error.request

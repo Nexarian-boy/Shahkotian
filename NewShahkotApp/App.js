@@ -127,6 +127,7 @@ function AppNavigator() {
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+          <Stack.Screen name="RestaurantDeals" component={RestaurantDealsScreen} />
         </>
       ) : (
         <>
