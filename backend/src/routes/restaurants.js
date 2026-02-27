@@ -43,8 +43,58 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * GET /api/restaurants/deals/all
+ * Get all active deals from all restaurants
+ * NOTE: Must be defined BEFORE /:id to avoid wildcard route interception
+ */
+router.get('/deals/all', async (req, res) => {
+  try {
+    const deals = await prisma.deal.findMany({
+      where: {
+        isActive: true,
+        restaurant: { isActive: true },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        restaurant: {
+          select: { id: true, name: true, image: true, address: true, phone: true },
+        },
+      },
+    });
+
+    res.json({ deals });
+  } catch (error) {
+    console.error('Get all deals error:', error);
+    res.status(500).json({ error: 'Failed to load deals.' });
+  }
+});
+
+/**
+ * GET /api/restaurants/owner/profile
+ * Get restaurant owner's own restaurant
+ * NOTE: Must be before /:id to avoid wildcard interception
+ */
+router.get('/owner/profile', authenticateRestaurant, async (req, res) => {
+  try {
+    const restaurant = await prisma.restaurant.findUnique({
+      where: { id: req.restaurantId },
+      select: {
+        id: true, name: true, address: true, phone: true, whatsapp: true,
+        description: true, image: true, email: true,
+        deals: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+    if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' });
+    res.json(restaurant);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load profile.' });
+  }
+});
+
+/**
  * GET /api/restaurants/:id
  * Get single restaurant with its active deals
+ * NOTE: Must be defined AFTER specific string-path GET routes (/deals/all, /owner/profile)
  */
 router.get('/:id', async (req, res) => {
   try {
@@ -69,32 +119,6 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     console.error('Get restaurant error:', error);
     res.status(500).json({ error: 'Failed to load restaurant.' });
-  }
-});
-
-/**
- * GET /api/restaurants/deals/all
- * Get all active deals from all restaurants
- */
-router.get('/deals/all', async (req, res) => {
-  try {
-    const deals = await prisma.deal.findMany({
-      where: {
-        isActive: true,
-        restaurant: { isActive: true },
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        restaurant: {
-          select: { id: true, name: true, image: true, address: true, phone: true },
-        },
-      },
-    });
-
-    res.json({ deals });
-  } catch (error) {
-    console.error('Get all deals error:', error);
-    res.status(500).json({ error: 'Failed to load deals.' });
   }
 });
 
@@ -260,27 +284,6 @@ function authenticateRestaurant(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired token.' });
   }
 }
-
-/**
- * GET /api/restaurants/owner/profile
- * Get restaurant owner's own restaurant
- */
-router.get('/owner/profile', authenticateRestaurant, async (req, res) => {
-  try {
-    const restaurant = await prisma.restaurant.findUnique({
-      where: { id: req.restaurantId },
-      select: {
-        id: true, name: true, address: true, phone: true, whatsapp: true,
-        description: true, image: true, email: true,
-        deals: { orderBy: { createdAt: 'desc' } },
-      },
-    });
-    if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' });
-    res.json(restaurant);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to load profile.' });
-  }
-});
 
 /**
  * POST /api/restaurants/owner/deals

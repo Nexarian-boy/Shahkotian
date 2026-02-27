@@ -190,7 +190,7 @@ export default function FeedScreen({ navigation }) {
     }
   };
 
-  const handleLike = async (postId) => {
+  const handleLike = useCallback(async (postId) => {
     try {
       const response = await postsAPI.likePost(postId);
       setPosts((prev) =>
@@ -207,9 +207,9 @@ export default function FeedScreen({ navigation }) {
     } catch (error) {
       console.error('Like error:', error);
     }
-  };
+  }, []);
 
-  const handleShare = async (post) => {
+  const handleShare = useCallback(async (post) => {
     try {
       const message = post.text
         ? `${post.text}\n\n- Shared from Apna Shahkot`
@@ -221,9 +221,9 @@ export default function FeedScreen({ navigation }) {
     } catch (error) {
       console.error('Share error:', error);
     }
-  };
+  }, [])
 
-  const handleDelete = async (postId, isOwner) => {
+  const handleDelete = useCallback(async (postId, isOwner) => {
     const deleteType = isOwner ? 'your' : 'this';
     Alert.alert(
       'Delete Post',
@@ -238,7 +238,6 @@ export default function FeedScreen({ navigation }) {
               if (isOwner) {
                 await postsAPI.deletePost(postId);
               } else {
-                // Admin delete
                 const { adminAPI } = require('../services/api');
                 await adminAPI.deletePost(postId);
               }
@@ -251,9 +250,9 @@ export default function FeedScreen({ navigation }) {
         },
       ]
     );
-  };
+  }, []);
 
-  const openComments = async (post) => {
+  const openComments = useCallback(async (post) => {
     setSelectedPost(post);
     setShowCommentsModal(true);
     setLoadingComments(true);
@@ -266,7 +265,7 @@ export default function FeedScreen({ navigation }) {
     } finally {
       setLoadingComments(false);
     }
-  };
+  }, [])
 
   const addComment = async () => {
     if (!newComment.trim() || !selectedPost) return;
@@ -290,7 +289,7 @@ export default function FeedScreen({ navigation }) {
     }
   };
 
-  const renderPost = ({ item }) => {
+  const renderPost = useCallback(({ item }) => {
     const isOwner = item.user?.id === user?.id;
     const canDelete = isOwner || isAdmin;
 
@@ -368,7 +367,9 @@ export default function FeedScreen({ navigation }) {
         </View>
       </View>
     );
-  };
+  }, [user?.id, isAdmin, handleLike, handleShare, handleDelete, openComments]);
+
+  const keyExtractor = useCallback((item) => item.id, []);
 
   return (
     <View style={styles.container}>
@@ -482,12 +483,17 @@ export default function FeedScreen({ navigation }) {
       <FlatList
         data={posts}
         renderItem={renderPost}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         onScroll={handleScroll}
         scrollEventThrottle={16}
+        removeClippedSubviews={Platform.OS === 'android'}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        windowSize={10}
+        initialNumToRender={5}
         ListEmptyComponent={
           !loading && (
             <View style={styles.emptyContainer}>
