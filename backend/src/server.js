@@ -66,6 +66,38 @@ app.get('/api/db-status', async (req, res) => {
   }
 });
 
+// Cloudinary status endpoint
+app.get('/api/cloudinary-status', async (req, res) => {
+  try {
+    const cloudinaryModule = require('./config/cloudinary');
+    const manager = cloudinaryModule.manager;
+    if (manager) {
+      const statuses = await manager.getAllStatus();
+      return res.json({ activeAccount: manager.activeIndex, totalAccounts: manager.accounts.length, rotateAt: parseFloat(process.env.CLOUDINARY_CREDITS_LIMIT || '20'), accounts: statuses });
+    }
+    res.json({ activeAccount: 0, totalAccounts: 1, accounts: [] });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to get Cloudinary status.' });
+  }
+});
+
+// Cloudinary manual switch endpoint (admin only)
+app.post('/api/cloudinary-switch', async (req, res) => {
+  try {
+    const { index } = req.body;
+    if (typeof index !== 'number' && typeof index !== 'string') {
+      return res.status(400).json({ error: 'index is required (0-based account number)' });
+    }
+    const cloudinaryModule = require('./config/cloudinary');
+    const manager = cloudinaryModule.manager;
+    if (!manager) return res.status(500).json({ error: 'Cloudinary manager not available' });
+    const acc = await manager.manualSwitch(parseInt(index, 10));
+    res.json({ success: true, message: `Switched to account #${index} (${acc.cloud_name})`, activeAccount: manager.activeIndex });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/posts', postRoutes);
@@ -100,7 +132,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 8080;
 
 async function startServer() {
   try {
