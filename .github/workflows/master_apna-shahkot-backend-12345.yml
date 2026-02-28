@@ -3,7 +3,7 @@ name: Deploy Backend to Azure Web App
 on:
   push:
     branches:
-      - main   # or your default branch
+      - master   # or your default branch
 
 jobs:
   build-and-deploy:
@@ -36,3 +36,4 @@ jobs:
         slot-name: 'production'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
         package: './backend'   # point to the folder with package.json
+
