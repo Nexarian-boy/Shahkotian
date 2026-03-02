@@ -9,8 +9,6 @@ const bloodDonors = [
   { name: "Asad Mallhi", contact: "0347-8672258", group: "A+" },
   { name: "Hasan Mallhi", contact: "0340-1076138", group: "A+" },
   { name: "Tahir Saboo", contact: "0341-7010038", group: "A+" },
-  { name: "Gufran Mallhi", contact: "", group: "A+" },
-  { name: "Touqir Mallhi", contact: "", group: "A+" },
   { name: "Abrar Wainse", contact: "0345-7725063", group: "A+" },
 
   // B-
@@ -20,9 +18,6 @@ const bloodDonors = [
   { name: "Ali Imran", contact: "0322-6248705", group: "B+" },
   { name: "Nayyar Raza Mallhi", contact: "0300-4147343", group: "B+" },
   { name: "Ghulam Abbas", contact: "0345-4091013", group: "B+" },
-  { name: "Aqif Sial", contact: "", group: "B+" },
-  { name: "Azeem Army", contact: "", group: "B+" },
-  { name: "Adnan Afzal", contact: "", group: "B+" },
   { name: "Ali Haider", contact: "0309-6789473", group: "B+" },
   { name: "Aqeel Abbas Mallhi", contact: "0345-7474599", group: "B+" },
   { name: "Qamar Zaman", contact: "0345-7558984", group: "B+" },
@@ -42,11 +37,9 @@ const bloodDonors = [
   { name: "Saif Mallhi", contact: "0341-5401238", group: "O-" },
 
   // O+
-  { name: "Iftikhar Younis", contact: "", group: "O+" },
   { name: "Ateeq Chheena", contact: "0344-1100038", group: "O+" },
   { name: "Aoun Abbas", contact: "0341-4549261", group: "O+" },
   { name: "Inam Ul Haq", contact: "0342-1754899", group: "O+" },
-  { name: "Raza Hussain", contact: "", group: "O+" },
   { name: "Dr. Sharafat Ali", contact: "0343-4397639", group: "O+" },
   { name: "Irtiza Tahir Mallhi", contact: "0341-5400637", group: "O+" },
   { name: "Taied Hussain", contact: "0349-7682684", group: "O+" },

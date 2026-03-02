@@ -279,22 +279,17 @@ export default function BloodDonationScreen({ navigation }) {
           contentContainerStyle={{ padding: 12, paddingBottom: 40 }}
           ListHeaderComponent={<AdBanner />}
           ListFooterComponent={() => {
-            // Filter local (Awami Welfare Foundation) donors by selected blood group
+            // Filter local donors by selected blood group
             const filtered = LOCAL_DONORS_RAW.filter(d => {
               if (!selectedGroup) return true;
               return GROUP_LABEL_MAP[d.group] === selectedGroup;
             });
-            if (finderMode === 'emergency') return null; // local donors have no emergency flag
+            if (finderMode === 'emergency') return null;
+            if (filtered.length === 0) return null;
             return (
-              <View style={{ marginTop: 8 }}>
-                <View style={styles.localSectionHeader}>
-                  <Text style={styles.localSectionTitle}>🤝 Awami Welfare Foundation Donors</Text>
-                </View>
+              <View style={{ marginTop: 4 }}>
                 <AdBanner />
-                {filtered.length === 0 ? (
-                  <Text style={{ color: '#999', textAlign: 'center', padding: 16, fontSize: 13 }}>No community donors for this blood group.</Text>
-                ) : (
-                  filtered.map((donor, i) => {
+                {filtered.map((donor, i) => {
                     const bgInfo = BLOOD_GROUPS.find(g => g.label === donor.group) || { color: '#999' };
                     return (
                       <View key={`local-${i}`} style={styles.donorCard}>
@@ -306,20 +301,17 @@ export default function BloodDonationScreen({ navigation }) {
                             <Text style={styles.donorName}>{donor.name}</Text>
                           </View>
                         </View>
-                        {donor.contact ? (
-                          <View style={styles.donorActions}>
-                            <TouchableOpacity style={styles.callBtn} onPress={() => callDonor(donor.contact)}>
-                              <Text style={styles.callBtnText}>📞 Call</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.whatsappBtn} onPress={() => whatsappDonor(donor.contact, donor.name)}>
-                              <Text style={styles.whatsappBtnText}>💬 WhatsApp</Text>
-                            </TouchableOpacity>
-                          </View>
-                        ) : null}
+                        <View style={styles.donorActions}>
+                          <TouchableOpacity style={styles.callBtn} onPress={() => callDonor(donor.contact)}>
+                            <Text style={styles.callBtnText}>📞 Call</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={styles.whatsappBtn} onPress={() => whatsappDonor(donor.contact, donor.name)}>
+                            <Text style={styles.whatsappBtnText}>💬 WhatsApp</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     );
-                  })
-                )}
+                  })}
               </View>
             );
           }}
