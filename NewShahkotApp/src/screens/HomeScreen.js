@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, APP_NAME } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { postsAPI, listingsAPI, newsAPI, tournamentsAPI, jobsAPI, notificationsAPI } from '../services/api';
+import AdBanner from '../components/AdBanner';
 
 const { width } = Dimensions.get('window');
 const CARD_W = (width - 48) / 2;
@@ -201,6 +202,9 @@ export default function HomeScreen({ navigation }) {
           ))}
         </ScrollView>
 
+        {/* Ad after Quick Access */}
+        <AdBanner />
+
         {/* Trending Listings */}
         {trendingListings.length > 0 && (
           <View style={styles.section}>
@@ -263,6 +267,9 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
         )}
+
+        {/* Ad before News */}
+        <AdBanner />
 
         {/* Latest News */}
         {latestNews.length > 0 && (

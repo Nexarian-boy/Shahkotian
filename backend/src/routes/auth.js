@@ -32,14 +32,15 @@ const router = express.Router();
  */
 router.get('/test-smtp', async (req, res) => {
   const testEmail = req.query.email || process.env.ADMIN_EMAIL || 'test@example.com';
-  const result = await sendEmail(testEmail, '✅ Email Test — Apna Shahkot', '<p>Email (Brevo API) is working!</p>');
+  const result = await sendEmail(testEmail, '✅ Email Test — Apna Shahkot', '<p>SMTP email is working!</p>');
   res.json({
     success: result.ok,
     error: result.error || null,
-    brevoKeySet: !!process.env.BREVO_API_KEY,
-    brevoKeyPreview: process.env.BREVO_API_KEY ? process.env.BREVO_API_KEY.slice(0, 8) + '****' : 'NOT SET',
+    smtpHost: process.env.EMAIL_HOST || 'NOT SET',
+    smtpPort: process.env.EMAIL_PORT || 'NOT SET',
+    emailUserSet: !!process.env.EMAIL_USER,
     senderEmail: process.env.EMAIL_USER || 'NOT SET',
-    message: result.ok ? 'Email sent successfully via Brevo!' : 'Email FAILED — see error above',
+    message: result.ok ? `Email sent successfully via ${process.env.EMAIL_HOST}!` : 'Email FAILED — see error above',
   });
 });
 

@@ -33,6 +33,8 @@ export default function AdminDashboardScreen({ navigation }) {
   const [allNews, setAllNews] = useState([]);
   const [allListings, setAllListings] = useState([]);
   const [dbStatus, setDbStatus] = useState([]);
+  const [cloudinaryStatus, setCloudinaryStatus] = useState([]);
+  const [cloudinarySwitching, setCloudinarySwitching] = useState(false);
   const [storageInfo, setStorageInfo] = useState(null);
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState({});
@@ -75,14 +77,17 @@ export default function AdminDashboardScreen({ navigation }) {
         setReports(res.data.reports || []);
       } else if (activeTab === 'Storage') {
         try {
-          const [dbRes, storRes] = await Promise.all([
+          const [dbRes, storRes, cloudRes] = await Promise.all([
             adminAPI.getDbStatus(),
             adminAPI.getStorage(),
+            adminAPI.getCloudinaryStatus(),
           ]);
           console.log('DB Status:', dbRes.data);
           console.log('Storage:', storRes.data);
+          console.log('Cloudinary Status:', cloudRes.data);
           setDbStatus(Array.isArray(dbRes.data?.databases) ? dbRes.data.databases : []);
           setStorageInfo(storRes.data || null);
+          setCloudinaryStatus(Array.isArray(cloudRes.data?.accounts) ? cloudRes.data.accounts : []);
         } catch (storageError) {
           console.log('Storage load error:', storageError);
           // Try to load storage info even if db status fails
@@ -394,6 +399,27 @@ export default function AdminDashboardScreen({ navigation }) {
     />
   );
 
+  const handleCloudinarySwitch = async (index) => {
+    Alert.alert('Switch Cloudinary', `Switch to Account #${index + 1}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Switch', onPress: async () => {
+          try {
+            setCloudinarySwitching(true);
+            await adminAPI.switchCloudinary(index);
+            const res = await adminAPI.getCloudinaryStatus();
+            setCloudinaryStatus(Array.isArray(res.data?.accounts) ? res.data.accounts : []);
+            Alert.alert('Done', `Switched to Cloudinary Account #${index + 1}`);
+          } catch (e) {
+            Alert.alert('Error', 'Failed to switch Cloudinary account.');
+          } finally {
+            setCloudinarySwitching(false);
+          }
+        }
+      }
+    ]);
+  };
+
   const renderStorage = () => (
     <ScrollView style={styles.tabContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}>
       {/* DB Rotation Status */}
@@ -412,6 +438,39 @@ export default function AdminDashboardScreen({ navigation }) {
           <View style={[styles.dbDot, { backgroundColor: d.isAvailable ? '#4CAF50' : '#F44336' }]} />
         </View>
       ))}
+
+      {/* Cloudinary Rotation Status */}
+      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Cloudinary Video Storage</Text>
+      <Text style={{ fontSize: 12, color: COLORS.textLight, marginBottom: 10 }}>Auto-switches when monthly credits reach 20/25. Tap an account to switch manually.</Text>
+      {cloudinaryStatus.length === 0 && <Text style={{ color: COLORS.textLight, marginBottom: 12 }}>Loading...</Text>}
+      {cloudinarySwitching && <ActivityIndicator color={COLORS.primary} style={{ marginBottom: 8 }} />}
+      {cloudinaryStatus.map((acc, i) => {
+        const pct = Math.min(100, (acc.credits / (acc.limit || 25)) * 100);
+        const barColor = pct >= 80 ? '#F44336' : pct >= 60 ? '#FF9800' : '#4CAF50';
+        return (
+          <View key={i} style={[styles.dbRow, acc.isActive && styles.dbRowActive]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.dbTitle}>
+                {acc.isActive ? '⚡ ' : ''}{acc.cloudName}  {acc.isActive ? 'ACTIVE' : ''}
+              </Text>
+              <View style={styles.dbBarBg}>
+                <View style={[styles.dbBarFill, { width: `${pct}%`, backgroundColor: barColor }]} />
+              </View>
+              <Text style={styles.dbSizeText}>{acc.credits !== null ? `${acc.credits.toFixed(1)} / ${acc.limit || 25} credits` : 'Unavailable'}</Text>
+            </View>
+            {!acc.isActive && (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: COLORS.primary, marginLeft: 10 }]}
+                onPress={() => handleCloudinarySwitch(i)}
+                disabled={cloudinarySwitching}
+              >
+                <Text style={styles.actionBtnText}>Use</Text>
+              </TouchableOpacity>
+            )}
+            {acc.isActive && <View style={[styles.dbDot, { backgroundColor: '#4CAF50' }]} />}
+          </View>
+        );
+      })}
 
       {/* Record Counts */}
       {storageInfo?.totals && (

@@ -6,6 +6,7 @@ import {
 import { COLORS, SPORT_TYPES } from '../config/constants';
 import { tournamentsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import AdBanner from '../components/AdBanner';
 
 export default function TournamentsScreen({ navigation }) {
   const { user, isAdmin } = useAuth();
@@ -97,6 +98,7 @@ export default function TournamentsScreen({ navigation }) {
   };
 
   const renderTournament = ({ item }) => {
+    if (item.type === 'AD_ITEM') return <AdBanner />;
     const isExpanded = expandedId === item.id;
     const sportInfo = SPORT_TYPES.find(s => s.key === item.sport) || { icon: '🏆', label: item.sport };
     const canDelete = user && (isAdmin || item.createdById === user.id);
@@ -200,7 +202,7 @@ export default function TournamentsScreen({ navigation }) {
 
       {/* Tournament List */}
       <FlatList
-        data={tournaments}
+        data={(() => { const out = []; tournaments.forEach((t, i) => { out.push(t); if ((i + 1) % 3 === 0) out.push({ id: `ad-tourn-${i}`, type: 'AD_ITEM' }); }); return out; })()}
         renderItem={renderTournament}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={loadTournaments} colors={[COLORS.primary]} />}

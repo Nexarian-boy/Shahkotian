@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -7,6 +7,7 @@ import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { COLORS } from './src/config/constants';
+import { initAds, onScreenView } from './src/utils/AdManager';
 
 // Screens
 import SplashScreen from './src/screens/SplashScreen';
@@ -160,9 +161,18 @@ function AppNavigator() {
 }
 
 export default function App() {
+  const navigationRef = useRef(null);
+
+  useEffect(() => {
+    initAds();
+  }, []);
+
   return (
     <AuthProvider>
-      <NavigationContainer>
+      <NavigationContainer
+        ref={navigationRef}
+        onStateChange={() => onScreenView()}
+      >
         <StatusBar style="light" />
         <AppNavigator />
       </NavigationContainer>

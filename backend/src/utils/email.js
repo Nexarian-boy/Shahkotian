@@ -1,51 +1,70 @@
-// Uses Brevo (ex-Sendinblue) HTTP API — works on all cloud hosts, no domain needed.
-// Free tier: 300 emails/day. Only requires verifying sender email address.
-// Sign up at https://app.brevo.com → set BREVO_API_KEY on Render.
+// Generic SMTP email — works with Amazon SES, Gmail, or any SMTP provider.
+// Set these env vars on DigitalOcean App Platform:
+//
+// Amazon SES (recommended — free 62,000 emails/month from EC2/App Platform):
+//   EMAIL_HOST = email-smtp.us-east-1.amazonaws.com
+//   EMAIL_PORT = 587
+//   EMAIL_USER = <your SES SMTP username from AWS Console → SES → SMTP Settings → Manage credentials>
+//   EMAIL_PASS = <your SES SMTP password>
+//
+// Gmail fallback:
+//   EMAIL_HOST = smtp.gmail.com
+//   EMAIL_PORT = 465
+//   EMAIL_USER = your@gmail.com
+//   EMAIL_PASS = <16-char App Password from myaccount.google.com/security>
 
-const BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email';
+const nodemailer = require('nodemailer');
+
+let _transporter = null;
+
+function getTransporter() {
+  if (_transporter) return _transporter;
+  const host = process.env.EMAIL_HOST || 'smtp.gmail.com';
+  const port = parseInt(process.env.EMAIL_PORT || '465', 10);
+  // port 465 uses SSL (secure:true), 587 uses STARTTLS (secure:false, starttls upgrades automatically)
+  const secure = port === 465;
+  _transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+  return _transporter;
+}
 
 /**
- * Send email via Brevo transactional API
+ * Send email via Gmail SMTP
  * @param {string} to - Recipient email
  * @param {string} subject - Email subject
  * @param {string} html - Email HTML content
  */
 async function sendEmail(to, subject, html) {
   try {
-    const apiKey = process.env.BREVO_API_KEY;
-    if (!apiKey) {
-      console.error('BREVO_API_KEY is not set in environment variables');
-      return { ok: false, error: 'BREVO_API_KEY not configured' };
+    const user = process.env.EMAIL_USER;
+    const pass = process.env.EMAIL_PASS;
+
+    if (!user || !pass) {
+      console.error('EMAIL_USER or EMAIL_PASS is not set in environment variables');
+      return { ok: false, error: 'Email credentials not configured (set EMAIL_USER and EMAIL_PASS)' };
     }
 
-    const senderEmail = process.env.EMAIL_USER || 'mypcjnaab@gmail.com';
-
-    const res = await fetch(BREVO_API_URL, {
-      method: 'POST',
-      headers: {
-        'api-key': apiKey,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        sender: { name: 'Apna Shahkot', email: senderEmail },
-        to: [{ email: to }],
-        subject,
-        htmlContent: html,
-      }),
+    const transporter = getTransporter();
+    const info = await transporter.sendMail({
+      from: `"Apna Shahkot" <${user}>`,
+      to,
+      subject,
+      html,
     });
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      console.error('Brevo API error:', JSON.stringify(data));
-      return { ok: false, error: data.message || JSON.stringify(data) };
-    }
-
-    console.log(`Email sent to ${to}: ${subject} (messageId: ${data.messageId})`);
+    console.log(`Email sent to ${to}: ${subject} (messageId: ${info.messageId})`);
     return { ok: true };
   } catch (error) {
     console.error('Email send error:', error.message);
+    // Reset transporter so next call retries fresh
+    _transporter = null;
     return { ok: false, error: error.message };
   }
 }

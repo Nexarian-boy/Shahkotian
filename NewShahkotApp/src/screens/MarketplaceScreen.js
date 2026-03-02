@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { COLORS, LISTING_CATEGORIES } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { listingsAPI } from '../services/api';
+import AdBanner from '../components/AdBanner';
 
 const { width } = Dimensions.get('window');
 
@@ -388,6 +389,7 @@ export default function MarketplaceScreen() {
           numColumns={2}
           columnWrapperStyle={{ paddingHorizontal: 6 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadListings(); }} />}
+          ListHeaderComponent={<AdBanner />}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyIcon}>🛒</Text>
@@ -395,6 +397,7 @@ export default function MarketplaceScreen() {
               <Text style={styles.emptySubtext}>Be the first to sell something!</Text>
             </View>
           }
+          ListFooterComponent={<AdBanner />}
           contentContainerStyle={{ paddingBottom: 80 }}
           showsVerticalScrollIndicator={false}
         />

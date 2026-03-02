@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Linking, RefreshControl, Modal, ScrollView,
@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS, DOCTOR_SPECIALTIES } from '../config/constants';
 import { doctorsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import AdBanner from '../components/AdBanner';
 
 export default function DoctorsScreen({ navigation }) {
   const { isAdmin } = useAuth();
@@ -128,6 +129,7 @@ export default function DoctorsScreen({ navigation }) {
   };
 
   const renderDoctor = ({ item }) => {
+    if (item.type === 'AD_ITEM') return <AdBanner />;
     const specialtyInfo = getSpecialtyInfo(item.specialty);
     return (
       <TouchableOpacity
@@ -488,7 +490,7 @@ export default function DoctorsScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={doctors}
+          data={(() => { const out = []; doctors.forEach((d, i) => { out.push(d); if ((i + 1) % 4 === 0) out.push({ id: `ad-doc-${i}`, type: 'AD_ITEM' }); }); return out; })()}
           renderItem={renderDoctor}
           keyExtractor={(item) => item.id}
           refreshControl={

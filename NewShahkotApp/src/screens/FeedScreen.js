@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput, Image,
   StyleSheet, RefreshControl, Alert, ActivityIndicator, Modal, Share,
@@ -8,7 +8,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Video, ResizeMode } from 'expo-av';
 import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
-import { postsAPI } from '../services/api';
+import { postsAPI, reportsAPI } from '../services/api';
+import AdBanner from '../components/AdBanner';
 
 const { width } = Dimensions.get('window');
 
@@ -223,6 +224,38 @@ export default function FeedScreen({ navigation }) {
     }
   }, [])
 
+  const handleReport = useCallback((post) => {
+    if (post.user?.id === user?.id) {
+      Alert.alert('Cannot Report', 'You cannot report your own post.');
+      return;
+    }
+    Alert.alert(
+      '🚩 Report Post',
+      'Why are you reporting this post?',
+      [
+        { text: 'Spam', onPress: () => submitReport(post, 'Spam') },
+        { text: 'Inappropriate Content', onPress: () => submitReport(post, 'Inappropriate Content') },
+        { text: 'Misinformation', onPress: () => submitReport(post, 'Misinformation') },
+        { text: 'Harassment / Hate', onPress: () => submitReport(post, 'Harassment or Hate Speech') },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }, [user?.id]);
+
+  const submitReport = useCallback(async (post, reason) => {
+    try {
+      await reportsAPI.submit({
+        targetType: 'POST',
+        targetId: post.id,
+        targetUserId: post.user?.id || null,
+        reason,
+      });
+      Alert.alert('Reported ✅', 'Thank you. Our admin team will review this post.');
+    } catch (err) {
+      Alert.alert('Error', 'Could not submit report. Please try again.');
+    }
+  }, []);
+
   const handleDelete = useCallback(async (postId, isOwner) => {
     const deleteType = isOwner ? 'your' : 'this';
     Alert.alert(
@@ -289,7 +322,18 @@ export default function FeedScreen({ navigation }) {
     }
   };
 
+  // Inject an ad placeholder after every 5th post
+  const postsWithAds = useMemo(() => {
+    const out = [];
+    posts.forEach((post, i) => {
+      out.push(post);
+      if ((i + 1) % 4 === 0) out.push({ id: `ad-feed-${i}`, type: 'AD_ITEM' });
+    });
+    return out;
+  }, [posts]);
+
   const renderPost = useCallback(({ item }) => {
+    if (item.type === 'AD_ITEM') return <AdBanner size="ANCHORED_ADAPTIVE_BANNER" />;
     const isOwner = item.user?.id === user?.id;
     const canDelete = isOwner || isAdmin;
 
@@ -364,10 +408,16 @@ export default function FeedScreen({ navigation }) {
             <Text style={styles.actionIcon}>↗️</Text>
             <Text style={styles.actionText}>Share</Text>
           </TouchableOpacity>
+          {item.user?.id !== user?.id && (
+            <TouchableOpacity style={styles.actionButton} onPress={() => handleReport(item)}>
+              <Text style={styles.actionIcon}>🚩</Text>
+              <Text style={styles.actionText}>Report</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
-  }, [user?.id, isAdmin, handleLike, handleShare, handleDelete, openComments]);
+  }, [user?.id, isAdmin, handleLike, handleShare, handleReport, submitReport, handleDelete, openComments]);
 
   const keyExtractor = useCallback((item) => item.id, []);
 
@@ -481,7 +531,7 @@ export default function FeedScreen({ navigation }) {
 
       {/* Posts Feed */}
       <FlatList
-        data={posts}
+        data={postsWithAds}
         renderItem={renderPost}
         keyExtractor={keyExtractor}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}

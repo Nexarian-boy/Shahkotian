@@ -197,12 +197,18 @@ router.put('/rishta/:id/approve', async (req, res) => {
       },
     });
 
+    // Auto-delete CNIC images after approval (sensitive data — keep only profile photos)
+    await prisma.rishtaProfile.update({
+      where: { id: req.params.id },
+      data: { cnicFront: null, cnicBack: null },
+    });
+
     // Send email notification
     if (profile.user.email) {
       await sendRishtaApprovalEmail(profile.user.email, profile.user.name);
     }
 
-    res.json({ message: 'Rishta profile approved and user notified via email.' });
+    res.json({ message: 'Rishta profile approved, CNIC images deleted, and user notified via email.' });
   } catch (error) {
     console.error('Approve rishta error:', error);
     res.status(500).json({ error: 'Failed to approve profile.' });
@@ -241,12 +247,18 @@ router.put('/rishta/:id/reject', async (req, res) => {
       },
     });
 
+    // Auto-delete CNIC images after rejection (sensitive data — no longer needed)
+    await prisma.rishtaProfile.update({
+      where: { id: req.params.id },
+      data: { cnicFront: null, cnicBack: null },
+    });
+
     // Send email
     if (profile.user.email) {
       await sendRishtaRejectionEmail(profile.user.email, profile.user.name, reason);
     }
 
-    res.json({ message: 'Rishta profile rejected.' });
+    res.json({ message: 'Rishta profile rejected, CNIC images deleted.' });
   } catch (error) {
     console.error('Reject rishta error:', error);
     res.status(500).json({ error: 'Failed to reject profile.' });

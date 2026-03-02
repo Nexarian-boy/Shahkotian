@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { restaurantsAPI } from '../services/api';
+import AdBanner from '../components/AdBanner';
 
 export default function RestaurantDealsScreen({ navigation, route }) {
   const { isAdmin } = useAuth();
@@ -262,7 +263,9 @@ export default function RestaurantDealsScreen({ navigation, route }) {
   };
 
   // Render deal card
-  const renderDealCard = ({ item }) => (
+  const renderDealCard = ({ item }) => {
+    if (item.type === 'AD_ITEM') return <AdBanner />;
+    return (
     <TouchableOpacity
       style={styles.dealCard}
       onPress={() => loadRestaurantDetail(item.restaurant?.id || item.restaurantId)}
@@ -292,10 +295,12 @@ export default function RestaurantDealsScreen({ navigation, route }) {
         )}
       </View>
     </TouchableOpacity>
-  );
+  );};
 
   // Render restaurant card
-  const renderRestaurantCard = ({ item }) => (
+  const renderRestaurantCard = ({ item }) => {
+    if (item.type === 'AD_ITEM') return <AdBanner />;
+    return (
     <TouchableOpacity style={styles.restaurantCard} onPress={() => loadRestaurantDetail(item.id)}>
       <View style={styles.restHeader}>
         {item.image ? (
@@ -344,7 +349,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
         </View>
       )}
     </TouchableOpacity>
-  );
+  );};
 
   if (loading) {
     return (
@@ -388,7 +393,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
       {/* Deals Tab */}
       {activeTab === 'deals' && (
         <FlatList
-          data={allDeals}
+          data={(() => { const out = []; allDeals.forEach((d, i) => { out.push(d); if ((i + 1) % 4 === 0) out.push({ id: `ad-deal-${i}`, type: 'AD_ITEM' }); }); return out; })()}
           keyExtractor={(item) => item.id}
           renderItem={renderDealCard}
           contentContainerStyle={{ padding: 12 }}
@@ -406,7 +411,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
       {/* Restaurants Tab */}
       {activeTab === 'restaurants' && (
         <FlatList
-          data={restaurants}
+          data={(() => { const out = []; restaurants.forEach((r, i) => { out.push(r); if ((i + 1) % 4 === 0) out.push({ id: `ad-rest-${i}`, type: 'AD_ITEM' }); }); return out; })()}
           keyExtractor={(item) => item.id}
           renderItem={renderRestaurantCard}
           contentContainerStyle={{ padding: 12 }}

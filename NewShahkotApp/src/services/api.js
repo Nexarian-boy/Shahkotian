@@ -220,6 +220,8 @@ export const adminAPI = {
   // Storage / DB info
   getStorage: () => api.get('/admin/storage'),
   getDbStatus: () => api.get('/db-status'),
+  getCloudinaryStatus: () => api.get('/cloudinary-status'),
+  switchCloudinary: (index) => api.post('/cloudinary-switch', { index }),
   // Cleanup old records
   cleanup: (target, olderThanDays = 30) => api.post('/admin/cleanup', { target, olderThanDays }),
 };
@@ -228,6 +230,8 @@ export const adminAPI = {
 export const reportsAPI = {
   getAll: (params) => api.get('/reports', { params }),
   takeAction: (id, action) => api.put(`/reports/${id}/action`, { action }),
+  // Submit a content report (posts, listings, users, etc.)
+  submit: (data) => api.post('/reports', data), // { targetType, targetId, targetUserId, reason }
 };
 
 // ============ DOCTORS API ============

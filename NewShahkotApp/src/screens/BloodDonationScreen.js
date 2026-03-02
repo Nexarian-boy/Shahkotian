@@ -6,6 +6,7 @@ import {
 import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { bloodAPI } from '../services/api';
+import AdBanner from '../components/AdBanner';
 
 const BLOOD_GROUPS = [
   { key: 'A_POSITIVE', label: 'A+', color: '#EF4444' },
@@ -142,6 +143,7 @@ export default function BloodDonationScreen({ navigation }) {
   const getGroupInfo = (key) => BLOOD_GROUPS.find(g => g.key === key) || { label: key, color: '#999' };
 
   const renderDonor = ({ item }) => {
+    if (item.type === 'AD_ITEM') return <AdBanner />;
     const groupInfo = getGroupInfo(item.bloodGroup);
     return (
       <View style={[styles.donorCard, item.isEmergency && styles.emergencyCard]}>
@@ -266,7 +268,7 @@ export default function BloodDonationScreen({ navigation }) {
         </View>
       ) : (
         <FlatList
-          data={donors}
+          data={(() => { const out = []; donors.forEach((d, i) => { out.push(d); if ((i + 1) % 4 === 0) out.push({ id: `ad-blood-${i}`, type: 'AD_ITEM' }); }); return out; })()}
           keyExtractor={(item) => item.id}
           renderItem={renderDonor}
           contentContainerStyle={{ padding: 12, paddingBottom: 40 }}

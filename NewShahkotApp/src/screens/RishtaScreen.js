@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { rishtaAPI, dmAPI } from '../services/api';
+import AdBanner from '../components/AdBanner';
 
 export default function RishtaScreen({ navigation }) {
   const { user, isVerified } = useAuth();
@@ -228,6 +229,21 @@ export default function RishtaScreen({ navigation }) {
       Alert.alert('Required Fields', 'Please fill in all required fields.');
       return;
     }
+
+    // 18+ age restriction required for matrimonial service
+    const ageNum = parseInt(age, 10);
+    if (isNaN(ageNum) || ageNum < 18) {
+      Alert.alert(
+        'Age Restriction',
+        'The Rishta service is only available for users aged 18 and above. This is a matrimonial platform for adults only.'
+      );
+      return;
+    }
+    if (ageNum > 80) {
+      Alert.alert('Invalid Age', 'Please enter a valid age.');
+      return;
+    }
+
     if (!cnicFront || !cnicBack) {
       Alert.alert('CNIC Required', 'Please upload both CNIC front and back images.');
       return;
@@ -615,10 +631,12 @@ export default function RishtaScreen({ navigation }) {
       {/* Browse Profiles */}
       {activeTab === 'browse' && (
         <FlatList
-          data={profiles}
+          data={(() => { const out = []; profiles.forEach((p, i) => { out.push(p); if ((i + 1) % 4 === 0) out.push({ id: `ad-rishta-${i}`, type: 'AD_ITEM' }); }); return out; })()}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ padding: 12 }}
-          renderItem={({ item }) => (
+          renderItem={({ item }) => {
+            if (item.type === 'AD_ITEM') return <AdBanner />;
+            return (
             <View style={styles.profileCard}>
               <View style={styles.profileHeader}>
                 <View style={[styles.profileAvatar, item.gender === 'Female' ? styles.avatarFemale : styles.avatarMale]}>
@@ -672,7 +690,7 @@ export default function RishtaScreen({ navigation }) {
                 </TouchableOpacity>
               </View>
             </View>
-          )}
+          );}}
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyIcon}>💑</Text>

@@ -255,8 +255,8 @@ model Shop {
 model RishtaProfile {
   id             String       @id @default(uuid())
   userId         String       @unique
-  cnicFront      String // Image URL
-  cnicBack       String // Image URL
+  cnicFront      String? // Image URL — auto-deleted after admin decision (privacy)
+  cnicBack       String? // Image URL — auto-deleted after admin decision (privacy)
   age            Int
   gender         String
   education      String

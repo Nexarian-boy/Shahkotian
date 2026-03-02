@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator, Modal, ScrollView,
@@ -9,6 +9,7 @@ import { COLORS, JOB_CATEGORIES, JOB_TYPES } from '../config/constants';
 import { jobsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import SkeletonLoader from '../components/SkeletonLoader';
+import AdBanner from '../components/AdBanner';
 
 const getCategoryInfo = (key) => JOB_CATEGORIES.find(c => c.key === key) || { label: key, icon: '📦' };
 const getTypeLabel = (key) => JOB_TYPES.find(t => t.key === key)?.label || key;
@@ -148,6 +149,7 @@ export default function JobsScreen({ navigation }) {
   };
 
   const renderJob = ({ item }) => {
+    if (item.type === 'AD_ITEM') return <AdBanner />;
     const cat = getCategoryInfo(item.category);
     return (
       <TouchableOpacity
@@ -460,7 +462,7 @@ export default function JobsScreen({ navigation }) {
         <SkeletonLoader type="list" count={4} />
       ) : (
         <FlatList
-          data={showMyJobs ? myJobs : jobs}
+          data={(() => { const src = showMyJobs ? myJobs : jobs; const out = []; src.forEach((j, i) => { out.push(j); if ((i + 1) % 4 === 0) out.push({ id: `ad-job-${i}`, type: 'AD_ITEM' }); }); return out; })()}
           renderItem={renderJob}
           keyExtractor={(item) => item.id}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadJobs(); }} />}

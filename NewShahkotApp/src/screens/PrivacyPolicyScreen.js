@@ -18,7 +18,7 @@ export default function PrivacyPolicyScreen({ navigation }) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.appName}>{APP_NAME}</Text>
-        <Text style={styles.date}>Last updated: February 2026</Text>
+        <Text style={styles.date}>Last updated: March 2026</Text>
 
         <Section title="1. Introduction">
           Apna Shahkot ("the App") is a community platform exclusively for residents and people
@@ -59,10 +59,12 @@ export default function PrivacyPolicyScreen({ navigation }) {
           We do not sell or share location data with third parties.
         </Section>
 
-        <Section title="5. Media Uploads">
-          Photos and videos you upload are stored securely on Cloudinary (cloudinary.com).
-          CNIC images submitted for Rishta verification are stored securely and are visible
-          only to the Admin for verification purposes.
+        <Section title="5. Media Uploads & CNIC Data">
+          {'Photos and videos you upload are stored on Cloudinary (cloudinary.com).\n\n' +
+            'CNIC images submitted for Rishta verification are stored only until the admin makes an approval or rejection decision. ' +
+            'They are automatically and permanently deleted immediately after the decision is made. ' +
+            'CNIC images are visible only to the App Admin and are used solely to verify age (18+) and identity. ' +
+            'They are never shared with other users, third parties, or advertisers.'}
         </Section>
 
         <Section title="6. Data Retention & Account Deletion">
@@ -78,12 +80,23 @@ export default function PrivacyPolicyScreen({ navigation }) {
           We do not share your data with advertisers or external marketing companies.
         </Section>
 
+        <Section title="7a. User-Generated Content & Reporting">
+          {'All posts, listings, chat messages, and other content published in the app are user-generated. ' +
+            'Apna Shahkot does not endorse any user content.\\n\\n' +
+            'Users can report content that violates our community guidelines using the Report (🚩) button available on posts. ' +
+            'Reports are reviewed by the admin team. Violating content is removed within 24-72 hours. ' +
+            'Repeat offenders will be permanently banned.\\n\\n' +
+            'To report any content, contact: mypcjnaab@gmail.com or WhatsApp +92 342 5844921.'}
+        </Section>
+
         <Section title="8. Third-Party Services">
           <BulletList items={[
             'Cloudinary — media storage (cloudinary.com/privacy)',
-            'Render — backend hosting (render.com/privacy)',
-            'Google / Gmail — OTP and notification emails',
-            'Firebase (optional) — push notifications (firebase.google.com/support/privacy)',
+            'DigitalOcean — backend hosting (digitalocean.com/legal/privacy-policy)',
+            'Amazon Web Services SES — transactional email (aws.amazon.com/privacy)',
+            'Firebase — push notifications (firebase.google.com/support/privacy)',
+            'Google AdMob — in-app advertising (policies.google.com/privacy)',
+            'Neon — database hosting (neon.tech/privacy)',
           ]} />
         </Section>
 
@@ -93,10 +106,12 @@ export default function PrivacyPolicyScreen({ navigation }) {
           and are stored securely on your device.
         </Section>
 
-        <Section title="10. Children's Privacy">
-          This App is intended for users aged 13 and above. We do not knowingly collect
-          personal information from children under 13. If you believe a child has provided
-          us with personal data, please contact us and we will delete it.
+        <Section title="10. Children's Privacy &amp; Age Requirements">
+          {'This App is intended for users aged 13 and above. We do not knowingly collect ' +
+            'personal information from children under 13.\n\n' +
+            'The Rishta (matrimonial) feature is restricted to users aged 18 and above. ' +
+            'Age is verified via CNIC. Misrepresentation of age will result in immediate account termination.\n\n' +
+            'If you believe a child has provided us with personal data, please contact us and we will delete it.'}
         </Section>
 
         <Section title="11. Your Rights">

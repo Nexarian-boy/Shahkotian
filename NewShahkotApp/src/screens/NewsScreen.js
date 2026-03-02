@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   RefreshControl, Image, Modal, ScrollView, TextInput, Alert,
@@ -8,6 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { COLORS, NEWS_CATEGORIES } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { newsAPI } from '../services/api';
+import AdBanner from '../components/AdBanner';
 
 export default function NewsScreen() {
   const { isAdmin } = useAuth();
@@ -101,7 +102,19 @@ export default function NewsScreen() {
     ]);
   };
 
-  const renderArticle = ({ item }) => (
+  // Inject an ad placeholder after every 3rd article
+  const newsWithAds = useMemo(() => {
+    const out = [];
+    news.forEach((article, i) => {
+      out.push(article);
+      if ((i + 1) % 3 === 0) out.push({ id: `ad-news-${i}`, type: 'AD_ITEM' });
+    });
+    return out;
+  }, [news]);
+
+  const renderArticle = ({ item }) => {
+    if (item.type === 'AD_ITEM') return <AdBanner />;
+    return (
     <TouchableOpacity style={styles.card} activeOpacity={0.8} onPress={() => setSelectedArticle(item)}>
       {item.images?.length > 0 && (
         <Image source={{ uri: item.images[0] }} style={styles.articleImage} resizeMode="cover" />
@@ -122,7 +135,8 @@ export default function NewsScreen() {
         </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -154,7 +168,7 @@ export default function NewsScreen() {
       />
 
       <FlatList
-        data={news}
+        data={newsWithAds}
         renderItem={renderArticle}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={loadNews} colors={[COLORS.primary]} />}

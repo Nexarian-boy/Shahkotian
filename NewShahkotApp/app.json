@@ -52,9 +52,16 @@
     },
     "plugins": [
       [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-9583068113931056~4534630315",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
+      [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Shahkot App needs location to verify you are within the Shahkot area."
+          "locationAlwaysAndWhenInUsePermission": "Apna Shahkot is only available within 50 km of Shahkot city. Your location is required to verify you are within the service area. Location is never tracked, sold, or shared with third parties."
         }
       ],
       [
