@@ -113,14 +113,16 @@ export default function LoginScreen({ navigation }) {
         { text: 'Retry', onPress: checkLocation },
       ]);
     }
-    if (otp.trim().length !== 6) return Alert.alert('Invalid OTP', 'Please enter the 6-digit code.');
+    // Strip all non-digit characters (handles invisible Unicode chars copied from Gmail)
+    const cleanOtp = otp.replace(/\D/g, '');
+    if (cleanOtp.length !== 6) return Alert.alert('Invalid OTP', 'Please enter the 6-digit code.');
     setLoading(true);
     try {
       await register({
         name: name.trim(),
         email: email.trim(),
         password: password.trim(),
-        otp: otp.trim(),
+        otp: cleanOtp,
         phone: phone.trim() || undefined,
         whatsapp: phone.trim() || undefined,
         latitude: userCoords?.latitude,

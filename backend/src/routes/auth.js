@@ -114,7 +114,8 @@ router.post('/register', geofenceCheck, async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     }
 
-    // Verify OTP
+    // Verify OTP (strip any non-digit chars that email clients might paste)
+    const cleanOtp = (otp || '').replace(/\D/g, '');
     const otpRecord = await prisma.emailOtp.findFirst({
       where: { email, used: false },
       orderBy: { createdAt: 'desc' },
@@ -123,7 +124,7 @@ router.post('/register', geofenceCheck, async (req, res) => {
     if (!otpRecord) {
       return res.status(400).json({ error: 'No OTP found. Please request a new one.' });
     }
-    if (otpRecord.otp !== otp) {
+    if (otpRecord.otp !== cleanOtp) {
       return res.status(400).json({ error: 'Incorrect OTP. Please try again.' });
     }
     if (otpRecord.expiresAt < new Date()) {

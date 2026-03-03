@@ -36,7 +36,7 @@ api.interceptors.response.use(
 // ============ AUTH API ============
 export const authAPI = {
   sendOtp: (email) => api.post('/auth/send-otp', { email }, { timeout: 60000 }),
-  register: (data) => api.post('/auth/register', data),
+  register: (data) => api.post('/auth/register', data, { timeout: 60000 }),
   login: (data) => api.post('/auth/login', data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }, { timeout: 60000 }),
   resetPassword: (data) => api.post('/auth/reset-password', data),
