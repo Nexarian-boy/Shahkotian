@@ -72,17 +72,11 @@
         }
       ]
     ],
+    "owner": "salman38",
     "extra": {
       "eas": {
-        "projectId": "6ed77a1d-aba9-4155-b44c-193887abc36d"
+        "projectId": "be4df999-170d-4c32-8369-2c0aaea183b6"
       }
-    },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/6ed77a1d-aba9-4155-b44c-193887abc36d"
-    },
-    "owner": "salman39"
+    }
   }
 }
