@@ -90,6 +90,7 @@ model User {
 
   isBlocked     Boolean  @default(false)
   lastSeenAt    DateTime?
+  fcmToken      String?  // Device token for push notifications (FCM/APNs)
 
   posts         Post[]
   comments      Comment[]

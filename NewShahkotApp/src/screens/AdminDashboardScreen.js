@@ -16,10 +16,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../config/constants';
 import { adminAPI, newsAPI, listingsAPI, reportsAPI } from '../services/api';
+import { notificationsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const { width } = Dimensions.get('window');
-const TABS = ['Overview', 'Users', 'Rishta', 'Reports', 'News', 'Storage'];
+const TABS = ['Overview', 'Users', 'Rishta', 'Reports', 'News', 'Notify', 'Storage'];
 
 export default function AdminDashboardScreen({ navigation }) {
   const { loading: authLoading } = useAuth();
@@ -40,6 +41,10 @@ export default function AdminDashboardScreen({ navigation }) {
   const [dataLoaded, setDataLoaded] = useState({});
   const [reports, setReports] = useState([]);
   const [reportFilter, setReportFilter] = useState('PENDING');
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifBody, setNotifBody] = useState('');
+  const [notifSending, setNotifSending] = useState(false);
+  const [notifStats, setNotifStats] = useState(null);
 
   // Wait for auth token to load before fetching
   useEffect(() => {
@@ -75,6 +80,9 @@ export default function AdminDashboardScreen({ navigation }) {
       } else if (activeTab === 'Reports') {
         const res = await reportsAPI.getAll({ status: reportFilter });
         setReports(res.data.reports || []);
+      } else if (activeTab === 'Notify') {
+        const res = await adminAPI.getNotificationStats();
+        setNotifStats(res.data);
       } else if (activeTab === 'Storage') {
         try {
           const [dbRes, storRes, cloudRes] = await Promise.all([
@@ -656,6 +664,114 @@ export default function AdminDashboardScreen({ navigation }) {
     />
   );
 
+  const handleSendNotification = async () => {
+    if (!notifTitle.trim() || !notifBody.trim()) {
+      Alert.alert('Incomplete', 'Please enter both title and message.');
+      return;
+    }
+    Alert.alert(
+      'Send to All Users?',
+      `Title: "${notifTitle}"\n\nMessage: "${notifBody}"\n\nThis will be sent to ALL active users.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send Now 🔔',
+          onPress: async () => {
+            try {
+              setNotifSending(true);
+              const res = await adminAPI.sendNotification({ title: notifTitle.trim(), body: notifBody.trim() });
+              Alert.alert(
+                'Sent! ✅',
+                `Notification sent to ${res.data.inAppSaved} users.\nPush delivered: ${res.data.pushSent}\nPush-enabled devices: ${res.data.pushTokensFound}`
+              );
+              setNotifTitle('');
+              setNotifBody('');
+              // Refresh stats
+              const statsRes = await adminAPI.getNotificationStats();
+              setNotifStats(statsRes.data);
+            } catch (err) {
+              Alert.alert('Error', err.response?.data?.error || 'Failed to send notification.');
+            } finally {
+              setNotifSending(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const renderNotifications = () => (
+    <ScrollView style={styles.tabContent} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}>
+      {/* Stats Banner */}
+      {notifStats && (
+        <View style={styles.notifStatsBanner}>
+          <View style={styles.notifStatItem}>
+            <Text style={styles.notifStatNum}>{notifStats.totalUsers}</Text>
+            <Text style={styles.notifStatLabel}>Total Users</Text>
+          </View>
+          <View style={[styles.notifStatItem, { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.3)' }]}>
+            <Text style={styles.notifStatNum}>{notifStats.pushEnabled}</Text>
+            <Text style={styles.notifStatLabel}>Push Enabled 🔔</Text>
+          </View>
+          <View style={[styles.notifStatItem, { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.3)' }]}>
+            <Text style={styles.notifStatNum}>{notifStats.pushDisabled}</Text>
+            <Text style={styles.notifStatLabel}>No Push</Text>
+          </View>
+        </View>
+      )}
+
+      <Text style={styles.sectionTitle}>Send Push Notification</Text>
+      <Text style={{ fontSize: 13, color: COLORS.textLight, marginBottom: 16, lineHeight: 20 }}>
+        Notification will appear on users' phones even when the app is closed, like WhatsApp or Instagram notifications.
+      </Text>
+
+      <View style={styles.notifInputCard}>
+        <Text style={styles.notifInputLabel}>Notification Title</Text>
+        <TextInput
+          style={styles.notifInput}
+          placeholder="e.g. Shahkot Mela 2026 🎉"
+          placeholderTextColor={COLORS.textLight}
+          value={notifTitle}
+          onChangeText={setNotifTitle}
+          maxLength={100}
+        />
+        <Text style={[styles.notifInputLabel, { marginTop: 12 }]}>Message</Text>
+        <TextInput
+          style={[styles.notifInput, { height: 100, textAlignVertical: 'top' }]}
+          placeholder="e.g. Apna Shahkot mein aaj raat Mela hai, zaroor aayein!"
+          placeholderTextColor={COLORS.textLight}
+          value={notifBody}
+          onChangeText={setNotifBody}
+          multiline
+          maxLength={500}
+        />
+        <Text style={{ fontSize: 12, color: COLORS.textLight, textAlign: 'right', marginTop: 4 }}>{notifBody.length}/500</Text>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.sendNotifBtn, notifSending && { opacity: 0.6 }]}
+        onPress={handleSendNotification}
+        disabled={notifSending}
+      >
+        {notifSending
+          ? <ActivityIndicator color="#fff" />
+          : <>
+              <Ionicons name="notifications" size={22} color="#fff" />
+              <Text style={styles.sendNotifBtnText}>Send to All Users</Text>
+            </>
+        }
+      </TouchableOpacity>
+
+      <View style={styles.notifTipsCard}>
+        <Text style={styles.notifTipsTitle}>💡 Tips for Good Notifications</Text>
+        <Text style={styles.notifTip}>• Short title (max 50 chars) — people see this first</Text>
+        <Text style={styles.notifTip}>• Message should be interesting & action-oriented</Text>
+        <Text style={styles.notifTip}>• Don't send more than 2-3 per day</Text>
+        <Text style={styles.notifTip}>• Works even when app is closed or in background</Text>
+      </View>
+    </ScrollView>
+  );
+
   const renderTab = () => {
     if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
     switch (activeTab) {
@@ -664,6 +780,7 @@ export default function AdminDashboardScreen({ navigation }) {
       case 'Rishta': return renderRishta();
       case 'Reports': return renderReports();
       case 'News': return renderNews();
+      case 'Notify': return renderNotifications();
       case 'Storage': return renderStorage();
       default: return null;
     }
@@ -941,4 +1058,59 @@ const styles = StyleSheet.create({
   cleanupBtnIcon: { fontSize: 22, marginRight: 12 },
   cleanupBtnTitle: { fontSize: 14, fontWeight: '700', color: '#C62828' },
   cleanupBtnSub: { fontSize: 12, color: COLORS.textLight, marginTop: 2 },
+  // ---- Notifications tab ----
+  notifStatsBanner: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    elevation: 4,
+  },
+  notifStatItem: { flex: 1, alignItems: 'center', paddingHorizontal: 8 },
+  notifStatNum: { fontSize: 26, fontWeight: '800', color: '#fff' },
+  notifStatLabel: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2, textAlign: 'center' },
+  notifInputCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+  },
+  notifInputLabel: { fontSize: 13, fontWeight: '700', color: COLORS.text, marginBottom: 6 },
+  notifInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    color: COLORS.text,
+    backgroundColor: COLORS.background,
+  },
+  sendNotifBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: COLORS.primary,
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginBottom: 20,
+    elevation: 4,
+  },
+  sendNotifBtnText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  notifTipsCard: {
+    backgroundColor: '#F0FFF4',
+    borderRadius: 14,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+    marginBottom: 30,
+  },
+  notifTipsTitle: { fontSize: 14, fontWeight: '700', color: '#2E7D32', marginBottom: 10 },
+  notifTip: { fontSize: 13, color: '#388E3C', lineHeight: 22 },
 });

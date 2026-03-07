@@ -146,6 +146,8 @@ export const notificationsAPI = {
   getAll: (page = 1) => api.get(`/notifications?page=${page}`),
   markRead: (id) => api.put(`/notifications/${id}/read`),
   markAllRead: () => api.put('/notifications/read-all'),
+  saveFcmToken: (token) => api.put('/notifications/fcm-token', { token }),
+  removeFcmToken: () => api.delete('/notifications/fcm-token'),
 };
 
 // ============ CHAT API ============
@@ -224,6 +226,9 @@ export const adminAPI = {
   switchCloudinary: (index) => api.post('/cloudinary-switch', { index }),
   // Cleanup old records
   cleanup: (target, olderThanDays = 30) => api.post('/admin/cleanup', { target, olderThanDays }),
+  // Push notifications
+  sendNotification: (data) => api.post('/admin/send-notification', data),
+  getNotificationStats: () => api.get('/admin/notification-stats'),
 };
 
 // ============ REPORTS API ============

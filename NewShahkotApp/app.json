@@ -21,7 +21,8 @@
         "NSLocationAlwaysUsageDescription": "Shahkot App needs your location to verify you are within the Shahkot area.",
         "NSCameraUsageDescription": "Shahkot App needs camera access to upload profile photos and post images.",
         "NSMicrophoneUsageDescription": "Shahkot App needs microphone access to record voice messages.",
-        "NSPhotoLibraryUsageDescription": "Shahkot App needs photo library access to select images and videos."
+        "NSPhotoLibraryUsageDescription": "Shahkot App needs photo library access to select images and videos.",
+        "NSUserNotificationsUsageDescription": "Apna Shahkot sends you notifications about important community updates, news, and activities in your area."
       }
     },
     "android": {
@@ -44,13 +45,23 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.INTERNET",
         "android.permission.VIBRATE",
-        "android.permission.RECEIVE_BOOT_COMPLETED"
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#0C8A43",
+          "defaultChannel": "apnashahkot_default",
+          "sounds": []
+        }
+      ],
       [
         "react-native-google-mobile-ads",
         {

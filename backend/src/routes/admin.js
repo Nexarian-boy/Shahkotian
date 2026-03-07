@@ -4,6 +4,7 @@ const prisma = require('../config/database');
 const { authenticate, adminOnly } = require('../middleware/auth');
 const { sendRishtaApprovalEmail, sendRishtaRejectionEmail } = require('../utils/email');
 const { deleteFromCloudinary } = require('../utils/cloudinaryUpload');
+const firebaseAdmin = require('../config/firebase');
 
 const router = express.Router();
 
@@ -580,6 +581,134 @@ router.post('/cleanup', async (req, res) => {
   } catch (error) {
     console.error('Cleanup error:', error);
     res.status(500).json({ error: 'Failed to cleanup.' });
+  }
+});
+
+// ============ PUSH NOTIFICATIONS ============
+
+/**
+ * POST /api/admin/send-notification
+ * Send a push notification to ALL users (or optionally a subset)
+ * body: { title, body, data? }
+ */
+router.post('/send-notification', async (req, res) => {
+  try {
+    const { title, body, data = {} } = req.body;
+
+    if (!title || !body) {
+      return res.status(400).json({ error: 'title and body are required.' });
+    }
+
+    // Save as in-app notification for every user (so it shows in Notifications screen too)
+    const allUsers = await prisma.user.findMany({
+      where: { isActive: true },
+      select: { id: true, fcmToken: true },
+    });
+
+    if (allUsers.length === 0) {
+      return res.json({ message: 'No active users found.', sent: 0, failed: 0 });
+    }
+
+    // Save in-app notifications in bulk
+    await prisma.notification.createMany({
+      data: allUsers.map((u) => ({
+        userId: u.id,
+        title,
+        body,
+      })),
+    });
+
+    // Collect valid FCM tokens
+    const tokens = allUsers.map((u) => u.fcmToken).filter(Boolean);
+
+    let fcmResult = { successCount: 0, failureCount: 0 };
+
+    if (tokens.length > 0 && firebaseAdmin) {
+      // FCM allows max 500 tokens per multicast — send in batches
+      const BATCH = 500;
+      for (let i = 0; i < tokens.length; i += BATCH) {
+        const batch = tokens.slice(i, i + BATCH);
+        try {
+          const response = await firebaseAdmin.messaging().sendEachForMulticast({
+            tokens: batch,
+            notification: { title, body },
+            data: Object.fromEntries(
+              Object.entries(data).map(([k, v]) => [k, String(v)])
+            ),
+            android: {
+              priority: 'high',
+              notification: {
+                channelId: 'apnashahkot_default',
+                sound: 'default',
+                priority: 'high',
+                defaultVibrateTimings: true,
+              },
+            },
+            apns: {
+              payload: {
+                aps: {
+                  sound: 'default',
+                  badge: 1,
+                  'content-available': 1,
+                },
+              },
+            },
+          });
+          fcmResult.successCount += response.successCount;
+          fcmResult.failureCount += response.failureCount;
+
+          // Clean up invalid/expired tokens
+          const invalidTokenUsers = [];
+          response.responses.forEach((r, idx) => {
+            if (
+              !r.success &&
+              (r.error?.code === 'messaging/invalid-registration-token' ||
+                r.error?.code === 'messaging/registration-token-not-registered')
+            ) {
+              invalidTokenUsers.push(batch[idx]);
+            }
+          });
+          if (invalidTokenUsers.length > 0) {
+            await prisma.user.updateMany({
+              where: { fcmToken: { in: invalidTokenUsers } },
+              data: { fcmToken: null },
+            });
+          }
+        } catch (batchErr) {
+          console.error('FCM batch error:', batchErr.message);
+          fcmResult.failureCount += batch.length;
+        }
+      }
+    }
+
+    res.json({
+      message: `Notification sent to ${allUsers.length} users.`,
+      inAppSaved: allUsers.length,
+      pushTokensFound: tokens.length,
+      pushSent: fcmResult.successCount,
+      pushFailed: fcmResult.failureCount,
+      firebaseConfigured: !!firebaseAdmin,
+    });
+  } catch (error) {
+    console.error('Send notification error:', error);
+    res.status(500).json({ error: 'Failed to send notification.' });
+  }
+});
+
+/**
+ * GET /api/admin/notification-stats
+ * How many users have FCM tokens (push-enabled)
+ */
+router.get('/notification-stats', async (req, res) => {
+  try {
+    const [totalUsers, pushEnabled] = await Promise.all([
+      prisma.user.count({ where: { isActive: true } }),
+      prisma.user.count({ where: { isActive: true, fcmToken: { not: null } } }),
+    ]);
+    res.json({ totalUsers, pushEnabled, pushDisabled: totalUsers - pushEnabled });
+  } catch (error) {
+    console.error('Notification stats error:', error);
+    res.status(500).json({ error: 'Failed to load stats.' });
   }
 });
 

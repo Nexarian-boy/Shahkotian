@@ -1,8 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authAPI } from '../services/api';
+import { Platform } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import { authAPI, notificationsAPI } from '../services/api';
 
 const AuthContext = createContext(null);
+
+// Configure how notifications appear when app is in foreground
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -12,6 +24,46 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     loadStoredAuth();
   }, []);
+
+  // Register for push notifications and save token to backend
+  const registerPushToken = async () => {
+    try {
+      if (!Device.isDevice) return; // Does not work on emulator/simulator
+
+      // Create the high-priority notification channel for Android
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('apnashahkot_default', {
+          name: 'Apna Shahkot',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#0C8A43',
+          sound: 'default',
+          enableLights: true,
+          enableVibrate: true,
+          showBadge: true,
+        });
+      }
+
+      // Request permission (required on iOS 12+ and Android 13+)
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') return;
+
+      // Get the native device push token (works for both FCM and APNs)
+      const pushToken = (await Notifications.getDevicePushTokenAsync()).data;
+      if (!pushToken) return;
+
+      // Save to backend
+      await notificationsAPI.saveFcmToken(pushToken);
+    } catch (err) {
+      // Non-critical — don't crash the app
+      console.warn('Push token registration failed:', err.message);
+    }
+  };
 
   const loadStoredAuth = async () => {
     try {
@@ -42,6 +94,10 @@ export function AuthProvider({ children }) {
 
     setToken(newToken);
     setUser(newUser);
+
+    // Register push token after login succeeds
+    registerPushToken();
+
     return newUser;
   };
 
@@ -56,10 +112,18 @@ export function AuthProvider({ children }) {
 
     setToken(newToken);
     setUser(newUser);
+
+    // Register push token after registration succeeds
+    registerPushToken();
+
     return newUser;
   };
 
   const logout = async () => {
+    // Remove FCM token from backend so user stops receiving pushes
+    try {
+      await notificationsAPI.removeFcmToken();
+    } catch (_) {}
     await AsyncStorage.multiRemove(['token', 'user']);
     setToken(null);
     setUser(null);

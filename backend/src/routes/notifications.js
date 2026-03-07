@@ -5,6 +5,46 @@ const { authenticate } = require('../middleware/auth');
 const router = express.Router();
 
 /**
+ * PUT /api/notifications/fcm-token
+ * Save or update the user's FCM device token for push notifications
+ */
+router.put('/fcm-token', authenticate, async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token || typeof token !== 'string' || token.trim().length === 0) {
+      return res.status(400).json({ error: 'Valid FCM token is required.' });
+    }
+
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { fcmToken: token.trim() },
+    });
+
+    res.json({ message: 'FCM token saved.' });
+  } catch (error) {
+    console.error('Save FCM token error:', error);
+    res.status(500).json({ error: 'Failed to save FCM token.' });
+  }
+});
+
+/**
+ * DELETE /api/notifications/fcm-token
+ * Remove FCM token (on logout, so user stops receiving notifications)
+ */
+router.delete('/fcm-token', authenticate, async (req, res) => {
+  try {
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { fcmToken: null },
+    });
+    res.json({ message: 'FCM token removed.' });
+  } catch (error) {
+    console.error('Remove FCM token error:', error);
+    res.status(500).json({ error: 'Failed to remove FCM token.' });
+  }
+});
+
+/**
  * GET /api/notifications
  * Get user's notifications
  */
