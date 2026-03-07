@@ -47,13 +47,15 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
+const { authenticate, adminOnly } = require('./middleware/auth');
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Apna Shahkot API is running', timestamp: new Date() });
 });
 
-// Database status endpoint
-app.get('/api/db-status', async (req, res) => {
+// Database status endpoint (admin only)
+app.get('/api/db-status', authenticate, adminOnly, async (req, res) => {
   try {
     const dbManager = prisma.__dbManager;
     if (dbManager) {
@@ -66,8 +68,8 @@ app.get('/api/db-status', async (req, res) => {
   }
 });
 
-// Cloudinary status endpoint
-app.get('/api/cloudinary-status', async (req, res) => {
+// Cloudinary status endpoint (admin only)
+app.get('/api/cloudinary-status', authenticate, adminOnly, async (req, res) => {
   try {
     const cloudinaryModule = require('./config/cloudinary');
     const manager = cloudinaryModule.manager;
@@ -82,7 +84,7 @@ app.get('/api/cloudinary-status', async (req, res) => {
 });
 
 // Cloudinary manual switch endpoint (admin only)
-app.post('/api/cloudinary-switch', async (req, res) => {
+app.post('/api/cloudinary-switch', authenticate, adminOnly, async (req, res) => {
   try {
     const { index } = req.body;
     if (typeof index !== 'number' && typeof index !== 'string') {

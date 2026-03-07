@@ -9,8 +9,52 @@ const { uploadImageFile } = require('../utils/imageUpload');
 const { sendEmail } = require('../utils/email');
 const multer = require('multer');
 
+const crypto = require('crypto');
+
 function generateOTP() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 1000000).toString();
+}
+
+function hashOTP(otp) {
+  return crypto.createHash('sha256').update(otp).digest('hex');
+}
+
+// ── In-memory rate-limiting & OTP brute-force protection ───────────────
+const otpVerifyAttempts = new Map(); // email → { count, lockedUntil }
+const otpSendTracker = new Map();    // email → { count, windowStart }
+const MAX_VERIFY_ATTEMPTS = 5;
+const LOCKOUT_MS = 30 * 60 * 1000;       // 30 min
+const MAX_SENDS_PER_WINDOW = 3;
+const SEND_WINDOW_MS = 15 * 60 * 1000;   // 15 min
+
+function isVerifyLocked(email) {
+  const r = otpVerifyAttempts.get(email);
+  if (!r || !r.lockedUntil) return null;
+  if (r.lockedUntil > Date.now()) return Math.ceil((r.lockedUntil - Date.now()) / 60000);
+  otpVerifyAttempts.delete(email);
+  return null;
+}
+function recordVerifyFail(email) {
+  const r = otpVerifyAttempts.get(email) || { count: 0, lockedUntil: null };
+  r.count += 1;
+  if (r.count >= MAX_VERIFY_ATTEMPTS) r.lockedUntil = Date.now() + LOCKOUT_MS;
+  otpVerifyAttempts.set(email, r);
+  return r.count >= MAX_VERIFY_ATTEMPTS;
+}
+function clearVerifyAttempts(email) { otpVerifyAttempts.delete(email); }
+
+function isSendLimited(email) {
+  const r = otpSendTracker.get(email);
+  if (!r) return null;
+  if (Date.now() - r.windowStart > SEND_WINDOW_MS) { otpSendTracker.delete(email); return null; }
+  if (r.count >= MAX_SENDS_PER_WINDOW) return Math.ceil((SEND_WINDOW_MS - (Date.now() - r.windowStart)) / 60000);
+  return null;
+}
+function recordSend(email) {
+  const r = otpSendTracker.get(email);
+  if (!r || Date.now() - r.windowStart > SEND_WINDOW_MS) {
+    otpSendTracker.set(email, { count: 1, windowStart: Date.now() });
+  } else { r.count += 1; }
 }
 
 const storage = multer.memoryStorage();
@@ -31,6 +75,10 @@ const router = express.Router();
  * Remove after confirming email works on Render
  */
 router.get('/test-smtp', async (req, res) => {
+  // Block in production unless admin secret is provided
+  if (process.env.NODE_ENV === 'production' && req.query.secret !== process.env.ADMIN_SECRET) {
+    return res.status(403).json({ error: 'Not allowed.' });
+  }
   const testEmail = req.query.email || process.env.ADMIN_EMAIL || 'test@example.com';
   const result = await sendEmail(testEmail, '✅ Email Test — Apna Shahkot', '<p>Email is working from Apna Shahkot!</p>');
   res.json({
@@ -54,6 +102,12 @@ router.post('/send-otp', async (req, res) => {
       return res.status(400).json({ error: 'A valid email address is required.' });
     }
 
+    // Rate-limit OTP sending (max 3 per 15 min per email)
+    const sendWait = isSendLimited(email);
+    if (sendWait) {
+      return res.status(429).json({ error: `Too many OTP requests. Try again in ${sendWait} minutes.` });
+    }
+
     // Check email not already registered
     const existing = await prisma.user.findFirst({ where: { email } });
     if (existing) {
@@ -65,7 +119,7 @@ router.post('/send-otp', async (req, res) => {
 
     // Remove any old OTPs for this email, then create a fresh one
     await prisma.emailOtp.deleteMany({ where: { email } });
-    await prisma.emailOtp.create({ data: { email, otp, expiresAt } });
+    await prisma.emailOtp.create({ data: { email, otp: hashOTP(otp), expiresAt } });
 
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;">
@@ -90,6 +144,7 @@ router.post('/send-otp', async (req, res) => {
       return res.status(500).json({ error: `Failed to send OTP email. (${result.error || 'SMTP error'})` });
     }
 
+    recordSend(email);
     res.json({ message: 'OTP sent to your email. Valid for 10 minutes.' });
   } catch (error) {
     console.error('Send OTP error:', error);
@@ -114,8 +169,17 @@ router.post('/register', geofenceCheck, async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     }
 
+    // Brute-force lockout check
+    const lockMin = isVerifyLocked(email);
+    if (lockMin) {
+      return res.status(429).json({ error: `Too many failed attempts. Try again in ${lockMin} minutes.` });
+    }
+
     // Verify OTP (strip any non-digit chars that email clients might paste)
     const cleanOtp = (otp || '').replace(/\D/g, '');
+    if (cleanOtp.length !== 6) {
+      return res.status(400).json({ error: 'OTP must be a 6-digit code.' });
+    }
     const otpRecord = await prisma.emailOtp.findFirst({
       where: { email, used: false },
       orderBy: { createdAt: 'desc' },
@@ -124,7 +188,12 @@ router.post('/register', geofenceCheck, async (req, res) => {
     if (!otpRecord) {
       return res.status(400).json({ error: 'No OTP found. Please request a new one.' });
     }
-    if (otpRecord.otp !== cleanOtp) {
+    if (otpRecord.otp !== hashOTP(cleanOtp)) {
+      const maxedOut = recordVerifyFail(email);
+      if (maxedOut) {
+        await prisma.emailOtp.update({ where: { id: otpRecord.id }, data: { used: true } });
+        return res.status(429).json({ error: 'Too many failed attempts. OTP invalidated. Request a new one.' });
+      }
       return res.status(400).json({ error: 'Incorrect OTP. Please try again.' });
     }
     if (otpRecord.expiresAt < new Date()) {
@@ -140,8 +209,9 @@ router.post('/register', geofenceCheck, async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Mark OTP as used
+    // Mark OTP as used & clear brute-force counter
     await prisma.emailOtp.update({ where: { id: otpRecord.id }, data: { used: true } });
+    clearVerifyAttempts(email);
 
     // Determine role
     const adminEmail = process.env.ADMIN_EMAIL;
@@ -268,11 +338,17 @@ router.post('/login', geofenceCheck, async (req, res) => {
  * POST /api/auth/forgot-password
  * Send OTP to an existing user's email for password reset
  */
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', geofenceCheck, async (req, res) => {
   try {
     const { email } = req.body;
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ error: 'A valid email address is required.' });
+    }
+
+    // Rate-limit OTP sending (max 3 per 15 min per email)
+    const sendWait = isSendLimited(email);
+    if (sendWait) {
+      return res.status(429).json({ error: `Too many OTP requests. Try again in ${sendWait} minutes.` });
     }
 
     const user = await prisma.user.findFirst({ where: { email } });
@@ -284,7 +360,7 @@ router.post('/forgot-password', async (req, res) => {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     await prisma.emailOtp.deleteMany({ where: { email } });
-    await prisma.emailOtp.create({ data: { email, otp, expiresAt } });
+    await prisma.emailOtp.create({ data: { email, otp: hashOTP(otp), expiresAt } });
 
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;">
@@ -307,6 +383,7 @@ router.post('/forgot-password', async (req, res) => {
       return res.status(500).json({ error: 'Failed to send OTP email.' });
     }
 
+    recordSend(email);
     res.json({ message: 'OTP sent to your email for password reset.' });
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -318,7 +395,7 @@ router.post('/forgot-password', async (req, res) => {
  * POST /api/auth/reset-password
  * Verify OTP and set new password
  */
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', geofenceCheck, async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
 
@@ -329,6 +406,18 @@ router.post('/reset-password', async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     }
 
+    // Brute-force lockout check
+    const lockMin = isVerifyLocked(email);
+    if (lockMin) {
+      return res.status(429).json({ error: `Too many failed attempts. Try again in ${lockMin} minutes.` });
+    }
+
+    // Sanitize OTP input
+    const cleanOtp = (otp || '').replace(/\D/g, '');
+    if (cleanOtp.length !== 6) {
+      return res.status(400).json({ error: 'OTP must be a 6-digit code.' });
+    }
+
     const otpRecord = await prisma.emailOtp.findFirst({
       where: { email, used: false },
       orderBy: { createdAt: 'desc' },
@@ -337,7 +426,12 @@ router.post('/reset-password', async (req, res) => {
     if (!otpRecord) {
       return res.status(400).json({ error: 'No OTP found. Please request a new one.' });
     }
-    if (otpRecord.otp !== otp) {
+    if (otpRecord.otp !== hashOTP(cleanOtp)) {
+      const maxedOut = recordVerifyFail(email);
+      if (maxedOut) {
+        await prisma.emailOtp.update({ where: { id: otpRecord.id }, data: { used: true } });
+        return res.status(429).json({ error: 'Too many failed attempts. OTP invalidated. Request a new one.' });
+      }
       return res.status(400).json({ error: 'Incorrect OTP.' });
     }
     if (otpRecord.expiresAt < new Date()) {
@@ -352,6 +446,7 @@ router.post('/reset-password', async (req, res) => {
     });
 
     await prisma.emailOtp.update({ where: { id: otpRecord.id }, data: { used: true } });
+    clearVerifyAttempts(email);
 
     res.json({ message: 'Password reset successful! You can now login.' });
   } catch (error) {
