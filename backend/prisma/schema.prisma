@@ -112,6 +112,7 @@ model User {
   blockedByUsers   Block[]    @relation("Blocked")
   jobs             Job[]
   jobApplications  JobApplication[]
+  appointments     Appointment[]
 
   @@index([latitude, longitude])
 }
@@ -518,25 +519,77 @@ enum DoctorSpecialty {
 }
 
 model Doctor {
-  id           String           @id @default(uuid())
-  name         String
-  specialty    DoctorSpecialty
-  clinicName   String?
-  address      String
-  phone        String
-  whatsapp     String?
-  timings      String?          // e.g., "Mon-Sat: 5PM-9PM"
-  fee          Int?             // Consultation fee in PKR
-  education    String?          // e.g., "MBBS, FCPS"
-  experience   String?          // e.g., "15 years"
-  isVerified   Boolean          @default(false)
-  latitude     Float?
-  longitude    Float?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id              String           @id @default(uuid())
+  name            String
+  specialty       DoctorSpecialty
+  clinicName      String?
+  address         String
+  phone           String
+  whatsapp        String?
+  timings         String?          // e.g., "Mon-Sat: 5PM-9PM"
+  fee             Int?             // Consultation fee in PKR
+  education       String?          // e.g., "MBBS, FCPS"
+  experience      String?          // e.g., "15 years"
+  isVerified      Boolean          @default(false)
+  latitude        Float?
+  longitude       Float?
+  // Doctor login & online booking
+  email           String?          @unique
+  password        String?          // Hashed
+  onlineBooking   Boolean          @default(false)
+  paymentMethod   String?          // e.g., "EasyPaisa", "JazzCash"
+  paymentAccount  String?          // Account number
+  startTime       String?          // e.g., "17:00"
+  endTime         String?          // e.g., "21:00"
+  avgConsultTime  Int              @default(15) // minutes per patient
+  currentToken    Int              @default(0)
+  totalTokensToday Int             @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  appointments    Appointment[]
 
   @@index([specialty])
   @@index([name])
+  @@index([email])
+}
+
+// ============ APPOINTMENTS ============
+
+enum AppointmentStatus {
+  PENDING
+  APPROVED
+  PAYMENT_PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  doctorId        String
+  userId          String
+  status          AppointmentStatus @default(PENDING)
+  tokenNumber     Int?
+  appointmentDate DateTime
+  estimatedTime   String?
+  fee             Int?
+  paymentMethod   String?
+  paymentAccount  String?
+  paymentProof    String?           // Cloudinary URL of payment screenshot
+  paymentVerified Boolean           @default(false)
+  notes           String?
+  cancelReason    String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, appointmentDate])
+  @@index([userId])
+  @@index([status])
 }
 
 // ============ RESTAURANTS & DEALS ============

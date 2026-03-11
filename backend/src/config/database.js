@@ -241,10 +241,26 @@ function createModelProxy(modelName, manager) {
       if (typeof method !== 'string') return undefined;
 
       return async (...args) => {
-        // ── WRITES: active DB only ──────────────────────────────────────────
+        // ── WRITES: active DB first, fallback on P2025 ─────────────────────
         if (WRITE_METHODS.has(method)) {
           const activeClient = await manager.getActiveClient();
-          return activeClient[modelName][method](...args);
+          try {
+            return await activeClient[modelName][method](...args);
+          } catch (err) {
+            // P2025 = "Record to update/delete not found" — record may live in another DB
+            if (err.code === 'P2025' && (method === 'update' || method === 'delete' || method === 'upsert')) {
+              for (const db of manager.databases) {
+                if (db.index === manager.activeIndex || !db.client || db.isAvailable === false) continue;
+                try {
+                  return await db.client[modelName][method](...args);
+                } catch (innerErr) {
+                  if (innerErr.code === 'P2025') continue; // not in this DB either
+                  throw innerErr;
+                }
+              }
+            }
+            throw err; // re-throw if no DB had the record or different error
+          }
         }
 
         const allClients = getAllClients(manager);

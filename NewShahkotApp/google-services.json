@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1038645539010",
+    "project_id": "shahkot-2dc8a",
+    "storage_bucket": "shahkot-2dc8a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1038645539010:android:ceecf6b85886bf8dd20b5b",
+        "android_client_info": {
+          "package_name": "shahkot.apna"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBAL5mwmlpW7Hfol1FruSJm4rbD9zk7zeM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

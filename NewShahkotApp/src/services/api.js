@@ -234,6 +234,52 @@ export const doctorsAPI = {
   create: (data) => api.post('/doctors', data),
   update: (id, data) => api.put(`/doctors/${id}`, data),
   delete: (id) => api.delete(`/doctors/${id}`),
+  // Doctor auth
+  doctorLogin: (data) => api.post('/doctors/auth/login', data),
+  doctorProfile: (token) => api.get('/doctors/me/profile', {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  doctorUpdateProfile: (token, data) => api.put('/doctors/me/profile', data, {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  doctorDashboard: (token) => api.get('/doctors/me/dashboard', {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  doctorUpdateToken: (token, currentToken) => api.put('/doctors/me/current-token', { currentToken }, {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+};
+
+// ============ APPOINTMENTS API ============
+export const appointmentsAPI = {
+  book: (data) => api.post('/appointments/book', data),
+  getMine: () => api.get('/appointments/my'),
+  getForDoctor: (token, params) => api.get('/appointments/doctor', {
+    params,
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  getOne: (id) => api.get(`/appointments/${id}`),
+  uploadPaymentProof: (id, formData) => api.put(`/appointments/${id}/payment-proof`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+  }),
+  cancel: (id, reason) => api.put(`/appointments/${id}/cancel`, { reason }),
+  // Doctor actions
+  approve: (token, id) => api.put(`/appointments/${id}/approve`, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  reject: (token, id, reason) => api.put(`/appointments/${id}/reject`, { reason }, {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  verifyPayment: (token, id) => api.put(`/appointments/${id}/verify-payment`, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  complete: (token, id) => api.put(`/appointments/${id}/complete`, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
+  noShow: (token, id) => api.put(`/appointments/${id}/no-show`, {}, {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
 };
 
 // ============ JOBS API ============

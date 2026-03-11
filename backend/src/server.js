@@ -28,6 +28,7 @@ const reportRoutes = require('./routes/reports');
 const doctorRoutes = require('./routes/doctors');
 const restaurantRoutes = require('./routes/restaurants');
 const clothBrandRoutes = require('./routes/clothBrands');
+const appointmentRoutes = require('./routes/appointments');
 
 const app = express();
 
@@ -132,6 +133,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/dm', dmRoutes);
 app.use('/api/doctors', doctorRoutes);
+app.use('/api/appointments', appointmentRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/restaurants', restaurantRoutes);

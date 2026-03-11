@@ -1,26 +1,41 @@
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
 const { authenticate, adminOnly } = require('../middleware/auth');
 
 const router = express.Router();
 
+// ── Doctor Auth Middleware ────────────────────────────────────────────
+function authenticateDoctor(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Doctor authentication required.' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.doctorId || decoded.type !== 'DOCTOR') {
+      return res.status(401).json({ error: 'Invalid doctor token.' });
+    }
+    req.doctorId = decoded.doctorId;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token.' });
+  }
+}
+
 // ============ PUBLIC ROUTES ============
 
 /**
  * GET /api/doctors
- * Get all doctors with optional filters
  */
 router.get('/', async (req, res) => {
   try {
     const { search, specialty, page = 1 } = req.query;
     const limit = 50;
-
     const where = {};
-    
-    if (specialty && specialty !== 'ALL') {
-      where.specialty = specialty;
-    }
-    
+    if (specialty && specialty !== 'ALL') where.specialty = specialty;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -34,22 +49,22 @@ router.get('/', async (req, res) => {
         where,
         skip: (parseInt(page) - 1) * limit,
         take: limit,
-        orderBy: [
-          { isVerified: 'desc' },
-          { name: 'asc' },
-        ],
+        orderBy: [{ isVerified: 'desc' }, { name: 'asc' }],
+        select: {
+          id: true, name: true, specialty: true, clinicName: true,
+          address: true, phone: true, whatsapp: true, timings: true,
+          fee: true, education: true, experience: true, isVerified: true,
+          onlineBooking: true, paymentMethod: true, startTime: true,
+          endTime: true, avgConsultTime: true, currentToken: true,
+          createdAt: true,
+        },
       }),
       prisma.doctor.count({ where }),
     ]);
 
     res.json({
       doctors,
-      pagination: {
-        page: parseInt(page),
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      pagination: { page: parseInt(page), limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (error) {
     console.error('Get doctors error:', error);
@@ -59,7 +74,6 @@ router.get('/', async (req, res) => {
 
 /**
  * GET /api/doctors/specialties
- * Get list of specialties with counts
  */
 router.get('/specialties', async (req, res) => {
   try {
@@ -80,44 +94,178 @@ router.get('/specialties', async (req, res) => {
       { key: 'HAKEEM', label: 'Hakeem', icon: '🍃' },
       { key: 'OTHER', label: 'Other', icon: '➕' },
     ];
-
-    // Get counts for each specialty
     const counts = await prisma.doctor.groupBy({
       by: ['specialty'],
       _count: { specialty: true },
     });
-
     const countMap = {};
-    counts.forEach(c => {
-      countMap[c.specialty] = c._count.specialty;
-    });
-
-    const result = specialties.map(s => ({
-      ...s,
-      count: countMap[s.key] || 0,
-    }));
-
-    res.json({ specialties: result });
+    counts.forEach((c) => { countMap[c.specialty] = c._count.specialty; });
+    res.json({ specialties: specialties.map((s) => ({ ...s, count: countMap[s.key] || 0 })) });
   } catch (error) {
     console.error('Get specialties error:', error);
     res.status(500).json({ error: 'Failed to load specialties.' });
   }
 });
 
+// ── Doctor Auth ──────────────────────────────────────────────────────
+
+/**
+ * POST /api/doctors/auth/login
+ */
+router.post('/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required.' });
+    }
+    const doctor = await prisma.doctor.findUnique({ where: { email } });
+    if (!doctor || !doctor.password) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+    const valid = await bcrypt.compare(password, doctor.password);
+    if (!valid) {
+      return res.status(401).json({ error: 'Invalid email or password.' });
+    }
+    const token = jwt.sign(
+      { doctorId: doctor.id, type: 'DOCTOR' },
+      process.env.JWT_SECRET,
+      { expiresIn: '30d' }
+    );
+    res.json({ token, doctor: { id: doctor.id, name: doctor.name, specialty: doctor.specialty } });
+  } catch (error) {
+    console.error('Doctor login error:', error);
+    res.status(500).json({ error: 'Login failed.' });
+  }
+});
+
+/**
+ * GET /api/doctors/me/profile
+ */
+router.get('/me/profile', authenticateDoctor, async (req, res) => {
+  try {
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: req.doctorId },
+      select: {
+        id: true, name: true, specialty: true, clinicName: true,
+        address: true, phone: true, whatsapp: true, timings: true,
+        fee: true, education: true, experience: true, isVerified: true,
+        email: true, onlineBooking: true, paymentMethod: true,
+        paymentAccount: true, startTime: true, endTime: true,
+        avgConsultTime: true, currentToken: true, totalTokensToday: true,
+      },
+    });
+    if (!doctor) return res.status(404).json({ error: 'Doctor not found.' });
+    res.json(doctor);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load profile.' });
+  }
+});
+
+/**
+ * PUT /api/doctors/me/profile
+ */
+router.put('/me/profile', authenticateDoctor, async (req, res) => {
+  try {
+    const allowed = [
+      'clinicName', 'address', 'phone', 'whatsapp', 'timings', 'fee',
+      'education', 'experience', 'onlineBooking', 'paymentMethod',
+      'paymentAccount', 'startTime', 'endTime', 'avgConsultTime',
+    ];
+    const data = {};
+    allowed.forEach((k) => {
+      if (req.body[k] !== undefined) {
+        if (k === 'fee' || k === 'avgConsultTime') data[k] = parseInt(req.body[k], 10) || 0;
+        else if (k === 'onlineBooking') data[k] = !!req.body[k];
+        else data[k] = req.body[k];
+      }
+    });
+    const doctor = await prisma.doctor.update({ where: { id: req.doctorId }, data });
+    res.json({ message: 'Profile updated.', doctor });
+  } catch (error) {
+    console.error('Doctor update error:', error);
+    res.status(500).json({ error: 'Failed to update profile.' });
+  }
+});
+
+/**
+ * GET /api/doctors/me/dashboard
+ */
+router.get('/me/dashboard', authenticateDoctor, async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const [doctor, todayAppointments, allStats] = await Promise.all([
+      prisma.doctor.findUnique({
+        where: { id: req.doctorId },
+        select: {
+          id: true, name: true, currentToken: true, totalTokensToday: true,
+          onlineBooking: true, paymentMethod: true, paymentAccount: true,
+          startTime: true, endTime: true, avgConsultTime: true, fee: true,
+        },
+      }),
+      prisma.appointment.findMany({
+        where: {
+          doctorId: req.doctorId,
+          appointmentDate: { gte: today, lt: tomorrow },
+        },
+        orderBy: { tokenNumber: 'asc' },
+        include: {
+          user: { select: { id: true, name: true, phone: true, photoUrl: true } },
+        },
+      }),
+      prisma.appointment.groupBy({
+        by: ['status'],
+        where: { doctorId: req.doctorId },
+        _count: { status: true },
+      }),
+    ]);
+
+    const stats = {};
+    allStats.forEach((s) => { stats[s.status] = s._count.status; });
+
+    res.json({ doctor, todayAppointments, stats });
+  } catch (error) {
+    console.error('Doctor dashboard error:', error);
+    res.status(500).json({ error: 'Failed to load dashboard.' });
+  }
+});
+
+/**
+ * PUT /api/doctors/me/current-token
+ */
+router.put('/me/current-token', authenticateDoctor, async (req, res) => {
+  try {
+    const { currentToken } = req.body;
+    const doctor = await prisma.doctor.update({
+      where: { id: req.doctorId },
+      data: { currentToken: parseInt(currentToken, 10) || 0 },
+    });
+    res.json({ message: 'Token updated.', currentToken: doctor.currentToken });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update token.' });
+  }
+});
+
 /**
  * GET /api/doctors/:id
- * Get single doctor details
  */
 router.get('/:id', async (req, res) => {
   try {
     const doctor = await prisma.doctor.findUnique({
       where: { id: req.params.id },
+      select: {
+        id: true, name: true, specialty: true, clinicName: true,
+        address: true, phone: true, whatsapp: true, timings: true,
+        fee: true, education: true, experience: true, isVerified: true,
+        onlineBooking: true, paymentMethod: true, startTime: true,
+        endTime: true, avgConsultTime: true, currentToken: true,
+        createdAt: true,
+      },
     });
-
-    if (!doctor) {
-      return res.status(404).json({ error: 'Doctor not found.' });
-    }
-
+    if (!doctor) return res.status(404).json({ error: 'Doctor not found.' });
     res.json(doctor);
   } catch (error) {
     console.error('Get doctor error:', error);
@@ -128,29 +276,31 @@ router.get('/:id', async (req, res) => {
 // ============ ADMIN ROUTES ============
 
 /**
- * POST /api/doctors
- * Add a new doctor (admin only)
+ * POST /api/doctors  (admin — with optional email/password for doctor login)
  */
 router.post('/', authenticate, adminOnly, async (req, res) => {
   try {
     const {
-      name,
-      specialty,
-      clinicName,
-      address,
-      phone,
-      whatsapp,
-      timings,
-      fee,
-      education,
-      experience,
-      isVerified,
-      latitude,
-      longitude,
+      name, specialty, clinicName, address, phone, whatsapp,
+      timings, fee, education, experience, isVerified,
+      latitude, longitude, email, password, onlineBooking,
+      paymentMethod, paymentAccount, startTime, endTime, avgConsultTime,
     } = req.body;
 
     if (!name || !specialty || !address || !phone) {
       return res.status(400).json({ error: 'Name, specialty, address, and phone are required.' });
+    }
+
+    let hashedPassword = null;
+    if (email && password) {
+      if (password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+      }
+      const existing = await prisma.doctor.findUnique({ where: { email } });
+      if (existing) {
+        return res.status(409).json({ error: 'A doctor with this email already exists.' });
+      }
+      hashedPassword = await bcrypt.hash(password, 12);
     }
 
     const doctor = await prisma.doctor.create({
@@ -168,6 +318,14 @@ router.post('/', authenticate, adminOnly, async (req, res) => {
         isVerified: isVerified || false,
         latitude: latitude ? parseFloat(latitude) : null,
         longitude: longitude ? parseFloat(longitude) : null,
+        email: email || null,
+        password: hashedPassword,
+        onlineBooking: onlineBooking || false,
+        paymentMethod: paymentMethod || null,
+        paymentAccount: paymentAccount || null,
+        startTime: startTime || null,
+        endTime: endTime || null,
+        avgConsultTime: avgConsultTime ? parseInt(avgConsultTime, 10) : 15,
       },
     });
 
@@ -179,52 +337,48 @@ router.post('/', authenticate, adminOnly, async (req, res) => {
 });
 
 /**
- * PUT /api/doctors/:id
- * Update a doctor (admin only)
+ * PUT /api/doctors/:id  (admin)
  */
 router.put('/:id', authenticate, adminOnly, async (req, res) => {
   try {
     const existing = await prisma.doctor.findUnique({ where: { id: req.params.id } });
-    if (!existing) {
-      return res.status(404).json({ error: 'Doctor not found.' });
-    }
+    if (!existing) return res.status(404).json({ error: 'Doctor not found.' });
 
     const {
-      name,
-      specialty,
-      clinicName,
-      address,
-      phone,
-      whatsapp,
-      timings,
-      fee,
-      education,
-      experience,
-      isVerified,
-      latitude,
-      longitude,
+      name, specialty, clinicName, address, phone, whatsapp,
+      timings, fee, education, experience, isVerified,
+      latitude, longitude, email, password, onlineBooking,
+      paymentMethod, paymentAccount, startTime, endTime, avgConsultTime,
     } = req.body;
 
-    const doctor = await prisma.doctor.update({
-      where: { id: req.params.id },
-      data: {
-        ...(name && { name }),
-        ...(specialty && { specialty }),
-        ...(clinicName !== undefined && { clinicName }),
-        ...(address && { address }),
-        ...(phone && { phone }),
-        ...(whatsapp !== undefined && { whatsapp }),
-        ...(timings !== undefined && { timings }),
-        ...(fee !== undefined && { fee: fee ? parseInt(fee, 10) : null }),
-        ...(education !== undefined && { education }),
-        ...(experience !== undefined && { experience }),
-        ...(isVerified !== undefined && { isVerified }),
-        ...(latitude !== undefined && { latitude: latitude ? parseFloat(latitude) : null }),
-        ...(longitude !== undefined && { longitude: longitude ? parseFloat(longitude) : null }),
-      },
-    });
+    const data = {};
+    if (name) data.name = name;
+    if (specialty) data.specialty = specialty;
+    if (clinicName !== undefined) data.clinicName = clinicName;
+    if (address) data.address = address;
+    if (phone) data.phone = phone;
+    if (whatsapp !== undefined) data.whatsapp = whatsapp;
+    if (timings !== undefined) data.timings = timings;
+    if (fee !== undefined) data.fee = fee ? parseInt(fee, 10) : null;
+    if (education !== undefined) data.education = education;
+    if (experience !== undefined) data.experience = experience;
+    if (isVerified !== undefined) data.isVerified = isVerified;
+    if (latitude !== undefined) data.latitude = latitude ? parseFloat(latitude) : null;
+    if (longitude !== undefined) data.longitude = longitude ? parseFloat(longitude) : null;
+    if (email !== undefined) data.email = email || null;
+    if (onlineBooking !== undefined) data.onlineBooking = onlineBooking;
+    if (paymentMethod !== undefined) data.paymentMethod = paymentMethod;
+    if (paymentAccount !== undefined) data.paymentAccount = paymentAccount;
+    if (startTime !== undefined) data.startTime = startTime;
+    if (endTime !== undefined) data.endTime = endTime;
+    if (avgConsultTime !== undefined) data.avgConsultTime = parseInt(avgConsultTime, 10) || 15;
 
-    res.json({ message: 'Doctor updated successfully.', doctor });
+    if (password) {
+      data.password = await bcrypt.hash(password, 12);
+    }
+
+    const doctor = await prisma.doctor.update({ where: { id: req.params.id }, data });
+    res.json({ message: 'Doctor updated.', doctor });
   } catch (error) {
     console.error('Update doctor error:', error);
     res.status(500).json({ error: 'Failed to update doctor.' });
@@ -232,18 +386,15 @@ router.put('/:id', authenticate, adminOnly, async (req, res) => {
 });
 
 /**
- * DELETE /api/doctors/:id
- * Delete a doctor (admin only)
+ * DELETE /api/doctors/:id  (admin)
  */
 router.delete('/:id', authenticate, adminOnly, async (req, res) => {
   try {
     const existing = await prisma.doctor.findUnique({ where: { id: req.params.id } });
-    if (!existing) {
-      return res.status(404).json({ error: 'Doctor not found.' });
-    }
-
+    if (!existing) return res.status(404).json({ error: 'Doctor not found.' });
+    await prisma.appointment.deleteMany({ where: { doctorId: req.params.id } });
     await prisma.doctor.delete({ where: { id: req.params.id } });
-    res.json({ message: 'Doctor deleted successfully.' });
+    res.json({ message: 'Doctor deleted.' });
   } catch (error) {
     console.error('Delete doctor error:', error);
     res.status(500).json({ error: 'Failed to delete doctor.' });
