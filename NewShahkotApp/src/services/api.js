@@ -280,6 +280,8 @@ export const appointmentsAPI = {
   noShow: (token, id) => api.put(`/appointments/${id}/no-show`, {}, {
     headers: { Authorization: `Bearer ${token}` },
   }),
+  // Public — returns { currentToken, totalTokensToday } for live queue display
+  getLiveToken: (doctorId) => api.get(`/appointments/live-token/${doctorId}`),
 };
 
 // ============ JOBS API ============

@@ -357,6 +357,7 @@ router.put('/:id/verify-payment', authenticateDoctor, async (req, res) => {
 
 /**
  * PUT /api/appointments/:id/complete
+ * Doctor marks appointment done → auto-advance currentToken
  */
 router.put('/:id/complete', authenticateDoctor, async (req, res) => {
   try {
@@ -370,14 +371,25 @@ router.put('/:id/complete', authenticateDoctor, async (req, res) => {
       where: { id: req.params.id },
       data: { status: 'COMPLETED' },
     });
+
+    // Auto-advance doctor’s currentToken to the next confirmed token
+    if (appt.tokenNumber) {
+      await prisma.doctor.update({
+        where: { id: req.doctorId },
+        data: { currentToken: appt.tokenNumber + 1 },
+      });
+    }
+
     res.json({ message: 'Appointment completed.', appointment: updated });
   } catch (error) {
+    console.error('Complete appointment error:', error);
     res.status(500).json({ error: 'Failed to update.' });
   }
 });
 
 /**
  * PUT /api/appointments/:id/no-show
+ * Doctor marks no-show → auto-advance currentToken
  */
 router.put('/:id/no-show', authenticateDoctor, async (req, res) => {
   try {
@@ -391,9 +403,36 @@ router.put('/:id/no-show', authenticateDoctor, async (req, res) => {
       where: { id: req.params.id },
       data: { status: 'NO_SHOW' },
     });
+
+    // Auto-advance doctor’s currentToken on no-show too
+    if (appt.tokenNumber) {
+      await prisma.doctor.update({
+        where: { id: req.doctorId },
+        data: { currentToken: appt.tokenNumber + 1 },
+      });
+    }
+
     res.json({ message: 'Marked as no-show.', appointment: updated });
   } catch (error) {
+    console.error('No-show error:', error);
     res.status(500).json({ error: 'Failed to update.' });
+  }
+});
+
+/**
+ * GET /api/appointments/live-token/:doctorId
+ * PUBLIC — returns currentToken for a doctor (for user-side live polling)
+ */
+router.get('/live-token/:doctorId', async (req, res) => {
+  try {
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: req.params.doctorId },
+      select: { id: true, name: true, currentToken: true, totalTokensToday: true },
+    });
+    if (!doctor) return res.status(404).json({ error: 'Doctor not found.' });
+    res.json(doctor);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to load token.' });
   }
 });
 

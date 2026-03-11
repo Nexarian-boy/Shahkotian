@@ -7,7 +7,7 @@ import * as Location from 'expo-location';
 import { COLORS, APP_NAME, GEOFENCE_RADIUS_KM } from '../config/constants';
 import { isWithinShahkot } from '../utils/geolocation';
 import { useAuth } from '../context/AuthContext';
-import { authAPI, restaurantsAPI, doctorsAPI } from '../services/api';
+import { authAPI, restaurantsAPI, doctorsAPI, clothBrandsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 
 // Language toggle shown at the top of each login view
@@ -198,7 +198,7 @@ export default function LoginScreen({ navigation }) {
         navigation.navigate('RestaurantDeals', { ownerToken: token, ownerProfile: profileRes.data });
         return;
       } catch (_) {
-        // Not a restaurant owner — try doctor login as last fallback
+        // Not a restaurant owner — try doctor login
         try {
           const docRes = await doctorsAPI.doctorLogin({ email: email.trim(), password: password.trim() });
           const docToken = docRes.data.token;
@@ -206,7 +206,16 @@ export default function LoginScreen({ navigation }) {
           navigation.navigate('Doctors', { doctorToken: docToken, doctorProfile: docProfile });
           return;
         } catch (_2) {
-          // Not a doctor either — show original error
+          // Not a doctor — try cloth brand owner login
+          try {
+            const brandRes = await clothBrandsAPI.ownerLogin({ email: email.trim(), password: password.trim() });
+            const brandToken = brandRes.data.token;
+            const brandProfileRes = await clothBrandsAPI.ownerProfile(brandToken);
+            navigation.navigate('ClothBrandDeals', { ownerToken: brandToken, ownerProfile: brandProfileRes.data });
+            return;
+          } catch (_3) {
+            // Not a cloth brand owner either — show original error
+          }
         }
       }
       const msg =

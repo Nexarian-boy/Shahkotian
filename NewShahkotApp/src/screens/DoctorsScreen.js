@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Linking, RefreshControl, Modal, ScrollView,
@@ -58,6 +58,9 @@ export default function DoctorsScreen({ navigation, route }) {
   // User appointments
   const [myAppointments, setMyAppointments] = useState([]);
   const [apptLoading, setApptLoading] = useState(false);
+  // Live token polling: { [doctorId]: { currentToken, totalTokensToday } }
+  const [liveTokens, setLiveTokens] = useState({});
+  const liveTokenIntervalRef = useRef(null);
 
   // Doctor auth & dashboard
   const [doctorToken, setDoctorToken] = useState(null);
@@ -95,7 +98,46 @@ export default function DoctorsScreen({ navigation, route }) {
   useEffect(() => {
     if (activeTab === 'bookings' && user) loadMyAppointments();
     if (activeTab === 'dashboard' && doctorToken) loadDoctorDashboard();
+    // Start/stop live token polling based on active tab
+    if (activeTab === 'bookings') {
+      startLiveTokenPolling();
+    } else {
+      stopLiveTokenPolling();
+    }
+    return () => stopLiveTokenPolling();
   }, [activeTab]);
+
+  const startLiveTokenPolling = () => {
+    stopLiveTokenPolling();
+    pollLiveTokens();
+    liveTokenIntervalRef.current = setInterval(pollLiveTokens, 30000);
+  };
+
+  const stopLiveTokenPolling = () => {
+    if (liveTokenIntervalRef.current) {
+      clearInterval(liveTokenIntervalRef.current);
+      liveTokenIntervalRef.current = null;
+    }
+  };
+
+  const pollLiveTokens = async () => {
+    const confirmedAppts = myAppointments.filter(a => a.status === 'CONFIRMED' && a.doctorId);
+    if (!confirmedAppts.length) return;
+    const uniqueDocIds = [...new Set(confirmedAppts.map(a => a.doctorId))];
+    const updates = {};
+    await Promise.all(uniqueDocIds.map(async (id) => {
+      try {
+        const res = await appointmentsAPI.getLiveToken(id);
+        updates[id] = res.data;
+      } catch (_) { /* ignore */ }
+    }));
+    if (Object.keys(updates).length) setLiveTokens(prev => ({ ...prev, ...updates }));
+  };
+
+  // Re-poll when appointment list updates
+  useEffect(() => {
+    if (activeTab === 'bookings') pollLiveTokens();
+  }, [myAppointments]);
 
   const loadDoctors = async () => {
     try {
@@ -413,10 +455,13 @@ export default function DoctorsScreen({ navigation, route }) {
           )}
         </View>
 
-        {item.status === 'CONFIRMED' && item.doctor?.currentToken > 0 && (
+        {item.status === 'CONFIRMED' && (liveTokens[item.doctorId]?.currentToken > 0 || item.doctor?.currentToken > 0) && (
           <View style={styles.liveToken}>
             <Text style={styles.liveTokenText}>
-              🔴 Live: Token #{item.doctor.currentToken} being served
+              🔴 Live: Token #{(liveTokens[item.doctorId]?.currentToken ?? item.doctor?.currentToken)} being served
+              {liveTokens[item.doctorId]?.totalTokensToday
+                ? ` / ${liveTokens[item.doctorId].totalTokensToday} today`
+                : ''}
             </Text>
           </View>
         )}
