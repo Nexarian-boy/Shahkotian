@@ -7,7 +7,7 @@ import * as Location from 'expo-location';
 import { COLORS, APP_NAME, GEOFENCE_RADIUS_KM } from '../config/constants';
 import { isWithinShahkot } from '../utils/geolocation';
 import { useAuth } from '../context/AuthContext';
-import { authAPI, restaurantsAPI } from '../services/api';
+import { authAPI, restaurantsAPI, doctorsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 
 // Language toggle shown at the top of each login view
@@ -198,7 +198,16 @@ export default function LoginScreen({ navigation }) {
         navigation.navigate('RestaurantDeals', { ownerToken: token, ownerProfile: profileRes.data });
         return;
       } catch (_) {
-        // Not a restaurant owner either — show original error
+        // Not a restaurant owner — try doctor login as last fallback
+        try {
+          const docRes = await doctorsAPI.doctorLogin({ email: email.trim(), password: password.trim() });
+          const docToken = docRes.data.token;
+          const docProfile = docRes.data.doctor;
+          navigation.navigate('Doctors', { doctorToken: docToken, doctorProfile: docProfile });
+          return;
+        } catch (_2) {
+          // Not a doctor either — show original error
+        }
       }
       const msg =
         error.response?.data?.error ||
