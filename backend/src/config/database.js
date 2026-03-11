@@ -258,23 +258,52 @@ function createModelProxy(modelName, manager) {
       if (typeof method !== 'string') return undefined;
 
       return async (...args) => {
-        // ── WRITES: active DB first, fallback to ALL other DBs on P2025 ────
+        // ── WRITES: active DB only (non-active DBs are read-only) ──────────
         if (WRITE_METHODS.has(method)) {
           const activeClient = await manager.getActiveClient();
           try {
             return await activeClient[modelName][method](...args);
           } catch (err) {
-            // P2025 = "Record to update/delete not found" — record may live in another DB
-            if (err.code === 'P2025' && (method === 'update' || method === 'delete' || method === 'upsert')) {
-              for (const db of manager.databases) {
-                if (db.index === manager.activeIndex) continue;
-                const client = await getOrConnectClient(db, manager); // lazy-connect if needed
-                if (!client) continue;
-                try {
-                  return await client[modelName][method](...args);
-                } catch (innerErr) {
-                  if (innerErr.code === 'P2025') continue; // not in this DB either
-                  throw innerErr;
+            // P2025 = "Record to update/delete not found" — record may live in a non-active DB
+            if (err.code === 'P2025' && (method === 'update' || method === 'delete' || method === 'deleteMany' || method === 'upsert')) {
+              const opts = args[0] || {};
+              if (method === 'delete' || method === 'deleteMany') {
+                // Deletes from non-active DBs are acceptable — we are removing data, not writing new data
+                for (const db of manager.databases) {
+                  if (db.index === manager.activeIndex) continue;
+                  const client = await getOrConnectClient(db, manager);
+                  if (!client) continue;
+                  try {
+                    return await client[modelName][method](...args);
+                  } catch (innerErr) {
+                    if (innerErr.code === 'P2025') continue;
+                    throw innerErr;
+                  }
+                }
+              } else {
+                // update / upsert: non-active DBs stay read-only.
+                // Lazily migrate the record from whichever non-active DB has it → active DB, then retry.
+                for (const db of manager.databases) {
+                  if (db.index === manager.activeIndex) continue;
+                  const client = await getOrConnectClient(db, manager);
+                  if (!client) continue;
+                  try {
+                    const existing = await client[modelName].findFirst({ where: opts.where });
+                    if (!existing) continue;
+                    // Migrate: upsert the record into the active DB (create if missing, no-op if present)
+                    try {
+                      await activeClient[modelName].upsert({
+                        where: opts.where,
+                        create: existing,
+                        update: {},
+                      });
+                    } catch (_) { /* ignore migration conflicts */ }
+                    // Retry the original write on the active DB
+                    return await activeClient[modelName][method](...args);
+                  } catch (innerErr) {
+                    if (innerErr.code === 'P2025') continue;
+                    // ignore read errors from non-active DBs and try next
+                  }
                 }
               }
             }
