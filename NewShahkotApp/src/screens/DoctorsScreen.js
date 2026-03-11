@@ -1104,6 +1104,12 @@ export default function DoctorsScreen({ navigation, route }) {
               onChangeText={(v) => setForm({ ...form, password: v })} secureTextEntry placeholderTextColor={COLORS.textLight} />
 
             <View style={styles.divider} />
+            <Text style={styles.sectionTitle}>� Availability</Text>
+            <WeekdaySelector label="Available Days" value={form.weekdays} onChange={(v) => setForm({ ...form, weekdays: v })} />
+            <TimePicker12hr label="Start Time" value={form.startTime} onChange={(v) => setForm({ ...form, startTime: v })} />
+            <TimePicker12hr label="End Time" value={form.endTime} onChange={(v) => setForm({ ...form, endTime: v })} />
+
+            <View style={styles.divider} />
             <Text style={styles.sectionTitle}>📋 Online Booking Settings</Text>
             <TouchableOpacity
               style={[styles.toggleBtn, form.onlineBooking && styles.toggleBtnActive]}
@@ -1126,9 +1132,6 @@ export default function DoctorsScreen({ navigation, route }) {
                       keyboardType={f.kb || 'default'} placeholderTextColor={COLORS.textLight} />
                   </View>
                 ))}
-                <WeekdaySelector label="Available Days" value={form.weekdays} onChange={(v) => setForm({ ...form, weekdays: v })} />
-                <TimePicker12hr label="Start Time" value={form.startTime} onChange={(v) => setForm({ ...form, startTime: v })} />
-                <TimePicker12hr label="End Time" value={form.endTime} onChange={(v) => setForm({ ...form, endTime: v })} />
                 <Text style={styles.fieldLabel}>Avg Min Per Patient</Text>
                 <TextInput style={styles.input} placeholder="15" value={form.avgConsultTime}
                   onChangeText={(v) => setForm({ ...form, avgConsultTime: v })}

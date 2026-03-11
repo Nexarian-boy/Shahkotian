@@ -1,4 +1,4 @@
-# Shahkot App 🏙️
+kot App 🏙️
 
 A comprehensive city app for **Shahkot, Pakistan** — a location-restricted platform (50KM radius) with social feed, marketplace, tournaments, govt directory, bazar finder, rishta/matrimonial, and news features.
 

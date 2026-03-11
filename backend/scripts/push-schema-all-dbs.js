@@ -46,3 +46,12 @@ for (let i = 0; i < urls.length; i++) {
 
 console.log(`\n📊  Done: ${passed} succeeded, ${failed} failed.\n`);
 if (failed > 0) process.exit(1);
+
+// Regenerate Prisma client so it matches the pushed schema
+console.log('🔄  Regenerating Prisma client...');
+try {
+  execSync('npx prisma generate', { stdio: 'inherit', cwd: process.cwd() });
+  console.log('✅  Prisma client regenerated.\n');
+} catch (e) {
+  console.error('⚠️   prisma generate failed (you may need to run it manually):', e.message);
+}
