@@ -544,6 +544,8 @@ model Doctor {
   avgConsultTime  Int              @default(15) // minutes per patient
   currentToken    Int              @default(0)
   totalTokensToday Int             @default(0)
+  weekdays        String?          // comma-separated: "Mon,Tue,Wed,Thu,Fri"
+  isAvailableNow  Boolean          @default(false)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 

@@ -49,14 +49,14 @@ router.get('/', async (req, res) => {
         where,
         skip: (parseInt(page) - 1) * limit,
         take: limit,
-        orderBy: [{ isVerified: 'desc' }, { name: 'asc' }],
+        orderBy: [{ isAvailableNow: 'desc' }, { isVerified: 'desc' }, { name: 'asc' }],
         select: {
           id: true, name: true, specialty: true, clinicName: true,
           address: true, phone: true, whatsapp: true, timings: true,
           fee: true, education: true, experience: true, isVerified: true,
           onlineBooking: true, paymentMethod: true, startTime: true,
           endTime: true, avgConsultTime: true, currentToken: true,
-          createdAt: true,
+          weekdays: true, isAvailableNow: true, createdAt: true,
         },
       }),
       prisma.doctor.count({ where }),
@@ -152,6 +152,7 @@ router.get('/me/profile', authenticateDoctor, async (req, res) => {
         email: true, onlineBooking: true, paymentMethod: true,
         paymentAccount: true, startTime: true, endTime: true,
         avgConsultTime: true, currentToken: true, totalTokensToday: true,
+        weekdays: true, isAvailableNow: true,
       },
     });
     if (!doctor) return res.status(404).json({ error: 'Doctor not found.' });
@@ -170,12 +171,13 @@ router.put('/me/profile', authenticateDoctor, async (req, res) => {
       'clinicName', 'address', 'phone', 'whatsapp', 'timings', 'fee',
       'education', 'experience', 'onlineBooking', 'paymentMethod',
       'paymentAccount', 'startTime', 'endTime', 'avgConsultTime',
+      'weekdays', 'isAvailableNow',
     ];
     const data = {};
     allowed.forEach((k) => {
       if (req.body[k] !== undefined) {
         if (k === 'fee' || k === 'avgConsultTime') data[k] = parseInt(req.body[k], 10) || 0;
-        else if (k === 'onlineBooking') data[k] = !!req.body[k];
+        else if (k === 'onlineBooking' || k === 'isAvailableNow') data[k] = !!req.body[k];
         else data[k] = req.body[k];
       }
     });
@@ -204,6 +206,7 @@ router.get('/me/dashboard', authenticateDoctor, async (req, res) => {
           id: true, name: true, currentToken: true, totalTokensToday: true,
           onlineBooking: true, paymentMethod: true, paymentAccount: true,
           startTime: true, endTime: true, avgConsultTime: true, fee: true,
+          weekdays: true, isAvailableNow: true,
         },
       }),
       prisma.appointment.findMany({
@@ -284,7 +287,7 @@ router.post('/', authenticate, adminOnly, async (req, res) => {
       name, specialty, clinicName, address, phone, whatsapp,
       timings, fee, education, experience, isVerified,
       latitude, longitude, email, password, onlineBooking,
-      paymentMethod, paymentAccount, startTime, endTime, avgConsultTime,
+      paymentMethod, paymentAccount, startTime, endTime, avgConsultTime, weekdays,
     } = req.body;
 
     if (!name || !specialty || !address || !phone) {
@@ -326,6 +329,7 @@ router.post('/', authenticate, adminOnly, async (req, res) => {
         startTime: startTime || null,
         endTime: endTime || null,
         avgConsultTime: avgConsultTime ? parseInt(avgConsultTime, 10) : 15,
+        weekdays: weekdays || null,
       },
     });
 
@@ -349,6 +353,7 @@ router.put('/:id', authenticate, adminOnly, async (req, res) => {
       timings, fee, education, experience, isVerified,
       latitude, longitude, email, password, onlineBooking,
       paymentMethod, paymentAccount, startTime, endTime, avgConsultTime,
+      weekdays, isAvailableNow,
     } = req.body;
 
     const data = {};
@@ -372,6 +377,8 @@ router.put('/:id', authenticate, adminOnly, async (req, res) => {
     if (startTime !== undefined) data.startTime = startTime;
     if (endTime !== undefined) data.endTime = endTime;
     if (avgConsultTime !== undefined) data.avgConsultTime = parseInt(avgConsultTime, 10) || 15;
+    if (weekdays !== undefined) data.weekdays = weekdays;
+    if (isAvailableNow !== undefined) data.isAvailableNow = !!isAvailableNow;
 
     if (password) {
       data.password = await bcrypt.hash(password, 12);

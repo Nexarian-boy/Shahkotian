@@ -81,6 +81,7 @@ export default function DoctorsScreen({ navigation, route }) {
     phone: '', whatsapp: '', timings: '', fee: '', education: '', experience: '',
     isVerified: false, email: '', password: '', onlineBooking: false,
     paymentMethod: '', paymentAccount: '', startTime: '', endTime: '', avgConsultTime: '15',
+    weekdays: '', isAvailableNow: false,
   });
 
   // Doctor edit form
@@ -192,6 +193,7 @@ export default function DoctorsScreen({ navigation, route }) {
     phone: '', whatsapp: '', timings: '', fee: '', education: '', experience: '',
     isVerified: false, email: '', password: '', onlineBooking: false,
     paymentMethod: '', paymentAccount: '', startTime: '', endTime: '', avgConsultTime: '15',
+    weekdays: '', isAvailableNow: false,
   });
 
   // ── Book Appointment ───────────────────────────────────────────────
@@ -323,6 +325,17 @@ export default function DoctorsScreen({ navigation, route }) {
     } catch { Alert.alert('Error', 'Failed.'); }
   };
 
+  const handleToggleAvailability = async () => {
+    if (!doctorToken || !doctorDashboard?.doctor) return;
+    const current = doctorDashboard.doctor.isAvailableNow;
+    try {
+      await doctorsAPI.doctorUpdateProfile(doctorToken, { isAvailableNow: !current });
+      loadDoctorDashboard();
+    } catch {
+      Alert.alert('Error', 'Failed to update availability.');
+    }
+  };
+
   // ── Doctor Edit Profile ────────────────────────────────────────────
   const openEditProfile = () => {
     if (!doctorProfile) return;
@@ -341,6 +354,8 @@ export default function DoctorsScreen({ navigation, route }) {
       startTime: doctorProfile.startTime || '',
       endTime: doctorProfile.endTime || '',
       avgConsultTime: doctorProfile.avgConsultTime ? String(doctorProfile.avgConsultTime) : '15',
+      weekdays: doctorProfile.weekdays || '',
+      isAvailableNow: doctorProfile.isAvailableNow || false,
     });
     setShowEditProfileModal(true);
   };
@@ -420,6 +435,10 @@ export default function DoctorsScreen({ navigation, route }) {
         <Text style={styles.addressText}>📍 {item.address}</Text>
         {item.timings && <Text style={styles.timingsText}>🕐 {item.timings}</Text>}
         {item.fee != null && <Text style={styles.feeText}>💰 Rs. {item.fee}</Text>}
+        {item.isAvailableNow
+          ? <View style={styles.availableNow}><Text style={styles.availableNowText}>🟢 Available Now</Text></View>
+          : <View style={styles.notAvailable}><Text style={styles.notAvailableText}>⭕ Not Available</Text></View>
+        }
         {item.onlineBooking && item.currentToken > 0 && (
           <View style={styles.liveTokenSmall}>
             <Text style={styles.liveTokenSmallText}>{'🔴 Now serving: Token #'}{item.currentToken}</Text>
@@ -656,6 +675,20 @@ export default function DoctorsScreen({ navigation, route }) {
           ))}
         </View>
 
+        {/* Availability Toggle */}
+        <TouchableOpacity
+          style={[styles.availToggle, doc?.isAvailableNow ? styles.availToggleOn : styles.availToggleOff]}
+          onPress={handleToggleAvailability}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.availToggleText}>
+            {doc?.isAvailableNow ? '🟢 Available Now — Tap to go offline' : '⭕ Not Available — Tap to go online'}
+          </Text>
+          <Text style={{ color: doc?.isAvailableNow ? '#065F46' : COLORS.textLight, fontSize: 11, marginTop: 2, textAlign: 'center' }}>
+            This status is visible to patients on the doctor list
+          </Text>
+        </TouchableOpacity>
+
         {/* Settings */}
         <View style={styles.dashCard}>
           <Text style={styles.dashCardTitle}>⚙️ Booking Settings</Text>
@@ -666,6 +699,7 @@ export default function DoctorsScreen({ navigation, route }) {
           </Text>
           {doc?.paymentMethod && <Text style={styles.settingRow}>Payment: {doc.paymentMethod} — {doc.paymentAccount}</Text>}
           {doc?.startTime && <Text style={styles.settingRow}>Hours: {doc.startTime} - {doc.endTime}</Text>}
+          {doc?.weekdays ? <Text style={styles.settingRow}>Days: {doc.weekdays}</Text> : null}
           <Text style={styles.settingRow}>Avg time per patient: {doc?.avgConsultTime || 15} min</Text>
         </View>
 
@@ -972,8 +1006,6 @@ export default function DoctorsScreen({ navigation, route }) {
               { key: 'experience', label: 'Experience', ph: 'e.g. 15 years' },
               { key: 'paymentMethod', label: 'Payment Method', ph: 'EasyPaisa / JazzCash' },
               { key: 'paymentAccount', label: 'Payment Account', ph: 'Account number' },
-              { key: 'startTime', label: 'Start Time', ph: 'e.g. 17:00' },
-              { key: 'endTime', label: 'End Time', ph: 'e.g. 21:00' },
               { key: 'avgConsultTime', label: 'Avg. Time Per Patient (min)', ph: '15', kb: 'numeric' },
             ].map((f) => (
               <View key={f.key}>
@@ -988,6 +1020,17 @@ export default function DoctorsScreen({ navigation, route }) {
                 />
               </View>
             ))}
+            <WeekdaySelector label="Available Days" value={editForm.weekdays || ''} onChange={(v) => setEditForm({ ...editForm, weekdays: v })} />
+            <TimePicker12hr label="Start Time" value={editForm.startTime || ''} onChange={(v) => setEditForm({ ...editForm, startTime: v })} />
+            <TimePicker12hr label="End Time" value={editForm.endTime || ''} onChange={(v) => setEditForm({ ...editForm, endTime: v })} />
+            <TouchableOpacity
+              style={[styles.toggleBtn, editForm.isAvailableNow && { backgroundColor: '#D1FAE5', borderColor: '#10B981' }]}
+              onPress={() => setEditForm({ ...editForm, isAvailableNow: !editForm.isAvailableNow })}
+            >
+              <Text style={{ fontWeight: '600', color: editForm.isAvailableNow ? '#065F46' : COLORS.textLight }}>
+                {editForm.isAvailableNow ? '🟢 Currently Seeing Patients (Available Now)' : '⭕ Not Available Now'}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.toggleBtn, editForm.onlineBooking && styles.toggleBtnActive]}
               onPress={() => setEditForm({ ...editForm, onlineBooking: !editForm.onlineBooking })}
@@ -1075,9 +1118,6 @@ export default function DoctorsScreen({ navigation, route }) {
                 {[
                   { key: 'paymentMethod', label: 'Payment Method', ph: 'EasyPaisa / JazzCash' },
                   { key: 'paymentAccount', label: 'Payment Account', ph: 'Account number' },
-                  { key: 'startTime', label: 'Start Time', ph: '17:00' },
-                  { key: 'endTime', label: 'End Time', ph: '21:00' },
-                  { key: 'avgConsultTime', label: 'Avg Min Per Patient', ph: '15', kb: 'numeric' },
                 ].map((f) => (
                   <View key={f.key}>
                     <Text style={styles.fieldLabel}>{f.label}</Text>
@@ -1086,6 +1126,13 @@ export default function DoctorsScreen({ navigation, route }) {
                       keyboardType={f.kb || 'default'} placeholderTextColor={COLORS.textLight} />
                   </View>
                 ))}
+                <WeekdaySelector label="Available Days" value={form.weekdays} onChange={(v) => setForm({ ...form, weekdays: v })} />
+                <TimePicker12hr label="Start Time" value={form.startTime} onChange={(v) => setForm({ ...form, startTime: v })} />
+                <TimePicker12hr label="End Time" value={form.endTime} onChange={(v) => setForm({ ...form, endTime: v })} />
+                <Text style={styles.fieldLabel}>Avg Min Per Patient</Text>
+                <TextInput style={styles.input} placeholder="15" value={form.avgConsultTime}
+                  onChangeText={(v) => setForm({ ...form, avgConsultTime: v })}
+                  keyboardType="numeric" placeholderTextColor={COLORS.textLight} />
               </>
             )}
 
@@ -1123,6 +1170,80 @@ function DetailRow({ label, value, highlight }) {
     <View style={{ marginBottom: 14 }}>
       <Text style={{ fontSize: 12, color: COLORS.textLight, fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: 15, color: highlight ? COLORS.primary : COLORS.text, fontWeight: highlight ? '700' : '400' }}>{value}</Text>
+    </View>
+  );
+}
+
+function WeekdaySelector({ label, value, onChange }) {
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const selected = value ? value.split(',').map(d => d.trim()).filter(Boolean) : [];
+  const toggle = (day) => {
+    const next = selected.includes(day) ? selected.filter(d => d !== day) : [...selected, day];
+    onChange(next.join(','));
+  };
+  return (
+    <View style={{ marginBottom: 4 }}>
+      <Text style={styles.fieldLabel}>{label || 'Available Days'}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+        {DAYS.map(d => {
+          const active = selected.includes(d);
+          return (
+            <TouchableOpacity key={d} style={[styles.tpBtn, active && styles.tpBtnActive]} onPress={() => toggle(d)}>
+              <Text style={[styles.tpBtnText, active && { color: COLORS.white }]}>{d}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function TimePicker12hr({ label, value, onChange }) {
+  const parseTime = (v) => {
+    if (!v) return { hour: null, minute: null, period: null };
+    const [h, m] = v.split(':').map(Number);
+    if (isNaN(h)) return { hour: null, minute: null, period: null };
+    const period = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    return { hour: hour12, minute: m || 0, period };
+  };
+  const t = parseTime(value);
+  const update = (field, newVal) => {
+    const hour = field === 'hour' ? newVal : (t.hour ?? 9);
+    const minute = field === 'minute' ? newVal : (t.minute ?? 0);
+    const period = field === 'period' ? newVal : (t.period ?? 'AM');
+    let h = hour % 12;
+    if (period === 'PM') h += 12;
+    onChange(`${String(h).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
+  };
+  const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  const MINUTES = [0, 15, 30, 45];
+  return (
+    <View style={{ marginBottom: 4 }}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 4 }}>
+        {HOURS.map(h => (
+          <TouchableOpacity key={h} style={[styles.tpBtn, t.hour === h && styles.tpBtnActive]} onPress={() => update('hour', h)}>
+            <Text style={[styles.tpBtnText, t.hour === h && { color: COLORS.white }]}>{h}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', gap: 4, marginBottom: 8 }}>
+        {MINUTES.map(m => (
+          <TouchableOpacity key={m} style={[styles.tpBtn, t.minute === m && t.minute !== null && styles.tpBtnActive]} onPress={() => update('minute', m)}>
+            <Text style={[styles.tpBtnText, t.minute === m && t.minute !== null && { color: COLORS.white }]}>:{String(m).padStart(2, '0')}</Text>
+          </TouchableOpacity>
+        ))}
+        {['AM', 'PM'].map(p => (
+          <TouchableOpacity key={p} style={[styles.tpBtn, t.period === p && styles.tpBtnActive]} onPress={() => update('period', p)}>
+            <Text style={[styles.tpBtnText, t.period === p && { color: COLORS.white }]}>{p}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {value
+        ? <Text style={{ fontSize: 11, color: COLORS.textSecondary, marginBottom: 8 }}>✓ {t.hour}:{String(t.minute ?? 0).padStart(2, '0')} {t.period}</Text>
+        : <Text style={{ fontSize: 11, color: COLORS.textLight, marginBottom: 8 }}>Tap to set time</Text>
+      }
     </View>
   );
 }
@@ -1310,4 +1431,31 @@ const styles = StyleSheet.create({
   emptySmall: { alignItems: 'center', paddingVertical: 40 },
   emptyText: { fontSize: 16, color: COLORS.textSecondary, fontWeight: '600', marginTop: 8 },
   emptySub: { fontSize: 13, color: COLORS.textLight, marginTop: 4 },
+  // Time picker & weekday selector
+  tpBtn: {
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8,
+    borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface,
+    minWidth: 36, alignItems: 'center',
+  },
+  tpBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  tpBtnText: { fontSize: 12, fontWeight: '600', color: COLORS.text },
+  // Availability badge on doctor cards
+  availableNow: {
+    backgroundColor: '#D1FAE5', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3,
+    alignSelf: 'flex-start', marginBottom: 6,
+  },
+  availableNowText: { color: '#065F46', fontSize: 11, fontWeight: '700' },
+  notAvailable: {
+    backgroundColor: '#F3F4F6', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3,
+    alignSelf: 'flex-start', marginBottom: 6,
+  },
+  notAvailableText: { color: '#9CA3AF', fontSize: 11, fontWeight: '600' },
+  // Dashboard availability toggle
+  availToggle: {
+    borderRadius: 14, padding: 16, marginBottom: 12, alignItems: 'center',
+    elevation: 2,
+  },
+  availToggleOn: { backgroundColor: '#D1FAE5', borderWidth: 1, borderColor: '#6EE7B7' },
+  availToggleOff: { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: COLORS.border },
+  availToggleText: { fontSize: 16, fontWeight: '700', color: COLORS.text },
 });
