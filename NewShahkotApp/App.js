@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { COLORS } from './src/config/constants';
@@ -39,6 +40,7 @@ import JobsScreen from './src/screens/JobsScreen';
 import PrivacyPolicyScreen from './src/screens/PrivacyPolicyScreen';
 import RestaurantDealsScreen from './src/screens/RestaurantDealsScreen';
 import ClothBrandDealsScreen from './src/screens/ClothBrandDealsScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -112,15 +114,29 @@ function MainTabs() {
 
 // Auth Flow Navigation
 function AppNavigator() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, isNewUser } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2500);
     return () => clearTimeout(timer);
   }, []);
 
-  if (showSplash || loading) {
+  // Check onboarding status when authentication changes
+  useEffect(() => {
+    if (isAuthenticated) {
+      AsyncStorage.getItem('hasSeenOnboarding').then((val) => {
+        setNeedsOnboarding(val !== 'true');
+        setOnboardingChecked(true);
+      });
+    } else {
+      setOnboardingChecked(true);
+    }
+  }, [isAuthenticated]);
+
+  if (showSplash || loading || !onboardingChecked) {
     return <SplashScreen />;
   }
 
@@ -136,6 +152,9 @@ function AppNavigator() {
         </>
       ) : (
         <>
+          {needsOnboarding && (
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          )}
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="Tournaments" component={TournamentsScreen} />
           <Stack.Screen name="TournamentDetail" component={TournamentDetailScreen} />

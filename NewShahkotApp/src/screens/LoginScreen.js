@@ -123,6 +123,9 @@ export default function LoginScreen({ navigation }) {
     if (password.length < 6) {
       return Alert.alert('Weak Password', 'Password must be at least 6 characters.');
     }
+    if (!phone.trim()) {
+      return Alert.alert('Required', 'Phone number is required for important features like Blood Donation.');
+    }
     setOtpSending(true);
     try {
       await authAPI.sendOtp(email.trim());
@@ -523,7 +526,7 @@ export default function LoginScreen({ navigation }) {
 
           {isRegister && (
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>{t('phoneWhatsapp')}</Text>
+              <Text style={styles.label}>{t('phoneWhatsapp')} *</Text>
               <TextInput
                 style={styles.input}
                 placeholder={t('phoneFormat')}

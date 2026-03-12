@@ -8,6 +8,15 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, DOCTOR_SPECIALTIES } from '../config/constants';
+
+// Convert 24h time string ("17:00") to 12h format ("5:00 PM")
+const formatTo12Hour = (time) => {
+  if (!time) return '';
+  const [h, m] = time.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+};
 import { doctorsAPI, appointmentsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -568,7 +577,7 @@ export default function DoctorsScreen({ navigation, route }) {
                   <Text style={styles.onlineInfoTitle}>📋 Online Booking Available</Text>
                   {item.paymentMethod && <Text style={styles.onlineInfoText}>Payment: {item.paymentMethod}</Text>}
                   {item.startTime && item.endTime && (
-                    <Text style={styles.onlineInfoText}>Hours: {item.startTime} - {item.endTime}</Text>
+                    <Text style={styles.onlineInfoText}>Hours: {formatTo12Hour(item.startTime)} - {formatTo12Hour(item.endTime)}</Text>
                   )}
                 </View>
               )}
@@ -698,7 +707,7 @@ export default function DoctorsScreen({ navigation, route }) {
             </Text>
           </Text>
           {doc?.paymentMethod && <Text style={styles.settingRow}>Payment: {doc.paymentMethod} — {doc.paymentAccount}</Text>}
-          {doc?.startTime && <Text style={styles.settingRow}>Hours: {doc.startTime} - {doc.endTime}</Text>}
+          {doc?.startTime && <Text style={styles.settingRow}>Hours: {formatTo12Hour(doc.startTime)} - {formatTo12Hour(doc.endTime)}</Text>}
           {doc?.weekdays ? <Text style={styles.settingRow}>Days: {doc.weekdays}</Text> : null}
           <Text style={styles.settingRow}>Avg time per patient: {doc?.avgConsultTime || 15} min</Text>
         </View>
