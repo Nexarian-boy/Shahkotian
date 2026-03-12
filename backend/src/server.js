@@ -2,12 +2,15 @@ require('dotenv').config();
 // Initialize Firebase Admin if configured
 require('./config/firebase');
 
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const compression = require('compression');
+const { Server } = require('socket.io');
+const Redis = require('ioredis');
 
 const prisma = require('./config/database');
 const authRoutes = require('./routes/auth');
@@ -32,14 +35,61 @@ const appointmentRoutes = require('./routes/appointments');
 const bazarRoutes = require('./routes/bazar');
 
 const app = express();
+const httpServer = http.createServer(app);
+
+// ── Redis Setup ────────────────────────────────────────────────────────
+let redis = null;
+if (process.env.REDIS_URL) {
+  redis = new Redis(process.env.REDIS_URL, { maxRetriesPerRequest: 3, lazyConnect: true });
+  redis.connect().then(() => console.log('✅ Redis connected')).catch(err => {
+    console.warn('⚠️ Redis connection failed, running without cache:', err.message);
+    redis = null;
+  });
+} else {
+  console.log('ℹ️ No REDIS_URL set, running without Redis cache');
+}
+
+// ── Socket.IO Setup ────────────────────────────────────────────────────
+const io = new Server(httpServer, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  transports: ['websocket', 'polling'],
+});
+
+// Make io and redis available to routes
+app.set('io', io);
+app.set('redis', redis);
+
+// Socket.IO connection handler
+io.on('connection', (socket) => {
+  console.log(`🔌 Socket connected: ${socket.id}`);
+
+  // Join a bazar chat room
+  socket.on('joinBazarChat', (bazarId) => {
+    if (bazarId) {
+      socket.join(`bazar:${bazarId}`);
+      console.log(`Socket ${socket.id} joined bazar:${bazarId}`);
+    }
+  });
+
+  // Leave a bazar chat room
+  socket.on('leaveBazarChat', (bazarId) => {
+    if (bazarId) {
+      socket.leave(`bazar:${bazarId}`);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`🔌 Socket disconnected: ${socket.id}`);
+  });
+});
 
 // Security middleware
 app.use(helmet());
 app.use(cors());
 app.use(compression()); // Compress all responses for faster transfer
 app.use(morgan('dev'));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '300mb' }));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -165,7 +215,7 @@ async function startServer() {
       console.log('✅ Database manager initialized');
     }
 
-    const server = app.listen(PORT, () => {
+    const server = httpServer.listen(PORT, () => {
       console.log(`🚀 Apna Shahkot API running on port ${PORT}`);
       console.log(`📍 Geofence: ${process.env.SHAHKOT_LAT}, ${process.env.SHAHKOT_LNG} (${process.env.GEOFENCE_RADIUS_KM}km radius)`);
 
@@ -248,4 +298,4 @@ async function startServer() {
 
 startServer();
 
-module.exports = app;
+module.exports = { app, httpServer, io };

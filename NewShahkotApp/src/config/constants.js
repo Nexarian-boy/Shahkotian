@@ -65,7 +65,9 @@ export const COLORS = {
   secondary: '#FF6584',
   accent: '#FFC107',
   accentDark: '#FF8F00',
-  background: '#F0F4F0',
+  background: '#F5F7F6',
+  backgroundGradientTop: '#F3F9F4',
+  backgroundGradientBottom: '#E8F5E9',
   surface: '#FFFFFF',
   text: '#1A2E1A',
   textSecondary: '#5A6B5A',
@@ -98,7 +100,7 @@ export const FONTS = {
 
 // Video Limits
 export const MAX_VIDEO_DURATION_SECONDS = 180; // 3 minutes
-export const MAX_VIDEO_SIZE_MB = 100;
+export const MAX_VIDEO_SIZE_MB = 300;
 
 // Job Categories
 export const JOB_CATEGORIES = [

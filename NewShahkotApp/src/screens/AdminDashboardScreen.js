@@ -48,8 +48,10 @@ export default function AdminDashboardScreen({ navigation }) {
   // Trader management
   const [allTraders, setAllTraders] = useState([]);
   const [pendingTraders, setPendingTraders] = useState([]);
+  const [presidents, setPresidents] = useState([]);
   const [presidentForm, setPresidentForm] = useState({ name: '', email: '', password: '' });
   const [creatingPresident, setCreatingPresident] = useState(false);
+  const [traderSearch, setTraderSearch] = useState('');
 
   // Wait for auth token to load before fetching
   useEffect(() => {
@@ -89,9 +91,10 @@ export default function AdminDashboardScreen({ navigation }) {
         const res = await adminAPI.getNotificationStats();
         setNotifStats(res.data);
       } else if (activeTab === 'Traders') {
-        const [allRes, pendRes] = await Promise.all([bazarAPI.getAllTraders(), bazarAPI.getPending()]);
+        const [allRes, pendRes, presRes] = await Promise.all([bazarAPI.getAllTraders(), bazarAPI.getPending(), bazarAPI.listPresidents()]);
         setAllTraders(allRes.data.traders || []);
         setPendingTraders(pendRes.data.traders || []);
+        setPresidents(presRes.data.presidents || []);
       } else if (activeTab === 'Storage') {
         try {
           const [dbRes, storRes, cloudRes] = await Promise.all([
@@ -764,67 +767,111 @@ export default function AdminDashboardScreen({ navigation }) {
     </ScrollView>
   );
 
-  const renderTraders = () => (
+  const renderTraders = () => {
+    const q = traderSearch.toLowerCase();
+    const filteredTraders = q ? allTraders.filter(t =>
+      t.fullName?.toLowerCase().includes(q) || t.shopName?.toLowerCase().includes(q) ||
+      t.phone?.includes(q) || t.bazar?.name?.toLowerCase().includes(q)
+    ) : allTraders;
+
+    return (
     <ScrollView style={{ flex: 1, padding: 12 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} colors={[COLORS.primary]} />}>
+      {/* Search */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, borderRadius: 10, paddingHorizontal: 12, marginBottom: 14, borderWidth: 1, borderColor: COLORS.border }}>
+        <Ionicons name="search" size={18} color={COLORS.textLight} />
+        <TextInput style={{ flex: 1, paddingVertical: 10, paddingHorizontal: 8, fontSize: 14, color: COLORS.text }} placeholder="Search traders by name, shop, phone..." value={traderSearch} onChangeText={setTraderSearch} placeholderTextColor={COLORS.textLight} />
+        {traderSearch.length > 0 && <TouchableOpacity onPress={() => setTraderSearch('')}><Ionicons name="close-circle" size={18} color={COLORS.textLight} /></TouchableOpacity>}
+      </View>
+
       {/* Pending Approvals */}
-      <Text style={styles.sectionTitle}>Pending Approvals ({pendingTraders.length})</Text>
-      {pendingTraders.map(trader => (
-        <View key={trader.id} style={[styles.userCard, { borderLeftWidth: 3, borderLeftColor: COLORS.warning }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-            {trader.photoUrl ? <Image source={{ uri: trader.photoUrl }} style={{ width: 40, height: 40, borderRadius: 20, marginRight: 10 }} /> : <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.gray, justifyContent: 'center', alignItems: 'center', marginRight: 10 }}><Text>🏪</Text></View>}
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: '700', color: COLORS.text }}>{trader.fullName}</Text>
-              <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>{trader.shopName} - {trader.bazar?.name}</Text>
-              <Text style={{ fontSize: 11, color: COLORS.textLight }}>📞 {trader.phone} | {trader.user?.email}</Text>
+      {pendingTraders.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>⚠️ Pending Approvals ({pendingTraders.length})</Text>
+          {pendingTraders.map(trader => (
+            <View key={trader.id} style={[styles.userCard, { borderLeftWidth: 3, borderLeftColor: COLORS.warning }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                {trader.photoUrl ? <Image source={{ uri: trader.photoUrl }} style={{ width: 44, height: 44, borderRadius: 22, marginRight: 10 }} /> : <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.gray + '30', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}><Text style={{ fontSize: 18 }}>🏪</Text></View>}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontWeight: '700', color: COLORS.text, fontSize: 14 }}>{trader.fullName}</Text>
+                  <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>🏪 {trader.shopName} • {trader.bazar?.name}</Text>
+                  <Text style={{ fontSize: 11, color: COLORS.textLight }}>📞 {trader.phone}</Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <TouchableOpacity style={{ flex: 1, backgroundColor: COLORS.success + '15', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }} onPress={async () => { try { await bazarAPI.approveTrader(trader.id); Alert.alert('Done', 'Trader approved'); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } }}>
+                  <Text style={{ color: COLORS.success, fontWeight: '700', fontSize: 13 }}>✓ Approve</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={{ flex: 1, backgroundColor: COLORS.error + '15', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }} onPress={async () => { try { await bazarAPI.rejectTrader(trader.id); Alert.alert('Done', 'Trader rejected'); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } }}>
+                  <Text style={{ color: COLORS.error, fontWeight: '700', fontSize: 13 }}>✗ Reject</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={{ backgroundColor: COLORS.error + '10', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 }} onPress={() => Alert.alert('Delete', 'Remove this trader?', [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await bazarAPI.deleteTrader(trader.id); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } } }])}>
+                  <Ionicons name="trash" size={16} color={COLORS.error} />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity style={{ flex: 1, backgroundColor: COLORS.success + '15', padding: 8, borderRadius: 8, alignItems: 'center' }} onPress={async () => { try { await bazarAPI.approveTrader(trader.id); Alert.alert('Done', 'Trader approved'); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } }}>
-              <Text style={{ color: COLORS.success, fontWeight: '700' }}>✓ Approve</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={{ flex: 1, backgroundColor: COLORS.error + '15', padding: 8, borderRadius: 8, alignItems: 'center' }} onPress={async () => { try { await bazarAPI.rejectTrader(trader.id); Alert.alert('Done', 'Trader rejected'); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } }}>
-              <Text style={{ color: COLORS.error, fontWeight: '700' }}>✗ Reject</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={{ backgroundColor: COLORS.error + '10', padding: 8, borderRadius: 8 }} onPress={() => Alert.alert('Delete', 'Remove this trader?', [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await bazarAPI.deleteTrader(trader.id); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } } }])}>
-              <Text>🗑</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
-      {pendingTraders.length === 0 && <Text style={{ color: COLORS.textLight, textAlign: 'center', marginTop: 16 }}>No pending requests</Text>}
+          ))}
+        </>
+      )}
+      {pendingTraders.length === 0 && <Text style={{ color: COLORS.textLight, textAlign: 'center', marginVertical: 8, fontStyle: 'italic' }}>No pending requests</Text>}
 
       {/* All Traders */}
-      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>All Traders ({allTraders.length})</Text>
-      {allTraders.map(trader => (
-        <View key={trader.id} style={styles.userCard}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontWeight: '700', color: COLORS.text }}>{trader.fullName} - {trader.shopName}</Text>
-              <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>{trader.bazar?.name} | {trader.status}</Text>
-            </View>
-            <TouchableOpacity onPress={() => Alert.alert('Delete', 'Remove this trader?', [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await bazarAPI.deleteTrader(trader.id); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } } }])}>
-              <Ionicons name="trash" size={18} color={COLORS.error} />
-            </TouchableOpacity>
+      <Text style={[styles.sectionTitle, { marginTop: 16 }]}>📊 All Traders ({filteredTraders.length}{q ? ` of ${allTraders.length}` : ''})</Text>
+      {filteredTraders.map(trader => (
+        <View key={trader.id} style={[styles.userCard, { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 }]}>
+          {trader.photoUrl ? <Image source={{ uri: trader.photoUrl }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} /> : <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.gray + '30', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}><Text style={{ fontSize: 14 }}>🏪</Text></View>}
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontWeight: '700', color: COLORS.text, fontSize: 13 }}>{trader.fullName} • {trader.shopName}</Text>
+            <Text style={{ fontSize: 11, color: COLORS.textSecondary }}>{trader.bazar?.name} | <Text style={{ color: trader.status === 'APPROVED' ? COLORS.success : trader.status === 'PENDING' ? COLORS.warning : COLORS.error }}>{trader.status}</Text></Text>
           </View>
+          <TouchableOpacity onPress={() => Alert.alert('Delete', 'Remove this trader?', [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await bazarAPI.deleteTrader(trader.id); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } } }])}>
+            <Ionicons name="trash" size={16} color={COLORS.error} />
+          </TouchableOpacity>
         </View>
       ))}
+      {filteredTraders.length === 0 && q && <Text style={{ color: COLORS.textLight, textAlign: 'center', marginTop: 10 }}>No traders matching "{traderSearch}"</Text>}
 
-      {/* Create President */}
-      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Create President Account</Text>
-      <View style={styles.userCard}>
-        <TextInput style={styles.notifInput} placeholder="President Name" value={presidentForm.name} onChangeText={v => setPresidentForm({ ...presidentForm, name: v })} placeholderTextColor={COLORS.textLight} />
-        <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Email" value={presidentForm.email} onChangeText={v => setPresidentForm({ ...presidentForm, email: v })} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
-        <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Password" value={presidentForm.password} onChangeText={v => setPresidentForm({ ...presidentForm, password: v })} secureTextEntry placeholderTextColor={COLORS.textLight} />
-        <TouchableOpacity style={[styles.sendNotifBtn, { marginTop: 12 }, creatingPresident && { opacity: 0.5 }]} disabled={creatingPresident} onPress={async () => {
-          if (!presidentForm.name || !presidentForm.email || !presidentForm.password) { Alert.alert('Required', 'Fill all fields'); return; }
-          try { setCreatingPresident(true); await bazarAPI.createPresident(presidentForm); Alert.alert('Done', 'President account created'); setPresidentForm({ name: '', email: '', password: '' }); } catch (e) { Alert.alert('Error', e.response?.data?.error || 'Failed'); } finally { setCreatingPresident(false); }
-        }}>
-          <Text style={styles.sendNotifBtnText}>{creatingPresident ? 'Creating...' : 'Create President'}</Text>
-        </TouchableOpacity>
+      {/* Presidents Section */}
+      <View style={{ marginTop: 20, backgroundColor: COLORS.surface, borderRadius: 12, padding: 14, elevation: 1, borderWidth: 1, borderColor: COLORS.border }}>
+        <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>👔 Presidents ({presidents.length})</Text>
+        {presidents.map(p => (
+          <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border + '50' }}>
+            <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.primary + '15', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
+              <Text style={{ fontSize: 14 }}>👔</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontWeight: '700', color: COLORS.text, fontSize: 13 }}>{p.name}</Text>
+              <Text style={{ fontSize: 11, color: COLORS.textSecondary }}>{p.email}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ backgroundColor: p.isActive ? COLORS.success + '15' : COLORS.error + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                <Text style={{ fontSize: 10, color: p.isActive ? COLORS.success : COLORS.error, fontWeight: '600' }}>{p.isActive ? 'Active' : 'Inactive'}</Text>
+              </View>
+              <TouchableOpacity onPress={() => Alert.alert('Delete President', `Remove ${p.name}?`, [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await bazarAPI.deletePresident(p.id); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } } }])}>
+                <Ionicons name="trash" size={16} color={COLORS.error} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+        {presidents.length === 0 && <Text style={{ color: COLORS.textLight, textAlign: 'center', fontStyle: 'italic', marginVertical: 6 }}>No presidents yet</Text>}
+
+        {/* Create President Form */}
+        <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: COLORS.border }}>
+          <Text style={{ fontWeight: '700', color: COLORS.text, fontSize: 14, marginBottom: 8 }}>+ Create New President</Text>
+          <TextInput style={styles.notifInput} placeholder="Name" value={presidentForm.name} onChangeText={v => setPresidentForm({ ...presidentForm, name: v })} placeholderTextColor={COLORS.textLight} />
+          <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Email" value={presidentForm.email} onChangeText={v => setPresidentForm({ ...presidentForm, email: v })} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
+          <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Password" value={presidentForm.password} onChangeText={v => setPresidentForm({ ...presidentForm, password: v })} secureTextEntry placeholderTextColor={COLORS.textLight} />
+          <TouchableOpacity style={[styles.sendNotifBtn, { marginTop: 10 }, creatingPresident && { opacity: 0.5 }]} disabled={creatingPresident} onPress={async () => {
+            if (!presidentForm.name.trim() || !presidentForm.email.trim() || !presidentForm.password.trim()) { Alert.alert('Required', 'Fill all fields'); return; }
+            try { setCreatingPresident(true); const res = await bazarAPI.createPresident(presidentForm); Alert.alert('Done', 'President account created'); setPresidentForm({ name: '', email: '', password: '' }); loadData(); } catch (e) { Alert.alert('Error', e.response?.data?.error || 'Failed to create president'); } finally { setCreatingPresident(false); }
+          }}>
+            <Text style={styles.sendNotifBtnText}>{creatingPresident ? 'Creating...' : 'Create President'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={{ height: 30 }} />
     </ScrollView>
   );
+  };
 
   const renderTab = () => {
     if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;

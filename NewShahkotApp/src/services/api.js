@@ -405,6 +405,8 @@ export const bazarAPI = {
     headers: { 'x-president-token': presidentToken },
   }),
   createPresident: (data) => api.post('/bazar/president/create', data),
+  listPresidents: () => api.get('/bazar/presidents'),
+  deletePresident: (id) => api.delete(`/bazar/president/${id}`),
   // Export
   getExportUrl: (presidentToken, bazarId) =>
     `${API_URL}/bazar/export-traders?presidentToken=${encodeURIComponent(presidentToken)}${bazarId && bazarId !== 'all' ? '&bazarId=' + bazarId : ''}`,

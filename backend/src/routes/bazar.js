@@ -61,10 +61,10 @@ router.post('/register', authenticate, upload.single('photo'), async (req, res) 
     const bazar = await prisma.bazar.findUnique({ where: { id: bazarId } });
     if (!bazar) return res.status(404).json({ error: 'Bazar not found.' });
 
-    let photoUrl = null;
-    if (req.file) {
-      photoUrl = await uploadToCloudinary(req.file, 'shahkot/traders');
+    if (!req.file) {
+      return res.status(400).json({ error: 'Profile photo is required.' });
     }
+    const photoUrl = await uploadToCloudinary(req.file, 'shahkot/traders');
 
     const trader = await prisma.trader.create({
       data: {
@@ -144,13 +144,28 @@ router.get('/traders/:bazarId', authenticate, async (req, res) => {
 router.get('/chat/messages', authenticate, async (req, res) => {
   try {
     const { bazarId, page = 1 } = req.query;
-    if (!bazarId) return res.status(400).json({ error: 'bazarId is required.' });
 
     const pageSize = 30;
     const skip = (parseInt(page) - 1) * pageSize;
+    const cacheKey = `bazar:chat:${bazarId || 'global'}:page:${page}`;
+
+    // Try Redis cache first (only for page 1)
+    const redis = req.app.get('redis');
+    if (redis && parseInt(page) === 1) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) return res.json(JSON.parse(cached));
+      } catch (e) { /* cache miss, continue */ }
+    }
+
+    // If bazarId is 'global' or not provided, return all messages
+    const where = {};
+    if (bazarId && bazarId !== 'global') {
+      where.bazarId = bazarId;
+    }
 
     const messages = await prisma.bazarChatMessage.findMany({
-      where: { bazarId },
+      where,
       orderBy: { createdAt: 'desc' },
       skip,
       take: pageSize,
@@ -160,6 +175,14 @@ router.get('/chat/messages', authenticate, async (req, res) => {
     });
 
     res.json({ messages: messages.reverse(), page: parseInt(page), hasMore: messages.length === pageSize });
+
+    // Cache page 1 for 10 seconds
+    if (redis && parseInt(page) === 1) {
+      try {
+        const response = { messages: messages.reverse(), page: parseInt(page), hasMore: messages.length === pageSize };
+        await redis.set(cacheKey, JSON.stringify(response), 'EX', 10);
+      } catch (e) { /* cache write fail is non-fatal */ }
+    }
   } catch (error) {
     console.error('Chat messages error:', error);
     res.status(500).json({ error: 'Failed to load messages.' });
@@ -180,7 +203,7 @@ router.post('/chat/send', authenticate, uploadMedia.fields([
     }
 
     const { text, bazarId, voiceDuration } = req.body;
-    if (!bazarId) return res.status(400).json({ error: 'bazarId is required.' });
+    const saveBazarId = (bazarId && bazarId !== 'global') ? bazarId : null;
 
     // Upload media
     let imageUrls = [];
@@ -206,7 +229,7 @@ router.post('/chat/send', authenticate, uploadMedia.fields([
     const message = await prisma.bazarChatMessage.create({
       data: {
         traderId: trader.id,
-        bazarId,
+        bazarId: saveBazarId,
         text: text || null,
         images: imageUrls,
         videos: videoUrls,
@@ -219,6 +242,14 @@ router.post('/chat/send', authenticate, uploadMedia.fields([
     });
 
     res.status(201).json({ message });
+
+    // Emit real-time event to global room
+    const io = req.app.get('io');
+    if (io) io.to('bazar:global').emit('newMessage', message);
+
+    // Invalidate cache
+    const redis = req.app.get('redis');
+    if (redis) redis.del('bazar:chat:global:page:1').catch(() => {});
   } catch (error) {
     console.error('Send chat error:', error);
     res.status(500).json({ error: 'Failed to send message.' });
@@ -234,14 +265,15 @@ router.post('/chat/poll', authenticate, async (req, res) => {
     }
 
     const { bazarId, pollQuestion, pollOptions } = req.body;
-    if (!bazarId || !pollQuestion || !pollOptions || pollOptions.length < 2) {
+    if (!pollQuestion || !pollOptions || pollOptions.length < 2) {
       return res.status(400).json({ error: 'Question and at least 2 options required.' });
     }
+    const saveBazarId = (bazarId && bazarId !== 'global') ? bazarId : null;
 
     const message = await prisma.bazarChatMessage.create({
       data: {
         traderId: trader.id,
-        bazarId,
+        bazarId: saveBazarId,
         pollQuestion,
         pollOptions,
         pollVotes: [],
@@ -252,6 +284,10 @@ router.post('/chat/poll', authenticate, async (req, res) => {
     });
 
     res.status(201).json({ message });
+
+    // Emit real-time poll event
+    const io = req.app.get('io');
+    if (io) io.to('bazar:global').emit('newMessage', message);
   } catch (error) {
     console.error('Create poll error:', error);
     res.status(500).json({ error: 'Failed to create poll.' });
@@ -293,6 +329,10 @@ router.post('/chat/poll/:id/vote', authenticate, async (req, res) => {
     });
 
     res.json({ message: updated });
+
+    // Emit real-time vote update
+    const io = req.app.get('io');
+    if (io) io.to('bazar:global').emit('messageUpdated', updated);
   } catch (error) {
     console.error('Vote error:', error);
     res.status(500).json({ error: 'Failed to vote.' });
@@ -315,6 +355,10 @@ router.delete('/chat/messages/:id', authenticate, async (req, res) => {
 
     await prisma.bazarChatMessage.delete({ where: { id: req.params.id } });
     res.json({ success: true });
+
+    // Emit real-time delete event
+    const io = req.app.get('io');
+    if (io) io.to('bazar:global').emit('messageDeleted', { id: req.params.id });
   } catch (error) {
     console.error('Delete message error:', error);
     res.status(500).json({ error: 'Failed to delete message.' });
@@ -579,6 +623,31 @@ router.post('/president/create', authenticate, adminOnly, async (req, res) => {
   } catch (error) {
     console.error('Create president error:', error);
     res.status(500).json({ error: 'Failed to create president.' });
+  }
+});
+
+// ============ ADMIN: LIST ALL PRESIDENTS ============
+router.get('/presidents', authenticate, adminOnly, async (req, res) => {
+  try {
+    const presidents = await prisma.president.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, name: true, email: true, isActive: true, createdAt: true },
+    });
+    res.json({ presidents });
+  } catch (error) {
+    console.error('List presidents error:', error);
+    res.status(500).json({ error: 'Failed to load presidents.' });
+  }
+});
+
+// ============ ADMIN: DELETE PRESIDENT ============
+router.delete('/president/:id', authenticate, adminOnly, async (req, res) => {
+  try {
+    await prisma.president.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: 'President deleted.' });
+  } catch (error) {
+    console.error('Delete president error:', error);
+    res.status(500).json({ error: 'Failed to delete president.' });
   }
 });
 

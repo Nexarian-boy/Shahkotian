@@ -3,10 +3,15 @@ import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Image, RefreshControl, Modal, Alert, ScrollView,
   KeyboardAvoidingView, Platform, ActivityIndicator, Linking,
-  SafeAreaView,
+  SafeAreaView, StatusBar, Dimensions, Keyboard,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio, Video, ResizeMode } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { LinearGradient } from 'expo-linear-gradient';
+import { io as socketIO } from 'socket.io-client';
 import { COLORS, API_URL } from '../config/constants';
 import { bazarAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -36,11 +41,26 @@ export default function BazarScreen() {
   const [chatHasMore, setChatHasMore] = useState(true);
   const [sending, setSending] = useState(false);
   const [selectedImages, setSelectedImages] = useState([]);
+  const [selectedVideos, setSelectedVideos] = useState([]);
   const chatListRef = useRef(null);
   const pollIntervalRef = useRef(null);
+  const socketRef = useRef(null);
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
+
+  // ========== VOICE RECORDING ==========
+  const [isRecording, setIsRecording] = useState(false);
+  const recordingRef = useRef(null);
+
+  // ========== SENDER PROFILE ==========
+  const [senderProfile, setSenderProfile] = useState(null);
+
+  // ========== FULL-SCREEN MEDIA VIEWER ==========
+  const [mediaViewer, setMediaViewer] = useState(null); // { uri, type: 'image'|'video' }
+
+  // Global chat bazar object (no bazar-wise splitting)
+  const GLOBAL_CHAT = { id: 'global', name: 'بازار بحث / Bazar Discussion' };
 
   // ========== VOTERS ==========
   const [votersBazar, setVotersBazar] = useState(null);
@@ -78,8 +98,41 @@ export default function BazarScreen() {
   useEffect(() => {
     if (chatBazar && currentView === 'chatRoom') {
       loadChatMessages(1);
-      pollIntervalRef.current = setInterval(() => loadChatMessages(1, true), 10000);
-      return () => clearInterval(pollIntervalRef.current);
+
+      // Connect Socket.IO for real-time updates
+      const socket = socketIO(API_URL.replace('/api', ''), {
+        transports: ['websocket', 'polling'],
+      });
+      socketRef.current = socket;
+
+      socket.on('connect', () => {
+        socket.emit('joinBazarChat', 'global');
+      });
+
+      socket.on('newMessage', (msg) => {
+        setMessages(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      });
+
+      socket.on('messageUpdated', (updated) => {
+        setMessages(prev => prev.map(m => m.id === updated.id ? updated : m));
+      });
+
+      socket.on('messageDeleted', ({ id }) => {
+        setMessages(prev => prev.filter(m => m.id !== id));
+      });
+
+      // Fallback polling every 30s in case socket drops
+      pollIntervalRef.current = setInterval(() => loadChatMessages(1, true), 30000);
+
+      return () => {
+        socket.emit('leaveBazarChat', 'global');
+        socket.disconnect();
+        socketRef.current = null;
+        clearInterval(pollIntervalRef.current);
+      };
     }
     return () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); };
   }, [chatBazar, currentView]);
@@ -155,7 +208,7 @@ export default function BazarScreen() {
   }, [chatBazar]);
 
   const sendChatMessage = async () => {
-    if (!chatText.trim() && selectedImages.length === 0) return;
+    if (!chatText.trim() && selectedImages.length === 0 && selectedVideos.length === 0) return;
     if (!chatBazar) return;
     try {
       setSending(true);
@@ -165,9 +218,13 @@ export default function BazarScreen() {
       selectedImages.forEach((uri, i) => {
         formData.append('images', { uri, name: `img_${i}.jpg`, type: 'image/jpeg' });
       });
+      selectedVideos.forEach((uri, i) => {
+        formData.append('videos', { uri, name: `vid_${i}.mp4`, type: 'video/mp4' });
+      });
       await bazarAPI.sendMessage(formData);
       setChatText('');
       setSelectedImages([]);
+      setSelectedVideos([]);
       loadChatMessages(1);
     } catch (e) {
       Alert.alert('Error', e.response?.data?.error || 'Failed to send');
@@ -177,14 +234,105 @@ export default function BazarScreen() {
   };
 
   const pickChatImages = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 0.7,
-      selectionLimit: 5,
-    });
-    if (!result.canceled) {
-      setSelectedImages(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 5));
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.6,
+        selectionLimit: 5,
+      });
+      if (!result.canceled && result.assets?.length > 0) {
+        setSelectedImages(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 5));
+      }
+    } catch (e) {
+      console.error('Image pick error:', e);
+      Alert.alert('Error', 'Failed to pick images. Please try again.');
+    }
+  };
+
+  const pickChatVideos = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+        allowsMultipleSelection: false,
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets?.length > 0) {
+        const asset = result.assets[0];
+        if (asset.fileSize && asset.fileSize > 300 * 1024 * 1024) {
+          Alert.alert('Too Large', 'Video must be under 300MB');
+          return;
+        }
+        setSelectedVideos(prev => [...prev, asset.uri].slice(0, 2));
+      }
+    } catch (e) {
+      console.error('Video pick error:', e);
+      Alert.alert('Error', 'Failed to pick video.');
+    }
+  };
+
+  // ====== VOICE RECORDING ======
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission', 'Microphone permission is required');
+        return;
+      }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      recordingRef.current = recording;
+      setIsRecording(true);
+    } catch (e) {
+      console.error('Start recording error:', e);
+      Alert.alert('Error', 'Failed to start recording');
+    }
+  };
+
+  const stopRecordingAndSend = async () => {
+    if (!recordingRef.current) return;
+    try {
+      setIsRecording(false);
+      await recordingRef.current.stopAndUnloadAsync();
+      const uri = recordingRef.current.getURI();
+      const status = await recordingRef.current.getStatusAsync();
+      const durationMs = status.durationMillis || 0;
+      recordingRef.current = null;
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+
+      if (!uri || durationMs < 500) return; // too short
+
+      setSending(true);
+      const formData = new FormData();
+      formData.append('bazarId', chatBazar?.id || 'global');
+      formData.append('voice', { uri, name: 'voice.m4a', type: 'audio/m4a' });
+      formData.append('voiceDuration', String(Math.round(durationMs / 1000)));
+      await bazarAPI.sendMessage(formData);
+      loadChatMessages(1);
+    } catch (e) {
+      console.error('Voice send error:', e);
+      Alert.alert('Error', 'Failed to send voice message');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // ====== EXCEL / CSV DOWNLOAD ======
+  const downloadExcel = async () => {
+    try {
+      const url = bazarAPI.getExportUrl(presidentToken, exportBazarId);
+      const filename = `traders_${Date.now()}.csv`;
+      const fileUri = FileSystem.documentDirectory + filename;
+      Alert.alert('Downloading...', 'Saving traders file...');
+      const res = await FileSystem.downloadAsync(url, fileUri);
+      if (res.status === 200) {
+        await Sharing.shareAsync(res.uri, { mimeType: 'text/csv', dialogTitle: 'Save Traders CSV' });
+      } else {
+        Alert.alert('Error', 'Download failed');
+      }
+    } catch (e) {
+      console.error('Download error:', e);
+      Alert.alert('Error', 'Failed to download file');
     }
   };
 
@@ -231,16 +379,29 @@ export default function BazarScreen() {
 
   // ====== REGISTRATION ======
   const pickRegPhoto = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.7,
-    });
-    if (!result.canceled) setRegPhoto(result.assets[0].uri);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+        allowsEditing: true,
+        aspect: [1, 1],
+      });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setRegPhoto(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.error('Photo pick error:', e);
+      Alert.alert('Error', 'Failed to pick photo. Please try again.');
+    }
   };
 
   const submitRegistration = async () => {
     if (!regForm.fullName.trim() || !regForm.shopName.trim() || !regForm.phone.trim() || !regForm.bazarId) {
       Alert.alert('ضروری / Required', 'براہ کرم تمام فیلڈز بھریں اور بازار منتخب کریں\nPlease fill Full Name, Shop Name, Phone and select a Bazar');
+      return;
+    }
+    if (!regPhoto) {
+      Alert.alert('تصویر ضروری ہے / Photo Required', 'براہ کرم اپنی پروفائل تصویر شامل کریں\nPlease add your profile picture');
       return;
     }
     try {
@@ -250,9 +411,7 @@ export default function BazarScreen() {
       formData.append('shopName', regForm.shopName.trim());
       formData.append('phone', regForm.phone.trim());
       formData.append('bazarId', regForm.bazarId);
-      if (regPhoto) {
-        formData.append('photo', { uri: regPhoto, name: 'photo.jpg', type: 'image/jpeg' });
-      }
+      formData.append('photo', { uri: regPhoto, name: 'photo.jpg', type: 'image/jpeg' });
       const res = await bazarAPI.register(formData);
       Alert.alert('کامیاب / Success', res.data.message || 'Registration submitted!');
       setMyTrader(res.data.trader);
@@ -376,14 +535,12 @@ export default function BazarScreen() {
       case 'pending':
         setCurrentView('home');
         break;
-      case 'chat':
-        setCurrentView('features');
-        break;
       case 'chatRoom':
         setChatBazar(null);
         setMessages([]);
+        setSelectedImages([]);
         clearInterval(pollIntervalRef.current);
-        setCurrentView('chat');
+        setCurrentView('features');
         break;
       case 'voters':
         if (votersBazar) {
@@ -439,8 +596,7 @@ export default function BazarScreen() {
     const titles = {
       register: 'اندراج / Register',
       pending: 'درخواست کی صورتحال',
-      chat: 'بحث کے لیے بازار منتخب کریں',
-      chatRoom: chatBazar?.name || 'Chat',
+      chatRoom: 'بازار بحث / Bazar Discussion',
       voters: votersBazar ? votersBazar.name : 'تصدیق شدہ ووٹرز',
       presidentLogin: 'President Login',
       presidentDashboard: 'President Dashboard',
@@ -534,14 +690,20 @@ export default function BazarScreen() {
             ))}
           </View>
 
-          <Text style={styles.inputLabel}>تصویر / Profile Picture (اختیاری / Optional)</Text>
+          <Text style={styles.inputLabel}>تصویر / Profile Picture (ضروری / Required) *</Text>
           <TouchableOpacity style={styles.photoPicker} onPress={pickRegPhoto}>
             {regPhoto ? (
-              <Image source={{ uri: regPhoto }} style={styles.photoPreview} />
+              <View style={styles.photoSelectedWrap}>
+                <Image source={{ uri: regPhoto }} style={styles.photoPreview} resizeMode="cover" />
+                <View style={styles.photoChangeOverlay}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>تبدیل / Change</Text>
+                </View>
+              </View>
             ) : (
               <View style={styles.photoPlaceholder}>
-                <Text style={{ fontSize: 28 }}>📷</Text>
-                <Text style={styles.photoPlaceholderText}>Tap to add photo (optional)</Text>
+                <Text style={{ fontSize: 32 }}>📷</Text>
+                <Text style={styles.photoPlaceholderText}>تصویر شامل کریں *</Text>
+                <Text style={[styles.photoPlaceholderText, { fontSize: 10, marginTop: 2 }]}>Tap to add photo</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -596,13 +758,13 @@ export default function BazarScreen() {
         <Text style={styles.approvedBannerSub}>{myTrader?.shopName} – {myTrader?.bazar?.name}</Text>
       </View>
 
-      <TouchableOpacity style={styles.featureCard} onPress={() => setCurrentView('chat')} activeOpacity={0.7}>
+      <TouchableOpacity style={styles.featureCard} onPress={() => { setChatBazar(GLOBAL_CHAT); setCurrentView('chatRoom'); }} activeOpacity={0.7}>
         <View style={[styles.featureIcon, { backgroundColor: '#E3F2FD' }]}>
           <Text style={{ fontSize: 32 }}>💬</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.featureTitle}>Discuss Issues / مسائل پر بات</Text>
-          <Text style={styles.featureSub}>Open chat room for bazar discussions</Text>
+          <Text style={styles.featureSub}>Open chat room for all traders</Text>
         </View>
         <Text style={{ fontSize: 22, color: COLORS.textLight }}>›</Text>
       </TouchableOpacity>
@@ -676,11 +838,31 @@ export default function BazarScreen() {
 
     return (
       <TouchableOpacity style={[styles.chatBubble, isOwn ? styles.chatBubbleOwn : styles.chatBubbleOther]} onLongPress={() => isOwn && deleteChatMsg(item.id)} activeOpacity={0.8}>
-        {!isOwn && <Text style={styles.chatSenderName}>{item.trader?.fullName}</Text>}
+        {!isOwn && <Text style={styles.chatSenderName} onPress={() => setSenderProfile(item.trader)}>{item.trader?.fullName}</Text>}
+        {/* Voice message bubble */}
+        {item.voiceUrl && (
+          <VoiceBubble uri={item.voiceUrl} duration={item.voiceDuration} isOwn={isOwn} />
+        )}
+        {/* Images — tap to full-screen */}
         {item.images?.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
-            {item.images.map((img, i) => <Image key={i} source={{ uri: img }} style={styles.chatImage} />)}
+            {item.images.map((img, i) => (
+              <TouchableOpacity key={i} onPress={() => setMediaViewer({ uri: img, type: 'image' })} activeOpacity={0.85}>
+                <Image source={{ uri: img }} style={styles.chatImage} />
+              </TouchableOpacity>
+            ))}
           </ScrollView>
+        )}
+        {/* Videos — tap to full-screen */}
+        {item.videos?.length > 0 && (
+          <View style={{ marginBottom: 4 }}>
+            {item.videos.map((vid, i) => (
+              <TouchableOpacity key={i} onPress={() => setMediaViewer({ uri: vid, type: 'video' })} activeOpacity={0.85} style={styles.videoBubbleWrap}>
+                <View style={styles.videoPlayOverlay}><Text style={{ fontSize: 30 }}>▶️</Text></View>
+                <Text style={{ fontSize: 11, color: isOwn ? 'rgba(255,255,255,0.7)' : COLORS.textSecondary }}>🎬 Video</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
         {item.text && <Text style={[styles.chatMsgText, isOwn && { color: '#fff' }]}>{item.text}</Text>}
         <Text style={[styles.chatTime, isOwn && { color: 'rgba(255,255,255,0.6)' }]}>
@@ -692,16 +874,17 @@ export default function BazarScreen() {
 
   const renderChatRoom = () => (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 80}
+      style={{ flex: 1, backgroundColor: COLORS.background }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <FlatList
         ref={chatListRef}
         data={messages}
         renderItem={renderChatMessage}
         keyExtractor={item => item.id}
-        contentContainerStyle={{ padding: 10, paddingBottom: 8, flexGrow: 1 }}
+        contentContainerStyle={{ padding: 10, paddingBottom: 4, flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
         onContentSizeChange={() => chatListRef.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
           <View style={styles.emptyState}>
@@ -712,12 +895,23 @@ export default function BazarScreen() {
         }
       />
 
-      {selectedImages.length > 0 && (
-        <ScrollView horizontal style={styles.imagePreviewRow}>
+      {/* Selected images + videos preview strip */}
+      {(selectedImages.length > 0 || selectedVideos.length > 0) && (
+        <ScrollView horizontal style={styles.imagePreviewRow} keyboardShouldPersistTaps="handled">
           {selectedImages.map((uri, i) => (
-            <View key={i} style={styles.previewItem}>
+            <View key={'img' + i} style={styles.previewItem}>
               <Image source={{ uri }} style={styles.previewThumb} />
               <TouchableOpacity style={styles.previewRemove} onPress={() => setSelectedImages(prev => prev.filter((_, idx) => idx !== i))}>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+          {selectedVideos.map((uri, i) => (
+            <View key={'vid' + i} style={styles.previewItem}>
+              <View style={[styles.previewThumb, { backgroundColor: '#222', justifyContent: 'center', alignItems: 'center' }]}>
+                <Text style={{ fontSize: 24 }}>🎬</Text>
+              </View>
+              <TouchableOpacity style={styles.previewRemove} onPress={() => setSelectedVideos(prev => prev.filter((_, idx) => idx !== i))}>
                 <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -725,28 +919,47 @@ export default function BazarScreen() {
         </ScrollView>
       )}
 
-      <SafeAreaView style={styles.chatInputSafe}>
-        <View style={styles.chatInputContainer}>
-          <TouchableOpacity onPress={pickChatImages} style={styles.chatActionBtn}>
-            <Text style={{ fontSize: 20 }}>📷</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowPollModal(true)} style={styles.chatActionBtn}>
-            <Text style={{ fontSize: 20 }}>📊</Text>
-          </TouchableOpacity>
-          <TextInput
-            style={styles.chatInput}
-            value={chatText}
-            onChangeText={setChatText}
-            placeholder="پیغام لکھیں..."
-            placeholderTextColor={COLORS.textLight}
-            multiline
-            maxLength={2000}
-          />
-          <TouchableOpacity onPress={sendChatMessage} disabled={sending} style={[styles.chatSendBtn, sending && { opacity: 0.5 }]}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{sending ? '...' : '➤'}</Text>
+      {/* Recording indicator */}
+      {isRecording && (
+        <View style={styles.recordingBar}>
+          <Text style={{ color: COLORS.error, fontWeight: '700' }}>🔴 Recording...</Text>
+          <TouchableOpacity onPress={stopRecordingAndSend} style={styles.stopRecordBtn}>
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>⬆ Send</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      )}
+
+      {/* Chat input bar */}
+      <View style={styles.chatInputContainer}>
+        <TouchableOpacity onPress={pickChatImages} style={styles.chatActionBtn}>
+          <Text style={{ fontSize: 20 }}>📷</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={pickChatVideos} style={styles.chatActionBtn}>
+          <Text style={{ fontSize: 20 }}>🎬</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => setShowPollModal(true)} style={styles.chatActionBtn}>
+          <Text style={{ fontSize: 20 }}>📊</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPressIn={startRecording}
+          onPressOut={stopRecordingAndSend}
+          style={[styles.chatActionBtn, isRecording && { backgroundColor: COLORS.error + '20', borderRadius: 20 }]}
+        >
+          <Text style={{ fontSize: 20 }}>{isRecording ? '⏹' : '🎙️'}</Text>
+        </TouchableOpacity>
+        <TextInput
+          style={styles.chatInput}
+          value={chatText}
+          onChangeText={setChatText}
+          placeholder="پیغام لکھیں..."
+          placeholderTextColor={COLORS.textLight}
+          multiline
+          maxLength={2000}
+        />
+        <TouchableOpacity onPress={sendChatMessage} disabled={sending} style={[styles.chatSendBtn, sending && { opacity: 0.5 }]}>
+          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{sending ? '...' : '➤'}</Text>
+        </TouchableOpacity>
+      </View>
 
       <Modal visible={showPollModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -964,7 +1177,7 @@ export default function BazarScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        <TouchableOpacity style={[styles.submitBtn, { marginTop: 12 }]} onPress={exportTraders}>
+        <TouchableOpacity style={[styles.submitBtn, { marginTop: 12 }]} onPress={downloadExcel}>
           <Text style={styles.submitBtnText}>📥 Download CSV File</Text>
         </TouchableOpacity>
         <View style={{ height: 40 }} />
@@ -1009,6 +1222,95 @@ export default function BazarScreen() {
     </Modal>
   );
 
+  // ========== VOICE BUBBLE COMPONENT ==========
+  const VoiceBubble = ({ uri, duration, isOwn }) => {
+    const [playing, setPlaying] = useState(false);
+    const soundRef = useRef(null);
+
+    const togglePlay = async () => {
+      try {
+        if (playing && soundRef.current) {
+          await soundRef.current.stopAsync();
+          await soundRef.current.unloadAsync();
+          soundRef.current = null;
+          setPlaying(false);
+          return;
+        }
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
+        const { sound } = await Audio.Sound.createAsync({ uri });
+        soundRef.current = sound;
+        sound.setOnPlaybackStatusUpdate(status => {
+          if (status.didJustFinish) { setPlaying(false); sound.unloadAsync(); soundRef.current = null; }
+        });
+        await sound.playAsync();
+        setPlaying(true);
+      } catch (e) {
+        console.error('Play error:', e);
+      }
+    };
+
+    const mins = Math.floor((duration || 0) / 60);
+    const secs = (duration || 0) % 60;
+    return (
+      <TouchableOpacity onPress={togglePlay} style={styles.voiceBubbleRow} activeOpacity={0.7}>
+        <Text style={{ fontSize: 22 }}>{playing ? '⏸' : '▶️'}</Text>
+        <View style={styles.voiceWaveform}>
+          {[...Array(12)].map((_, i) => (
+            <View key={i} style={[styles.voiceBar, { height: 6 + Math.random() * 14, backgroundColor: isOwn ? 'rgba(255,255,255,0.5)' : COLORS.primary + '60' }]} />
+          ))}
+        </View>
+        <Text style={{ fontSize: 11, color: isOwn ? 'rgba(255,255,255,0.7)' : COLORS.textSecondary }}>{mins}:{secs < 10 ? '0' + secs : secs}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  // ========== SENDER PROFILE MODAL ==========
+  const renderSenderProfileModal = () => (
+    <Modal visible={!!senderProfile} transparent animationType="slide" onRequestClose={() => setSenderProfile(null)}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={{ alignItems: 'center', marginBottom: 16 }}>
+            {senderProfile?.photoUrl ? (
+              <Image source={{ uri: senderProfile.photoUrl }} style={styles.detailPhoto} />
+            ) : (
+              <View style={[styles.detailPhoto, styles.voterPhotoPlaceholder]}>
+                <Text style={{ fontSize: 40 }}>🏪</Text>
+              </View>
+            )}
+            <Text style={{ fontSize: 20, fontWeight: '700', color: COLORS.text, marginTop: 10 }}>{senderProfile?.fullName}</Text>
+            <Text style={{ fontSize: 14, color: COLORS.textSecondary }}>{senderProfile?.shopName}</Text>
+          </View>
+          <TouchableOpacity onPress={() => setSenderProfile(null)} style={styles.closeBtn}>
+            <Text style={styles.closeBtnText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // ========== FULL-SCREEN MEDIA VIEWER ==========
+  const renderMediaViewer = () => (
+    <Modal visible={!!mediaViewer} transparent animationType="fade" onRequestClose={() => setMediaViewer(null)}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
+        <TouchableOpacity onPress={() => setMediaViewer(null)} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>✕</Text>
+        </TouchableOpacity>
+        {mediaViewer?.type === 'image' && (
+          <Image source={{ uri: mediaViewer.uri }} style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height * 0.75 }} resizeMode="contain" />
+        )}
+        {mediaViewer?.type === 'video' && (
+          <Video
+            source={{ uri: mediaViewer.uri }}
+            style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height * 0.65 }}
+            useNativeControls
+            resizeMode={ResizeMode.CONTAIN}
+            shouldPlay
+          />
+        )}
+      </View>
+    </Modal>
+  );
+
   // ========== LOADING ==========
   if (loading) {
     return (
@@ -1027,12 +1329,13 @@ export default function BazarScreen() {
       {currentView === 'register' && renderRegister()}
       {currentView === 'pending' && renderPending()}
       {currentView === 'features' && renderFeatures()}
-      {currentView === 'chat' && renderChatSelect()}
       {currentView === 'chatRoom' && renderChatRoom()}
       {currentView === 'voters' && renderVoters()}
       {currentView === 'presidentLogin' && renderPresidentLogin()}
       {currentView === 'presidentDashboard' && renderPresidentDashboard()}
       {renderTraderDetailModal()}
+      {renderSenderProfileModal()}
+      {renderMediaViewer()}
     </SafeAreaView>
   );
 }
@@ -1042,13 +1345,13 @@ const styles = StyleSheet.create({
   viewContainer: { flex: 1 },
 
   // Main Header
-  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, padding: 16, paddingTop: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, padding: 16, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 30) + 10 : 12 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: COLORS.white },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
   headerPresidentBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
 
   // Sub Header (feature screens)
-  subHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, paddingVertical: 12, paddingHorizontal: 8 },
+  subHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, paddingVertical: 12, paddingHorizontal: 8, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 30) + 8 : 12 },
   backBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
   backBtnText: { fontSize: 28, color: COLORS.white, fontWeight: '700' },
   subHeaderTitle: { flex: 1, fontSize: 16, fontWeight: '700', color: COLORS.white, textAlign: 'center' },
@@ -1085,10 +1388,12 @@ const styles = StyleSheet.create({
   bazarChipText: { fontSize: 13, color: COLORS.text },
 
   // Photo Picker
-  photoPicker: { width: 100, height: 100, borderRadius: 12, overflow: 'hidden', marginTop: 4 },
-  photoPreview: { width: 100, height: 100, borderRadius: 12 },
-  photoPlaceholder: { width: 100, height: 100, borderRadius: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, justifyContent: 'center', alignItems: 'center' },
-  photoPlaceholderText: { fontSize: 10, color: COLORS.textLight, textAlign: 'center', marginTop: 4 },
+  photoPicker: { width: 120, height: 120, borderRadius: 14, marginTop: 4, borderWidth: 2, borderColor: COLORS.error + '80', borderStyle: 'dashed' },
+  photoPreview: { width: '100%', height: '100%', borderRadius: 12 },
+  photoSelectedWrap: { width: '100%', height: '100%', borderRadius: 12, overflow: 'hidden' },
+  photoChangeOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 4, alignItems: 'center' },
+  photoPlaceholder: { width: '100%', height: '100%', borderRadius: 12, backgroundColor: COLORS.surface, justifyContent: 'center', alignItems: 'center' },
+  photoPlaceholderText: { fontSize: 11, color: COLORS.error, textAlign: 'center', marginTop: 4, fontWeight: '600' },
 
   // Submit Button
   submitBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 },
@@ -1134,11 +1439,23 @@ const styles = StyleSheet.create({
   chatImage: { width: 160, height: 120, borderRadius: 8, marginRight: 6 },
 
   // Chat Input
-  chatInputSafe: { backgroundColor: COLORS.surface },
-  chatInputContainer: { flexDirection: 'row', alignItems: 'flex-end', padding: 8, paddingBottom: Platform.OS === 'android' ? 10 : 8, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
-  chatActionBtn: { padding: 8 },
-  chatInput: { flex: 1, backgroundColor: COLORS.background, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontSize: 14, color: COLORS.text, maxHeight: 100 },
-  chatSendBtn: { backgroundColor: COLORS.primary, width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginLeft: 6 },
+  chatInputContainer: { flexDirection: 'row', alignItems: 'flex-end', padding: 6, paddingBottom: Platform.OS === 'android' ? 8 : 6, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
+  chatActionBtn: { padding: 6 },
+  chatInput: { flex: 1, backgroundColor: COLORS.background, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, fontSize: 14, color: COLORS.text, maxHeight: 100 },
+  chatSendBtn: { backgroundColor: COLORS.primary, width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
+
+  // Voice Bubble
+  voiceBubbleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  voiceWaveform: { flexDirection: 'row', alignItems: 'center', gap: 2, flex: 1 },
+  voiceBar: { width: 3, borderRadius: 2 },
+
+  // Video Bubble
+  videoBubbleWrap: { backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 10, padding: 14, alignItems: 'center', marginBottom: 4, minWidth: 140 },
+  videoPlayOverlay: { marginBottom: 4 },
+
+  // Recording Bar
+  recordingBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: COLORS.error + '10', borderTopWidth: 1, borderTopColor: COLORS.error + '20' },
+  stopRecordBtn: { backgroundColor: COLORS.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20 },
 
   // Poll
   pollBubble: { backgroundColor: COLORS.surface, alignSelf: 'stretch', maxWidth: '100%', borderWidth: 1, borderColor: COLORS.primary + '30', elevation: 1 },
@@ -1151,7 +1468,7 @@ const styles = StyleSheet.create({
   pollTotal: { fontSize: 11, color: COLORS.textLight, marginTop: 4 },
 
   // Image Preview
-  imagePreviewRow: { padding: 8, backgroundColor: COLORS.surface },
+  imagePreviewRow: { padding: 6, backgroundColor: COLORS.surface, maxHeight: 80 },
   previewItem: { position: 'relative', marginRight: 8 },
   previewThumb: { width: 60, height: 60, borderRadius: 8 },
   previewRemove: { position: 'absolute', top: -6, right: -6, backgroundColor: COLORS.error, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },

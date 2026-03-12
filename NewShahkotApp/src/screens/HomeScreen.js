@@ -10,6 +10,7 @@ import { useAuth } from '../context/AuthContext';
 import { listingsAPI, newsAPI, tournamentsAPI, jobsAPI, notificationsAPI } from '../services/api';
 import AdBanner from '../components/AdBanner';
 import { useLanguage } from '../context/LanguageContext';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
 const CARD_W = (width - 48) / 2;
@@ -127,7 +128,7 @@ export default function HomeScreen({ navigation }) {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+    <LinearGradient colors={[COLORS.backgroundGradientTop, COLORS.backgroundGradientBottom]} style={{ flex: 1 }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
@@ -342,7 +343,7 @@ export default function HomeScreen({ navigation }) {
       <TouchableOpacity style={styles.aiBtn} onPress={() => navigation.navigate('AIChatbot')} activeOpacity={0.85}>
         <Ionicons name="sparkles" size={26} color="#fff" />
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 }
 
