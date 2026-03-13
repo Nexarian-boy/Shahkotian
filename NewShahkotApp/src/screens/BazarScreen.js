@@ -856,22 +856,36 @@ export default function BazarScreen() {
         {item.images?.length > 0 && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4, gap: 4 }}>
             {item.images.map((img, i) => (
-              <TouchableOpacity
-                key={i}
-                onPress={() => setMediaViewer({ uri: img, type: 'image' })}
-                activeOpacity={0.85}
-              >
-                <Image
-                  source={{ uri: img }}
-                  style={{
-                    width: item.images.length === 1 ? 200 : 95,
-                    height: item.images.length === 1 ? 160 : 95,
-                    borderRadius: 8,
-                    backgroundColor: COLORS.border,
-                  }}
-                  resizeMode="cover"
-                />
-              </TouchableOpacity>
+              <View key={i} style={{ position: 'relative' }}>
+                <TouchableOpacity
+                  onPress={() => setMediaViewer({ uri: img, type: 'image' })}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={{ uri: img }}
+                    style={{
+                      width: item.images.length === 1 ? 200 : 95,
+                      height: item.images.length === 1 ? 160 : 95,
+                      borderRadius: 8,
+                      backgroundColor: COLORS.border,
+                    }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+                {isOwn && (
+                  <TouchableOpacity
+                    onPress={() => deleteChatMsg(item.id)}
+                    style={{
+                      position: 'absolute', top: 4, right: 4,
+                      backgroundColor: 'rgba(0,0,0,0.6)',
+                      borderRadius: 10, width: 20, height: 20,
+                      justifyContent: 'center', alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ))}
           </View>
         )}
@@ -879,10 +893,31 @@ export default function BazarScreen() {
         {item.videos?.length > 0 && (
           <View style={{ marginBottom: 4 }}>
             {item.videos.map((vid, i) => (
-              <TouchableOpacity key={i} onPress={() => setMediaViewer({ uri: vid, type: 'video' })} activeOpacity={0.85} style={styles.videoBubbleWrap}>
-                <View style={styles.videoPlayOverlay}><Text style={{ fontSize: 30 }}>▶️</Text></View>
-                <Text style={{ fontSize: 11, color: isOwn ? 'rgba(255,255,255,0.7)' : COLORS.textSecondary }}>🎬 Video</Text>
-              </TouchableOpacity>
+              <View key={i} style={{ position: 'relative' }}>
+                <TouchableOpacity
+                  onPress={() => setMediaViewer({ uri: vid, type: 'video' })}
+                  activeOpacity={0.85}
+                  style={styles.videoBubbleWrap}
+                >
+                  <View style={styles.videoPlayOverlay}>
+                    <Text style={{ fontSize: 30 }}>▶️</Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: isOwn ? 'rgba(255,255,255,0.7)' : COLORS.textSecondary }}>🎬 Video</Text>
+                </TouchableOpacity>
+                {isOwn && (
+                  <TouchableOpacity
+                    onPress={() => deleteChatMsg(item.id)}
+                    style={{
+                      position: 'absolute', top: 4, right: 4,
+                      backgroundColor: 'rgba(0,0,0,0.6)',
+                      borderRadius: 10, width: 20, height: 20,
+                      justifyContent: 'center', alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ))}
           </View>
         )}
@@ -902,7 +937,6 @@ export default function BazarScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      <AdBanner />
       <FlatList
   ref={chatListRef}
   data={messages}
@@ -910,6 +944,7 @@ export default function BazarScreen() {
   keyExtractor={item => item.id}
   style={{ flex: 1 }}
   contentContainerStyle={{ padding: 10, paddingBottom: 10, flexGrow: 1 }}
+  ListHeaderComponent={<AdBanner />}
   onEndReached={() => chatHasMore && loadChatMessages(chatPage + 1)}
   onEndReachedThreshold={0.2}
         keyboardShouldPersistTaps="handled"

@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
 const { authenticate, adminOnly } = require('../middleware/auth');
-const { uploadToCloudinary, uploadVideoToCloudinary } = require('../utils/cloudinaryUpload');
+const { uploadToCloudinary, uploadVideoToCloudinary, uploadAudioToCloudinary } = require('../utils/cloudinaryUpload');
 const { upload, uploadMedia } = require('../utils/upload');
 const { sendPushToUser } = require('../utils/pushNotification');
 
@@ -223,7 +223,7 @@ router.post('/chat/send', authenticate, uploadMedia.fields([
       }
     }
     if (req.files?.voice?.[0]) {
-      voiceUrl = await uploadToCloudinary(req.files.voice[0], 'shahkot/bazar-chat/voice');
+      voiceUrl = await uploadAudioToCloudinary(req.files.voice[0].buffer);
     }
 
     const message = await prisma.bazarChatMessage.create({
