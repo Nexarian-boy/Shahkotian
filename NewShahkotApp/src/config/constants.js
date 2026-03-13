@@ -82,6 +82,7 @@ export const COLORS = {
   black: '#000000',
   gray: '#EDF2ED',
   darkGray: '#374137',
+  chatBackground: '#ECE5DD',
   headerBg: '#0C8A43',
   cardShadow: '#0C8A43',
 };

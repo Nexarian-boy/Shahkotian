@@ -43,6 +43,13 @@ export default function BazarScreen() {
   const [selectedImages, setSelectedImages] = useState([]);
   const [selectedVideos, setSelectedVideos] = useState([]);
   const chatListRef = useRef(null);
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => {
+        chatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages]);
   const pollIntervalRef = useRef(null);
   const socketRef = useRef(null);
   const [showPollModal, setShowPollModal] = useState(false);
@@ -596,7 +603,7 @@ export default function BazarScreen() {
     const titles = {
       register: 'اندراج / Register',
       pending: 'درخواست کی صورتحال',
-      chatRoom: 'بازار بحث / Bazar Discussion',
+      chatRoom: '',
       voters: votersBazar ? votersBazar.name : 'تصدیق شدہ ووٹرز',
       presidentLogin: 'President Login',
       presidentDashboard: 'President Dashboard',
@@ -815,6 +822,7 @@ export default function BazarScreen() {
     if (isPoll) {
       const votes = item.pollVotes || [];
       const myVote = votes.find(v => v.startsWith(myTrader?.id + ':'));
+      const hasVoted = !!myVote;
       const totalVotes = votes.length;
       return (
         <View style={[styles.chatBubble, styles.pollBubble]}>
@@ -824,10 +832,11 @@ export default function BazarScreen() {
             const optVotes = votes.filter(v => v.endsWith(':' + idx)).length;
             const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
             const voted = myVote?.endsWith(':' + idx);
+            const isSelected = voted;
             return (
-              <TouchableOpacity key={idx} style={[styles.pollOption, voted && styles.pollOptionVoted]} onPress={() => !myVote && votePoll(item.id, idx)} disabled={!!myVote}>
-                <Text style={[styles.pollOptionText, voted && { fontWeight: '700' }]}>{opt}</Text>
-                {myVote && <Text style={styles.pollPct}>{pct}% ({optVotes})</Text>}
+              <TouchableOpacity key={idx} style={[styles.pollOption, isSelected && styles.pollOptionVoted]} onPress={() => votePoll(item.id, idx)}>
+                <Text style={[styles.pollOptionText, isSelected && { fontWeight: '700' }]}>{opt}</Text>
+                {hasVoted && <Text style={styles.pollPct}>{pct}% ({optVotes})</Text>}
               </TouchableOpacity>
             );
           })}
@@ -845,13 +854,26 @@ export default function BazarScreen() {
         )}
         {/* Images — tap to full-screen */}
         {item.images?.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 4 }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4, gap: 4 }}>
             {item.images.map((img, i) => (
-              <TouchableOpacity key={i} onPress={() => setMediaViewer({ uri: img, type: 'image' })} activeOpacity={0.85}>
-                <Image source={{ uri: img }} style={styles.chatImage} />
+              <TouchableOpacity
+                key={i}
+                onPress={() => setMediaViewer({ uri: img, type: 'image' })}
+                activeOpacity={0.85}
+              >
+                <Image
+                  source={{ uri: img }}
+                  style={{
+                    width: item.images.length === 1 ? 200 : 95,
+                    height: item.images.length === 1 ? 160 : 95,
+                    borderRadius: 8,
+                    backgroundColor: COLORS.border,
+                  }}
+                  resizeMode="cover"
+                />
               </TouchableOpacity>
             ))}
-          </ScrollView>
+          </View>
         )}
         {/* Videos — tap to full-screen */}
         {item.videos?.length > 0 && (
@@ -865,32 +887,39 @@ export default function BazarScreen() {
           </View>
         )}
         {item.text && <Text style={[styles.chatMsgText, isOwn && { color: '#fff' }]}>{item.text}</Text>}
-        <Text style={[styles.chatTime, isOwn && { color: 'rgba(255,255,255,0.6)' }]}>
-          {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
-        </Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 2 }}>
+          <Text style={[styles.chatTime, isOwn && { color: 'rgba(255,255,255,0.6)' }]}>
+            {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+          </Text>
+        </View>
       </TouchableOpacity>
     );
   };
 
   const renderChatRoom = () => (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: COLORS.background }}
+      style={{ flex: 1, backgroundColor: '#ECE5DD' }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
+      <AdBanner />
       <FlatList
-        ref={chatListRef}
-        data={messages}
-        renderItem={renderChatMessage}
-        keyExtractor={item => item.id}
-        contentContainerStyle={{ padding: 10, paddingBottom: 4, flexGrow: 1 }}
+  ref={chatListRef}
+  data={messages}
+  renderItem={renderChatMessage}
+  keyExtractor={item => item.id}
+  style={{ flex: 1 }}
+  contentContainerStyle={{ padding: 10, paddingBottom: 10, flexGrow: 1 }}
+  onEndReached={() => chatHasMore && loadChatMessages(chatPage + 1)}
+  onEndReachedThreshold={0.2}
         keyboardShouldPersistTaps="handled"
         onContentSizeChange={() => chatListRef.current?.scrollToEnd({ animated: false })}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Text style={{ fontSize: 48 }}>💬</Text>
-            <Text style={styles.emptyText}>ابھی تک کوئی پیغام نہیں</Text>
-            <Text style={[styles.emptyText, { fontSize: 13 }]}>No messages yet. Start the discussion!</Text>
+            <Text style={{ fontSize: 72 }}>💬</Text>
+            <Text style={[styles.emptyText, { fontSize: 18, marginTop: 16 }]}>ابھی تک کوئی پیغام نہیں</Text>
+            <Text style={[styles.emptyText, { fontSize: 13, marginTop: 6 }]}>No messages yet.</Text>
+            <Text style={[styles.emptyText, { fontSize: 13, color: COLORS.primary, marginTop: 4 }]}>Be the first to start the discussion! 👇</Text>
           </View>
         }
       />
@@ -1430,17 +1459,17 @@ const styles = StyleSheet.create({
   bazarSelectCount: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
 
   // Chat
-  chatBubble: { maxWidth: '80%', padding: 10, borderRadius: 12, marginBottom: 6 },
+  chatBubble: { maxWidth: '75%', padding: 10, borderRadius: 12, marginBottom: 6, overflow: 'hidden' },
   chatBubbleOwn: { backgroundColor: COLORS.primary, alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   chatBubbleOther: { backgroundColor: COLORS.surface, alignSelf: 'flex-start', borderBottomLeftRadius: 4, elevation: 1 },
   chatSenderName: { fontSize: 11, fontWeight: '700', color: COLORS.primary, marginBottom: 2 },
   chatMsgText: { fontSize: 14, color: COLORS.text, lineHeight: 20 },
   chatTime: { fontSize: 10, color: COLORS.textLight, marginTop: 4, textAlign: 'right' },
-  chatImage: { width: 160, height: 120, borderRadius: 8, marginRight: 6 },
+  chatImage: { width: 160, height: 160, borderRadius: 8, marginRight: 6, backgroundColor: COLORS.border },
 
   // Chat Input
-  chatInputContainer: { flexDirection: 'row', alignItems: 'flex-end', padding: 6, paddingBottom: Platform.OS === 'android' ? 8 : 6, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
-  chatActionBtn: { padding: 6 },
+  chatInputContainer: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 4, paddingVertical: 6, paddingBottom: Platform.OS === 'android' ? 24 : 10, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
+  chatActionBtn: { padding: 8, marginHorizontal: 2 },
   chatInput: { flex: 1, backgroundColor: COLORS.background, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, fontSize: 14, color: COLORS.text, maxHeight: 100 },
   chatSendBtn: { backgroundColor: COLORS.primary, width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
 
@@ -1468,9 +1497,9 @@ const styles = StyleSheet.create({
   pollTotal: { fontSize: 11, color: COLORS.textLight, marginTop: 4 },
 
   // Image Preview
-  imagePreviewRow: { padding: 6, backgroundColor: COLORS.surface, maxHeight: 80 },
+  imagePreviewRow: { padding: 8, backgroundColor: COLORS.surface, maxHeight: 90, borderTopWidth: 1, borderTopColor: COLORS.border },
   previewItem: { position: 'relative', marginRight: 8 },
-  previewThumb: { width: 60, height: 60, borderRadius: 8 },
+  previewThumb: { width: 70, height: 70, borderRadius: 10 },
   previewRemove: { position: 'absolute', top: -6, right: -6, backgroundColor: COLORS.error, width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
 
   // Search Bar

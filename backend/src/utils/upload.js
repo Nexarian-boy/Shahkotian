@@ -4,6 +4,7 @@ const path = require('path');
 // Allowed file types
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jpg'];
 const ALLOWED_VIDEO_TYPES = ['video/mp4', 'video/avi', 'video/x-matroska', 'video/quicktime', 'video/webm', 'video/3gpp'];
+const ALLOWED_AUDIO_TYPES = ['audio/m4a', 'audio/mp4', 'audio/x-m4a'];
 
 // Image-only filter
 const imageFilter = (req, file, cb) => {
@@ -15,11 +16,16 @@ const imageFilter = (req, file, cb) => {
 
 // Image + Video filter (for posts)
 const mediaFilter = (req, file, cb) => {
-  if (ALLOWED_IMAGE_TYPES.includes(file.mimetype) || ALLOWED_VIDEO_TYPES.includes(file.mimetype)) return cb(null, true);
+  if (
+    ALLOWED_IMAGE_TYPES.includes(file.mimetype) ||
+    ALLOWED_VIDEO_TYPES.includes(file.mimetype) ||
+    file.mimetype.startsWith('audio/') ||
+    ALLOWED_AUDIO_TYPES.includes(file.mimetype)
+  ) return cb(null, true);
   const ext = path.extname(file.originalname).toLowerCase();
-  const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.avi', '.mkv', '.mov', '.webm', '.3gp'];
+  const allowedExts = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.mp4', '.avi', '.mkv', '.mov', '.webm', '.3gp', '.m4a', '.mp3', '.wav', '.aac'];
   if (allowedExts.includes(ext)) return cb(null, true);
-  return cb(new Error('Only image and video files are allowed.'), false);
+  return cb(new Error('Only image, video, and audio files are allowed.'), false);
 };
 
 // Memory storage for Cloudinary uploads
@@ -64,4 +70,4 @@ const uploadListingMedia = multer({
   limits: { fileSize: 30 * 1024 * 1024, files: 6 },
 });
 
-module.exports = { upload, uploadMedia, uploadSingle, uploadCNIC, uploadRishta, uploadListingMedia, ALLOWED_IMAGE_TYPES, ALLOWED_VIDEO_TYPES };
+module.exports = { upload, uploadMedia, uploadSingle, uploadCNIC, uploadRishta, uploadListingMedia, ALLOWED_IMAGE_TYPES, ALLOWED_VIDEO_TYPES, ALLOWED_AUDIO_TYPES };

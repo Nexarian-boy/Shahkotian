@@ -312,14 +312,12 @@ router.post('/chat/poll/:id/vote', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Poll not found.' });
     }
 
-    // Check if already voted
     const votes = msg.pollVotes || [];
-    const alreadyVoted = votes.some(v => v.startsWith(`${trader.id}:`));
-    if (alreadyVoted) {
-      return res.status(400).json({ error: 'You have already voted.' });
-    }
-
-    const updatedVotes = [...votes, `${trader.id}:${optionIndex}`];
+    // Remove previous vote if exists, then add new one
+    const updatedVotes = [
+      ...votes.filter(v => !v.startsWith(`${trader.id}:`)),
+      `${trader.id}:${optionIndex}`
+    ];
     const updated = await prisma.bazarChatMessage.update({
       where: { id: req.params.id },
       data: { pollVotes: updatedVotes },
