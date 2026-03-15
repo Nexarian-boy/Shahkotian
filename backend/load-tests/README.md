@@ -65,8 +65,52 @@ k6 run load-tests/feature-matrix-load-test.js
 node scripts/load-testing/cleanup-test-users.js
 ```
 
+## One-click runner (recommended)
+
+Run everything with one command and save timestamped logs/reports:
+
+```powershell
+cd backend
+npm run loadtest:run:all
+```
+
+Advanced options (skip stages if needed):
+
+```powershell
+cd backend
+powershell -ExecutionPolicy Bypass -File scripts/load-testing/run-all-load-tests.ps1 -SkipCleanup
+powershell -ExecutionPolicy Bypass -File scripts/load-testing/run-all-load-tests.ps1 -SkipCreateUsers -SkipRotationChecks
+```
+
+Output location:
+
+- `backend/load-tests/results/<timestamp>/`
+- Contains per-step logs + `main-summary.json` + `matrix-summary.json`
+
 ## Notes
 
 - The matrix script intentionally treats some write responses (`400`, `404`) as acceptable for synthetic payload checks.
 - `main-load-test.js` writes chat messages to exercise write pressure; run cleanup afterwards if desired.
 - Admin-only status checks are skipped if admin credentials are not provided.
+
+## Undo / rollback
+
+If you only want to undo test data (recommended):
+
+```powershell
+cd backend
+npm run loadtest:users:cleanup
+```
+
+If you also want to remove the load-testing toolkit code itself:
+
+1. Remove folder `backend/load-tests/`
+2. Remove folder `backend/scripts/load-testing/`
+3. Remove these script entries from `backend/package.json`:
+	- `loadtest:users:create`
+	- `loadtest:db`
+	- `loadtest:cloudinary`
+	- `loadtest:k6:main`
+	- `loadtest:k6:matrix`
+	- `loadtest:users:cleanup`
+	- `loadtest:run:all`
