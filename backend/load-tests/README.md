@@ -48,6 +48,8 @@ Optional admin checks (for `/api/db-status`, `/api/cloudinary-status`):
 - `ADMIN_TOKEN` (recommended)
 - `ADMIN_EMAIL` + `ADMIN_PASSWORD` (optional fallback for k6 admin checks)
 
+If `ADMIN_TOKEN` is not set, `run-all-load-tests.ps1` now auto-generates one from the first active ADMIN user using `JWT_SECRET` and `DATABASE_URL`.
+
 Feature matrix tuning:
 
 - `MATRIX_RPS` (default `25`)
