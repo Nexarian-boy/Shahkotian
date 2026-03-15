@@ -1,4 +1,5 @@
 const express = require('express');
+const XLSX = require('xlsx');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
@@ -569,18 +570,36 @@ router.get('/export-traders', async (req, res) => {
       orderBy: [{ bazar: { name: 'asc' } }, { fullName: 'asc' }],
     });
 
-    const csvRows = ['Full Name,Shop Name,Phone,Bazar'];
-    traders.forEach(t => {
-      const name = (t.fullName || '').replace(/"/g, '""');
-      const shop = (t.shopName || '').replace(/"/g, '""');
-      const phone = (t.phone || '').replace(/"/g, '""');
-      const bazar = (t.bazar?.name || '').replace(/"/g, '""');
-      csvRows.push(`"${name}","${shop}","${phone}","${bazar}"`);
-    });
+    const rows = traders.map((t, i) => ({
+      'No.': i + 1,
+      'Full Name': t.fullName || '',
+      'Shop Name': t.shopName || '',
+      'Phone': t.phone || '',
+      Bazar: t.bazar?.name || '',
+      Status: t.status || '',
+      Registered: new Date(t.createdAt).toLocaleDateString('en-PK'),
+    }));
 
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="traders_${Date.now()}.csv"`);
-    res.send('\uFEFF' + csvRows.join('\n'));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    ws['!cols'] = [
+      { wch: 5 },
+      { wch: 25 },
+      { wch: 25 },
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 15 },
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Traders');
+
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="traders_${Date.now()}.xlsx"`);
+    res.send(buffer);
   } catch (error) {
     console.error('Export traders error:', error);
     res.status(500).json({ error: 'Failed to export.' });

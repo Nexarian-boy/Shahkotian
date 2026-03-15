@@ -360,19 +360,27 @@ export default function BazarScreen() {
   // ====== EXCEL / CSV DOWNLOAD ======
   const downloadExcel = async () => {
     try {
+      Alert.alert('Downloading...', 'Please wait, preparing Excel file...');
       const url = bazarAPI.getExportUrl(presidentToken, exportBazarId);
-      const filename = `traders_${Date.now()}.csv`;
+      const filename = `traders_${Date.now()}.xlsx`;
       const fileUri = FileSystem.documentDirectory + filename;
-      Alert.alert('Downloading...', 'Saving traders file...');
-      const res = await FileSystem.downloadAsync(url, fileUri);
+
+      const res = await FileSystem.downloadAsync(url, fileUri, {
+        headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+      });
+
       if (res.status === 200) {
-        await Sharing.shareAsync(res.uri, { mimeType: 'text/csv', dialogTitle: 'Save Traders CSV' });
+        await Sharing.shareAsync(res.uri, {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          dialogTitle: 'Save Traders Excel File',
+          UTI: 'com.microsoft.excel.xlsx',
+        });
       } else {
-        Alert.alert('Error', 'Download failed');
+        Alert.alert('Error', 'Download failed. Please try again.');
       }
     } catch (e) {
       console.error('Download error:', e);
-      Alert.alert('Error', 'Failed to download file');
+      Alert.alert('Error', 'Failed to download Excel file');
     }
   };
 
@@ -1414,7 +1422,7 @@ export default function BazarScreen() {
           ))}
         </View>
         <TouchableOpacity style={[styles.submitBtn, { marginTop: 12 }]} onPress={downloadExcel}>
-          <Text style={styles.submitBtnText}>📥 Download CSV File</Text>
+          <Text style={styles.submitBtnText}>📥 Download Excel File (.xlsx)</Text>
         </TouchableOpacity>
         <View style={{ height: 40 }} />
       </View>
