@@ -11,6 +11,7 @@ import { LanguageProvider } from './src/context/LanguageContext';
 import { COLORS } from './src/config/constants';
 import { initAds, onScreenView } from './src/utils/AdManager';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Notifications from 'expo-notifications';
 
 // Screens
 import SplashScreen from './src/screens/SplashScreen';
@@ -187,6 +188,25 @@ export default function App() {
 
   useEffect(() => {
     initAds();
+
+    // Handle notification tap when app is CLOSED or BACKGROUND
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      if (!navigationRef.current) return;
+
+      // Route based on notification type
+      if (data?.type === 'TRADER_APPROVED') {
+        navigationRef.current.navigate('Bazar');
+      } else if (data?.type === 'APPOINTMENT') {
+        navigationRef.current.navigate('Doctors');
+      } else if (data?.type === 'NEWS') {
+        navigationRef.current.navigate('News & Articles');
+      } else {
+        navigationRef.current.navigate('Notifications');
+      }
+    });
+
+    return () => subscription.remove();
   }, []);
 
   return (
