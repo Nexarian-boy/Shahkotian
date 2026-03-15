@@ -42,6 +42,18 @@ export default function BazarScreen() {
   const [sending, setSending] = useState(false);
   const [selectedImages, setSelectedImages] = useState([]);
   const [selectedVideos, setSelectedVideos] = useState([]);
+  const [replyTo, setReplyTo] = useState(null);
+  const [menuMsg, setMenuMsg] = useState(null);
+  const [showReactions, setShowReactions] = useState(null);
+  const [reactionsMap, setReactionsMap] = useState({});
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const recordingTimerRef = useRef(null);
+  const [playingId, setPlayingId] = useState(null);
+  const [playPositions, setPlayPositions] = useState({});
+  const soundRef = useRef(null);
+  const playingIdRef = useRef(null);
+
+  const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏'];
   const chatListRef = useRef(null);
   useEffect(() => {
     if (messages.length > 0) {
@@ -222,6 +234,7 @@ export default function BazarScreen() {
       const formData = new FormData();
       formData.append('bazarId', chatBazar.id);
       if (chatText.trim()) formData.append('text', chatText.trim());
+      if (replyTo) formData.append('replyToId', replyTo.id);
       selectedImages.forEach((uri, i) => {
         formData.append('images', { uri, name: `img_${i}.jpg`, type: 'image/jpeg' });
       });
@@ -232,6 +245,7 @@ export default function BazarScreen() {
       setChatText('');
       setSelectedImages([]);
       setSelectedVideos([]);
+      setReplyTo(null);
       loadChatMessages(1);
     } catch (e) {
       Alert.alert('Error', e.response?.data?.error || 'Failed to send');
@@ -280,6 +294,7 @@ export default function BazarScreen() {
 
   // ====== VOICE RECORDING ======
   const startRecording = async () => {
+    if (recordingRef.current) return;
     try {
       const permission = await Audio.requestPermissionsAsync();
       if (!permission.granted) {
@@ -287,34 +302,52 @@ export default function BazarScreen() {
         return;
       }
       await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      const recording = new Audio.Recording();
+      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.startAsync();
       recordingRef.current = recording;
       setIsRecording(true);
+      setRecordingDuration(0);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
     } catch (e) {
       console.error('Start recording error:', e);
       Alert.alert('Error', 'Failed to start recording');
     }
   };
 
+  const cancelRecording = async () => {
+    if (!recordingRef.current) return;
+    clearInterval(recordingTimerRef.current);
+    setIsRecording(false);
+    setRecordingDuration(0);
+    try {
+      await recordingRef.current.stopAndUnloadAsync();
+      recordingRef.current = null;
+    } catch (e) {}
+  };
+
   const stopRecordingAndSend = async () => {
     if (!recordingRef.current) return;
+    clearInterval(recordingTimerRef.current);
+    const dur = recordingDuration;
     try {
       setIsRecording(false);
       await recordingRef.current.stopAndUnloadAsync();
       const uri = recordingRef.current.getURI();
-      const status = await recordingRef.current.getStatusAsync();
-      const durationMs = status.durationMillis || 0;
       recordingRef.current = null;
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-
-      if (!uri || durationMs < 500) return; // too short
-
+      if (!uri || dur < 1) return;
       setSending(true);
       const formData = new FormData();
       formData.append('bazarId', chatBazar?.id || 'global');
       formData.append('voice', { uri, name: 'voice.m4a', type: 'audio/m4a' });
-      formData.append('voiceDuration', String(Math.round(durationMs / 1000)));
+      formData.append('voiceDuration', String(dur));
+      if (replyTo) formData.append('replyToId', replyTo.id);
       await bazarAPI.sendMessage(formData);
+      setReplyTo(null);
+      setRecordingDuration(0);
       loadChatMessages(1);
     } catch (e) {
       console.error('Voice send error:', e);
@@ -382,6 +415,55 @@ export default function BazarScreen() {
         } catch (e) { Alert.alert('Error', 'Failed to delete'); }
       }},
     ]);
+  };
+
+  const reactToMessage = (msgId, emoji) => {
+    setReactionsMap(prev => {
+      const existing = prev[msgId] || {};
+      const users = existing[emoji] || [];
+      let updated;
+      if (users.includes(myTrader?.id)) {
+        const kept = users.filter(id => id !== myTrader?.id);
+        updated = { ...existing, [emoji]: kept };
+        if (kept.length === 0) delete updated[emoji];
+      } else {
+        updated = { ...existing, [emoji]: [...users, myTrader?.id] };
+      }
+      return { ...prev, [msgId]: updated };
+    });
+    setShowReactions(null);
+  };
+
+  const reportChatMsg = (msg) => {
+    Alert.alert('Report Message', 'Report this message as inappropriate?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Report',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await bazarAPI.reportMessage(msg.id, 'Inappropriate content');
+            Alert.alert('Reported', 'Message reported to admins.');
+          } catch (e) {
+            Alert.alert('Error', 'Failed to report.');
+          }
+        }
+      },
+    ]);
+    setMenuMsg(null);
+  };
+
+  const shareMessage = async (msg) => {
+    try {
+      const { Share } = require('react-native');
+      await Share.share({ message: `${msg.text || '📷 Media'}\n\n— Shared from Shahkot Bazar Chat` });
+    } catch (e) {}
+    setMenuMsg(null);
+  };
+
+  const formatDuration = (seconds) => {
+    const s = Math.round(seconds || 0);
+    return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
   };
 
   // ====== REGISTRATION ======
@@ -818,6 +900,8 @@ export default function BazarScreen() {
   const renderChatMessage = ({ item }) => {
     const isOwn = item.trader?.userId === user?.id || item.traderId === myTrader?.id;
     const isPoll = !!item.pollQuestion;
+    const reactions = reactionsMap[item.id] || {};
+    const hasReactions = Object.keys(reactions).length > 0;
 
     if (isPoll) {
       const votes = item.pollVotes || [];
@@ -825,109 +909,147 @@ export default function BazarScreen() {
       const hasVoted = !!myVote;
       const totalVotes = votes.length;
       return (
-        <View style={[styles.chatBubble, styles.pollBubble]}>
-          <Text style={styles.pollSender}>{item.trader?.fullName} – {item.trader?.shopName}</Text>
-          <Text style={styles.pollQuestion}>{item.pollQuestion}</Text>
-          {(item.pollOptions || []).map((opt, idx) => {
-            const optVotes = votes.filter(v => v.endsWith(':' + idx)).length;
-            const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
-            const voted = myVote?.endsWith(':' + idx);
-            const isSelected = voted;
-            return (
-              <TouchableOpacity key={idx} style={[styles.pollOption, isSelected && styles.pollOptionVoted]} onPress={() => votePoll(item.id, idx)}>
-                <Text style={[styles.pollOptionText, isSelected && { fontWeight: '700' }]}>{opt}</Text>
-                {hasVoted && <Text style={styles.pollPct}>{pct}% ({optVotes})</Text>}
-              </TouchableOpacity>
-            );
-          })}
-          <Text style={styles.pollTotal}>{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</Text>
+        <View style={{ marginBottom: 8 }}>
+          <View style={[styles.chatBubble, styles.pollBubble]}>
+            <Text style={styles.pollSender}>{item.trader?.fullName} – {item.trader?.shopName}</Text>
+            <Text style={styles.pollQuestion}>{item.pollQuestion}</Text>
+            {(item.pollOptions || []).map((opt, idx) => {
+              const optVotes = votes.filter(v => v.endsWith(':' + idx)).length;
+              const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+              const voted = myVote?.endsWith(':' + idx);
+              return (
+                <TouchableOpacity key={idx} style={[styles.pollOption, voted && styles.pollOptionVoted]} onPress={() => votePoll(item.id, idx)}>
+                  <Text style={[styles.pollOptionText, voted && { fontWeight: '700' }]}>{opt}</Text>
+                  {hasVoted && <Text style={styles.pollPct}>{pct}% ({optVotes})</Text>}
+                </TouchableOpacity>
+              );
+            })}
+            <Text style={styles.pollTotal}>{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</Text>
+          </View>
         </View>
       );
     }
 
     return (
-      <TouchableOpacity style={[styles.chatBubble, isOwn ? styles.chatBubbleOwn : styles.chatBubbleOther]} onLongPress={() => isOwn && deleteChatMsg(item.id)} activeOpacity={0.8}>
-        {!isOwn && <Text style={styles.chatSenderName} onPress={() => setSenderProfile(item.trader)}>{item.trader?.fullName}</Text>}
-        {/* Voice message bubble */}
-        {item.voiceUrl && (
-          <VoiceBubble uri={item.voiceUrl} duration={item.voiceDuration} isOwn={isOwn} />
-        )}
-        {/* Images — tap to full-screen */}
-        {item.images?.length > 0 && (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4, gap: 4 }}>
-            {item.images.map((img, i) => (
-              <View key={i} style={{ position: 'relative' }}>
-                <TouchableOpacity
-                  onPress={() => setMediaViewer({ uri: img, type: 'image' })}
-                  activeOpacity={0.85}
-                >
-                  <Image
-                    source={{ uri: img }}
-                    style={{
-                      width: item.images.length === 1 ? 200 : 95,
-                      height: item.images.length === 1 ? 160 : 95,
-                      borderRadius: 8,
-                      backgroundColor: COLORS.border,
-                    }}
-                    resizeMode="cover"
-                  />
-                </TouchableOpacity>
-                {isOwn && (
-                  <TouchableOpacity
-                    onPress={() => deleteChatMsg(item.id)}
-                    style={{
-                      position: 'absolute', top: 4, right: 4,
-                      backgroundColor: 'rgba(0,0,0,0.6)',
-                      borderRadius: 10, width: 20, height: 20,
-                      justifyContent: 'center', alignItems: 'center',
-                    }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>✕</Text>
-                  </TouchableOpacity>
-                )}
+      <View style={{ marginBottom: 4 }}>
+        <View style={[styles.msgRow, isOwn ? { justifyContent: 'flex-end' } : { justifyContent: 'flex-start' }]}>
+          {!isOwn && (
+            <TouchableOpacity onPress={() => setSenderProfile(item.trader)} style={{ marginRight: 6, alignSelf: 'flex-end' }}>
+              {item.trader?.photoUrl ? (
+                <Image source={{ uri: item.trader.photoUrl }} style={styles.chatAvatar} />
+              ) : (
+                <View style={[styles.chatAvatar, styles.chatAvatarPlaceholder]}>
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>{item.trader?.fullName?.[0] || '?'}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity
+            style={[styles.chatBubble, isOwn ? styles.chatBubbleOwn : styles.chatBubbleOther]}
+            onLongPress={() => setMenuMsg(item)}
+            onPress={() => setShowReactions(showReactions === item.id ? null : item.id)}
+            activeOpacity={0.85}
+          >
+            {!isOwn && (
+              <Text style={styles.chatSenderName}>{item.trader?.fullName}</Text>
+            )}
+
+            {item.replyTo && (
+              <View style={styles.replyPreview}>
+                <View style={styles.replyAccentBar} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.replyName}>{item.replyTo.trader?.fullName || 'User'}</Text>
+                  <Text style={styles.replyText} numberOfLines={1}>
+                    {item.replyTo.voiceUrl ? '🎤 Voice message' : (item.replyTo.text || '📷 Photo')}
+                  </Text>
+                </View>
               </View>
-            ))}
-          </View>
-        )}
-        {/* Videos — tap to full-screen */}
-        {item.videos?.length > 0 && (
-          <View style={{ marginBottom: 4 }}>
-            {item.videos.map((vid, i) => (
-              <View key={i} style={{ position: 'relative' }}>
-                <TouchableOpacity
-                  onPress={() => setMediaViewer({ uri: vid, type: 'video' })}
-                  activeOpacity={0.85}
-                  style={styles.videoBubbleWrap}
-                >
-                  <View style={styles.videoPlayOverlay}>
-                    <Text style={{ fontSize: 30 }}>▶️</Text>
+            )}
+
+            {item.voiceUrl && (
+              <VoiceBubble uri={item.voiceUrl} duration={item.voiceDuration} isOwn={isOwn} />
+            )}
+
+            {item.images?.length > 0 && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4, gap: 4 }}>
+                {item.images.map((img, i) => (
+                  <View key={i} style={{ position: 'relative' }}>
+                    <TouchableOpacity onPress={() => setMediaViewer({ uri: img, type: 'image' })} activeOpacity={0.85}>
+                      <Image
+                        source={{ uri: img }}
+                        style={{
+                          width: item.images.length === 1 ? 200 : 95,
+                          height: item.images.length === 1 ? 160 : 95,
+                          borderRadius: 8,
+                          backgroundColor: COLORS.border,
+                        }}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                    {isOwn && (
+                      <TouchableOpacity onPress={() => deleteChatMsg(item.id)} style={styles.mediaDeleteBtn}>
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>✕</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                  <Text style={{ fontSize: 11, color: isOwn ? 'rgba(255,255,255,0.7)' : COLORS.textSecondary }}>🎬 Video</Text>
-                </TouchableOpacity>
-                {isOwn && (
-                  <TouchableOpacity
-                    onPress={() => deleteChatMsg(item.id)}
-                    style={{
-                      position: 'absolute', top: 4, right: 4,
-                      backgroundColor: 'rgba(0,0,0,0.6)',
-                      borderRadius: 10, width: 20, height: 20,
-                      justifyContent: 'center', alignItems: 'center',
-                    }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>✕</Text>
-                  </TouchableOpacity>
-                )}
+                ))}
               </View>
+            )}
+
+            {item.videos?.length > 0 && (
+              <View style={{ marginBottom: 4 }}>
+                {item.videos.map((vid, i) => (
+                  <View key={i} style={{ position: 'relative' }}>
+                    <TouchableOpacity onPress={() => setMediaViewer({ uri: vid, type: 'video' })} activeOpacity={0.85} style={styles.videoBubbleWrap}>
+                      <View style={styles.videoPlayOverlay}><Text style={{ fontSize: 30 }}>▶️</Text></View>
+                      <Text style={{ fontSize: 11, color: isOwn ? 'rgba(255,255,255,0.7)' : COLORS.textSecondary }}>🎬 Video</Text>
+                    </TouchableOpacity>
+                    {isOwn && (
+                      <TouchableOpacity onPress={() => deleteChatMsg(item.id)} style={styles.mediaDeleteBtn}>
+                        <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {item.text && <Text style={[styles.chatMsgText, isOwn && { color: '#fff' }]}>{item.text}</Text>}
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 2, gap: 4 }}>
+              <Text style={[styles.chatTime, isOwn && { color: 'rgba(255,255,255,0.6)' }]}>
+                {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+              </Text>
+              {isOwn && <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>✓✓</Text>}
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {hasReactions && (
+          <View style={[styles.reactionsRow, isOwn && { justifyContent: 'flex-end' }]}>
+            {Object.entries(reactions).map(([emoji, users]) => (
+              <TouchableOpacity
+                key={emoji}
+                style={[styles.reactionBadge, users.includes(myTrader?.id) && styles.reactionBadgeActive]}
+                onPress={() => reactToMessage(item.id, emoji)}
+              >
+                <Text style={{ fontSize: 13 }}>{emoji}</Text>
+                <Text style={{ fontSize: 11, color: COLORS.textSecondary, marginLeft: 2 }}>{users.length}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+        {showReactions === item.id && (
+          <View style={[styles.reactionsPicker, isOwn && { alignSelf: 'flex-end' }]}>
+            {REACTIONS.map(emoji => (
+              <TouchableOpacity key={emoji} style={{ padding: 6 }} onPress={() => reactToMessage(item.id, emoji)}>
+                <Text style={{ fontSize: 20 }}>{emoji}</Text>
+              </TouchableOpacity>
             ))}
           </View>
         )}
-        {item.text && <Text style={[styles.chatMsgText, isOwn && { color: '#fff' }]}>{item.text}</Text>}
-        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 2 }}>
-          <Text style={[styles.chatTime, isOwn && { color: 'rgba(255,255,255,0.6)' }]}>
-            {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
-          </Text>
-        </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -983,47 +1105,96 @@ export default function BazarScreen() {
         </ScrollView>
       )}
 
-      {/* Recording indicator */}
-      {isRecording && (
-        <View style={styles.recordingBar}>
-          <Text style={{ color: COLORS.error, fontWeight: '700' }}>🔴 Recording...</Text>
-          <TouchableOpacity onPress={stopRecordingAndSend} style={styles.stopRecordBtn}>
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>⬆ Send</Text>
+      {replyTo && (
+        <View style={styles.replyBar}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.replyBarName}>↩️ Replying to {replyTo.trader?.fullName}</Text>
+            <Text style={styles.replyBarText} numberOfLines={1}>{replyTo.text || '📷 Media'}</Text>
+          </View>
+          <TouchableOpacity onPress={() => setReplyTo(null)}>
+            <Text style={{ color: COLORS.error, fontSize: 18 }}>✕</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      {/* Chat input bar */}
       <View style={styles.chatInputContainer}>
-        <TouchableOpacity onPress={pickChatImages} style={styles.chatActionBtn}>
-          <Text style={{ fontSize: 20 }}>📷</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={pickChatVideos} style={styles.chatActionBtn}>
-          <Text style={{ fontSize: 20 }}>🎬</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setShowPollModal(true)} style={styles.chatActionBtn}>
-          <Text style={{ fontSize: 20 }}>📊</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPressIn={startRecording}
-          onPressOut={stopRecordingAndSend}
-          style={[styles.chatActionBtn, isRecording && { backgroundColor: COLORS.error + '20', borderRadius: 20 }]}
-        >
-          <Text style={{ fontSize: 20 }}>{isRecording ? '⏹' : '🎙️'}</Text>
-        </TouchableOpacity>
-        <TextInput
-          style={styles.chatInput}
-          value={chatText}
-          onChangeText={setChatText}
-          placeholder="پیغام لکھیں..."
-          placeholderTextColor={COLORS.textLight}
-          multiline
-          maxLength={2000}
-        />
-        <TouchableOpacity onPress={sendChatMessage} disabled={sending} style={[styles.chatSendBtn, sending && { opacity: 0.5 }]}>
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{sending ? '...' : '➤'}</Text>
-        </TouchableOpacity>
+        {isRecording ? (
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <TouchableOpacity style={{ padding: 10 }} onPress={cancelRecording}>
+              <Text style={{ fontSize: 18, color: COLORS.error }}>✕</Text>
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.error }} />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: COLORS.text }}>{formatDuration(recordingDuration)}</Text>
+              <Text style={{ fontSize: 13, color: COLORS.textSecondary }}>Recording...</Text>
+            </View>
+            <TouchableOpacity style={styles.chatSendBtn} onPress={stopRecordingAndSend}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>➤</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <TouchableOpacity onPress={pickChatImages} style={styles.chatActionBtn}>
+              <Text style={{ fontSize: 20 }}>📷</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={pickChatVideos} style={styles.chatActionBtn}>
+              <Text style={{ fontSize: 20 }}>🎬</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowPollModal(true)} style={styles.chatActionBtn}>
+              <Text style={{ fontSize: 20 }}>📊</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={styles.chatInput}
+              value={chatText}
+              onChangeText={setChatText}
+              placeholder="پیغام لکھیں..."
+              placeholderTextColor={COLORS.textLight}
+              multiline
+              maxLength={2000}
+            />
+            {(chatText.trim() || selectedImages.length > 0 || selectedVideos.length > 0) ? (
+              <TouchableOpacity onPress={sendChatMessage} disabled={sending} style={[styles.chatSendBtn, sending && { opacity: 0.5 }]}>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>{sending ? '...' : '➤'}</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={startRecording} style={styles.chatActionBtn}>
+                <Text style={{ fontSize: 20 }}>🎙️</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
       </View>
+
+      {menuMsg && (
+        <Modal transparent animationType="fade" visible onRequestClose={() => setMenuMsg(null)}>
+          <TouchableOpacity style={styles.menuOverlay} onPress={() => setMenuMsg(null)} activeOpacity={1}>
+            <View style={styles.menuBox}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setReplyTo(menuMsg); setMenuMsg(null); }}>
+                <Text style={styles.menuItemText}>↩️ Reply</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { reactToMessage(menuMsg.id, '❤️'); setMenuMsg(null); }}>
+                <Text style={styles.menuItemText}>❤️ Like</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => shareMessage(menuMsg)}>
+                <Text style={styles.menuItemText}>📤 Share</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setSenderProfile(menuMsg.trader); setMenuMsg(null); }}>
+                <Text style={styles.menuItemText}>👤 View Profile</Text>
+              </TouchableOpacity>
+              {(menuMsg.trader?.userId === user?.id || menuMsg.traderId === myTrader?.id) && (
+                <TouchableOpacity style={styles.menuItem} onPress={() => { deleteChatMsg(menuMsg.id); setMenuMsg(null); }}>
+                  <Text style={[styles.menuItemText, { color: COLORS.error }]}>🗑️ Delete</Text>
+                </TouchableOpacity>
+              )}
+              {menuMsg.trader?.userId !== user?.id && (
+                <TouchableOpacity style={[styles.menuItem, { borderBottomWidth: 0 }]} onPress={() => reportChatMsg(menuMsg)}>
+                  <Text style={[styles.menuItemText, { color: COLORS.warning }]}>🚩 Report</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
 
       <Modal visible={showPollModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -1494,19 +1665,38 @@ const styles = StyleSheet.create({
   bazarSelectCount: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
 
   // Chat
+  msgRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 2 },
+  chatAvatar: { width: 34, height: 34, borderRadius: 17 },
+  chatAvatarPlaceholder: { backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
   chatBubble: { maxWidth: '75%', padding: 10, borderRadius: 12, marginBottom: 6, overflow: 'hidden' },
   chatBubbleOwn: { backgroundColor: COLORS.primary, alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   chatBubbleOther: { backgroundColor: COLORS.surface, alignSelf: 'flex-start', borderBottomLeftRadius: 4, elevation: 1 },
   chatSenderName: { fontSize: 11, fontWeight: '700', color: COLORS.primary, marginBottom: 2 },
+  replyPreview: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 8, padding: 8, marginBottom: 6 },
+  replyAccentBar: { width: 3, backgroundColor: COLORS.primary, borderRadius: 2, marginRight: 8 },
+  replyName: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+  replyText: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   chatMsgText: { fontSize: 14, color: COLORS.text, lineHeight: 20 },
   chatTime: { fontSize: 10, color: COLORS.textLight, marginTop: 4, textAlign: 'right' },
   chatImage: { width: 160, height: 160, borderRadius: 8, marginRight: 6, backgroundColor: COLORS.border },
 
   // Chat Input
+  replyBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
+  replyBarName: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+  replyBarText: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   chatInputContainer: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 4, paddingVertical: 6, paddingBottom: Platform.OS === 'android' ? 24 : 10, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
   chatActionBtn: { padding: 8, marginHorizontal: 2 },
   chatInput: { flex: 1, backgroundColor: COLORS.background, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, fontSize: 14, color: COLORS.text, maxHeight: 100 },
   chatSendBtn: { backgroundColor: COLORS.primary, width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
+  reactionsRow: { flexDirection: 'row', marginLeft: 40, marginTop: 2, gap: 4, flexWrap: 'wrap' },
+  reactionBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border },
+  reactionBadgeActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primary + '15' },
+  reactionsPicker: { flexDirection: 'row', marginLeft: 40, marginTop: 4, backgroundColor: COLORS.surface, borderRadius: 24, padding: 6, gap: 2, alignSelf: 'flex-start', borderWidth: 1, borderColor: COLORS.border, elevation: 4 },
+  mediaDeleteBtn: { position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' },
+  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  menuBox: { backgroundColor: COLORS.surface, borderRadius: 16, width: 260, overflow: 'hidden', borderWidth: 1, borderColor: COLORS.border, elevation: 8 },
+  menuItem: { paddingVertical: 15, paddingHorizontal: 20, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  menuItemText: { fontSize: 15, color: COLORS.text, fontWeight: '600' },
 
   // Voice Bubble
   voiceBubbleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },

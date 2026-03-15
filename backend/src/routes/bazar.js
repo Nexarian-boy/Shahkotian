@@ -171,6 +171,11 @@ router.get('/chat/messages', authenticate, async (req, res) => {
       take: pageSize,
       include: {
         trader: { select: { id: true, fullName: true, shopName: true, photoUrl: true, bazarId: true } },
+        replyTo: {
+          include: {
+            trader: { select: { id: true, fullName: true, shopName: true } },
+          },
+        },
       },
     });
 
@@ -202,7 +207,7 @@ router.post('/chat/send', authenticate, uploadMedia.fields([
       return res.status(403).json({ error: 'Only approved traders can send messages.' });
     }
 
-    const { text, bazarId, voiceDuration } = req.body;
+    const { text, bazarId, voiceDuration, replyToId } = req.body;
     const saveBazarId = (bazarId && bazarId !== 'global') ? bazarId : null;
 
     // Upload media
@@ -235,9 +240,15 @@ router.post('/chat/send', authenticate, uploadMedia.fields([
         videos: videoUrls,
         voiceUrl,
         voiceDuration: voiceDuration ? parseInt(voiceDuration) : null,
+        replyToId: replyToId || null,
       },
       include: {
         trader: { select: { id: true, fullName: true, shopName: true, photoUrl: true, bazarId: true } },
+        replyTo: {
+          include: {
+            trader: { select: { id: true, fullName: true, shopName: true } },
+          },
+        },
       },
     });
 
@@ -280,6 +291,11 @@ router.post('/chat/poll', authenticate, async (req, res) => {
       },
       include: {
         trader: { select: { id: true, fullName: true, shopName: true, photoUrl: true, bazarId: true } },
+        replyTo: {
+          include: {
+            trader: { select: { id: true, fullName: true, shopName: true } },
+          },
+        },
       },
     });
 
@@ -323,6 +339,11 @@ router.post('/chat/poll/:id/vote', authenticate, async (req, res) => {
       data: { pollVotes: updatedVotes },
       include: {
         trader: { select: { id: true, fullName: true, shopName: true, photoUrl: true, bazarId: true } },
+        replyTo: {
+          include: {
+            trader: { select: { id: true, fullName: true, shopName: true } },
+          },
+        },
       },
     });
 
@@ -360,6 +381,32 @@ router.delete('/chat/messages/:id', authenticate, async (req, res) => {
   } catch (error) {
     console.error('Delete message error:', error);
     res.status(500).json({ error: 'Failed to delete message.' });
+  }
+});
+
+// ============ BAZAR CHAT: REPORT MESSAGE ============
+router.post('/chat/messages/:id/report', authenticate, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const msg = await prisma.bazarChatMessage.findUnique({
+      where: { id: req.params.id },
+      include: { trader: true },
+    });
+    if (!msg) return res.status(404).json({ error: 'Message not found.' });
+
+    await prisma.report.create({
+      data: {
+        reporterUserId: req.user.id,
+        targetUserId: msg.trader.userId,
+        targetType: 'BAZAR_MESSAGE',
+        targetId: req.params.id,
+        reason: reason || 'Inappropriate content',
+      },
+    });
+    res.json({ success: true, message: 'Message reported.' });
+  } catch (error) {
+    console.error('Report message error:', error);
+    res.status(500).json({ error: 'Failed to report.' });
   }
 });
 

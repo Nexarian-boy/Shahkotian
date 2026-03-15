@@ -378,6 +378,8 @@ export const bazarAPI = {
   createPoll: (data) => api.post('/bazar/chat/poll', data),
   votePoll: (messageId, optionIndex) => api.post(`/bazar/chat/poll/${messageId}/vote`, { optionIndex }),
   deleteMessage: (id) => api.delete(`/bazar/chat/messages/${id}`),
+  reportMessage: (messageId, reason) =>
+    api.post(`/bazar/chat/messages/${messageId}/report`, { reason }),
   // Admin/President
   getPending: (presidentToken) => api.get('/bazar/pending', {
     headers: presidentToken ? { 'x-president-token': presidentToken } : {},
