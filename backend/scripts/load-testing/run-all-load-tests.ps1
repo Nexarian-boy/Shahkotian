@@ -41,13 +41,19 @@ New-Item -ItemType Directory -Path $runDir -Force | Out-Null
 Write-Host "Project root: $projectRoot"
 Write-Host "Results dir : $runDir"
 
+if ($env:ADMIN_TOKEN) {
+  # Remove whitespace/non-token artifacts that can break HTTP headers.
+  $env:ADMIN_TOKEN = ($env:ADMIN_TOKEN -replace "\s", "").Trim()
+}
+
 if (-not $env:ADMIN_TOKEN -or [string]::IsNullOrWhiteSpace($env:ADMIN_TOKEN)) {
   Write-Step "Generate ADMIN token"
-  $generatedToken = node scripts/load-testing/generate-admin-token.js
-  if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($generatedToken)) {
+  $generatedOutput = node scripts/load-testing/generate-admin-token.js
+  $jwtMatch = [regex]::Match(($generatedOutput | Out-String), "[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
+  if ($LASTEXITCODE -ne 0 -or -not $jwtMatch.Success) {
     throw "Could not generate ADMIN_TOKEN automatically. Set ADMIN_TOKEN manually and retry."
   }
-  $env:ADMIN_TOKEN = $generatedToken.Trim()
+  $env:ADMIN_TOKEN = $jwtMatch.Value.Trim()
   Write-Host "ADMIN token generated automatically." -ForegroundColor Green
 }
 

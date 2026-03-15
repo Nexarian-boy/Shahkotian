@@ -2,7 +2,7 @@ require('dotenv').config();
 const https = require('https');
 
 const BASE_URL = process.env.BASE_URL || 'https://lionfish-app-tkr7y.ondigitalocean.app/api';
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
+const ADMIN_TOKEN = (process.env.ADMIN_TOKEN || '').replace(/\s+/g, '').trim();
 
 function getRequestOptions(pathname) {
   const url = new URL(BASE_URL);
