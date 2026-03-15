@@ -105,12 +105,17 @@ export function AuthProvider({ children }) {
     const response = await authAPI.register(userData);
     const { token: newToken, user: newUser } = response.data;
 
+    // STEP 1: Clear onboarding flag FIRST — must complete before auth state changes
+    await AsyncStorage.removeItem('hasSeenOnboarding');
+
+    // STEP 2: Save token and user
     await Promise.all([
       AsyncStorage.setItem('token', newToken),
       AsyncStorage.setItem('user', JSON.stringify(newUser)),
-      AsyncStorage.removeItem('hasSeenOnboarding'),
     ]);
 
+    // STEP 3: Update state LAST — this triggers isAuthenticated = true
+    // By this point hasSeenOnboarding is already cleared
     setToken(newToken);
     setUser(newUser);
 
