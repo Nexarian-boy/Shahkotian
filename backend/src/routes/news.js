@@ -85,6 +85,7 @@ router.get('/', authenticate, async (req, res) => {
       prisma.news.count({ where }),
     ]);
 
+    res.set('Cache-Control', 'public, max-age=30');
     res.json({
       news,
       pagination: {

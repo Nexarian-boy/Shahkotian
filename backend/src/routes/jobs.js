@@ -39,6 +39,7 @@ router.get('/', async (req, res) => {
       prisma.job.count({ where }),
     ]);
 
+    res.set('Cache-Control', 'public, max-age=30');
     res.json({ jobs, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
   } catch (error) {
     console.error('Get jobs error:', error);

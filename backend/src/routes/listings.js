@@ -51,6 +51,7 @@ router.get('/', authenticate, async (req, res) => {
       prisma.listing.count({ where }),
     ]);
 
+    res.set('Cache-Control', 'public, max-age=30');
     res.json({
       listings,
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },

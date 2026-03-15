@@ -23,8 +23,13 @@ class DatabaseManager {
   }
 
   createClient(url) {
+    // Add connection pool limits to prevent overwhelming Neon free tier.
+    const pooledUrl = url.includes('connection_limit')
+      ? url
+      : url + (url.includes('?') ? '&' : '?') + 'connection_limit=5&pool_timeout=20';
+
     return new PrismaClient({
-      datasources: { db: { url } },
+      datasources: { db: { url: pooledUrl } },
       log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
       // Connection pool settings for scalability
       // Prisma uses a connection pool internally; these env vars can tune it:
