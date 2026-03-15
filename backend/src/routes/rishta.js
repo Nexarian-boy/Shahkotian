@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../config/database');
 const { authenticate, verifiedOnly, adminOnly } = require('../middleware/auth');
+const { sendPushToUser } = require('../utils/pushNotification');
 const { upload, uploadRishta } = require('../utils/upload');
 const { uploadImageFile, uploadMultipleImages } = require('../utils/imageUpload');
 const { sendRishtaApprovalEmail, sendRishtaRejectionEmail } = require('../utils/email');
@@ -256,13 +257,12 @@ router.post('/interest/:profileId', authenticate, verifiedOnly, async (req, res)
 
     // Notify the profile owner
     try {
-      await prisma.notification.create({
-        data: {
-          userId: profile.userId,
-          title: '💝 New Rishta Interest',
-          body: `${req.user.name} has sent you a rishta interest. Check your Interests tab!`,
-        },
-      });
+      await sendPushToUser(
+        profile.userId,
+        '💝 New Rishta Interest',
+        `${req.user.name} has sent you a rishta interest. Check your Interests tab!`,
+        { type: 'RISHTA_INTEREST', profileId: profileId }
+      );
     } catch (notifErr) {
       console.error('Notification error (interest sent):', notifErr);
     }
@@ -362,13 +362,12 @@ router.put('/interest/:interestId/accept', authenticate, verifiedOnly, async (re
 
     // Notify the person whose interest was accepted
     try {
-      await prisma.notification.create({
-        data: {
-          userId: interest.fromUserId,
-          title: '✅ Rishta Interest Accepted!',
-          body: `${req.user.name} accepted your rishta interest! A private chat has been created.`,
-        },
-      });
+      await sendPushToUser(
+        interest.fromUserId,
+        '✅ Rishta Interest Accepted!',
+        `${req.user.name} accepted your rishta interest! A private chat has been created.`,
+        { type: 'RISHTA_ACCEPTED', chatId: chat.id }
+      );
     } catch (notifErr) {
       console.error('Notification error (interest accepted):', notifErr);
     }

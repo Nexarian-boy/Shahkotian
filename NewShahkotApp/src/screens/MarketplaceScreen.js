@@ -344,7 +344,7 @@ export default function MarketplaceScreen() {
                     style={styles.deleteListingBtn}
                     onPress={() => deleteListing(item.id)}
                   >
-                      <Text style={styles.deleteListingText}>🗑️ {t('deleteListing')}</Text>
+                      <Text style={styles.deleteListingText}>{t('deleteListing')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -357,7 +357,7 @@ export default function MarketplaceScreen() {
               style={styles.whatsappCTAButton}
               onPress={() => openWhatsApp(item.whatsapp, item.title)}
             >
-              <Text style={styles.whatsappCTAText}>💬 {t('contactWhatsapp')}</Text>
+              <Text style={styles.whatsappCTAText}>{t('contactWhatsapp')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.callCTAButton}

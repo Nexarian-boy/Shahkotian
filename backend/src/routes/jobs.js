@@ -1,6 +1,7 @@
 const express = require('express');
 const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
+const { sendPushToUser } = require('../utils/pushNotification');
 
 const router = express.Router();
 
@@ -231,13 +232,12 @@ router.post('/:id/apply', authenticate, async (req, res) => {
 
     // Notify the job poster
     try {
-      await prisma.notification.create({
-        data: {
-          userId: job.userId,
-          title: '📋 New Job Application',
-          body: `${req.user.name} applied to your job posting "${job.title}".`,
-        },
-      });
+      await sendPushToUser(
+        job.userId,
+        '📋 New Job Application',
+        `${req.user.name} applied to your job posting "${job.title}".`,
+        { type: 'JOB_APPLICATION', jobId: job.id }
+      );
     } catch (notifErr) {
       console.error('Notification error (job apply):', notifErr);
     }

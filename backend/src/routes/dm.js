@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../config/database');
 const { authenticate } = require('../middleware/auth');
+const { sendPushToUser } = require('../utils/pushNotification');
 const { upload } = require('../utils/upload');
 const { uploadMultipleImages } = require('../utils/imageUpload');
 
@@ -190,6 +191,22 @@ router.post('/:chatId/messages', authenticate, async (req, res) => {
             where: { id: req.params.chatId },
             data: { updatedAt: new Date() },
         });
+
+        // Push notification to receiver
+        try {
+            const sender = await prisma.user.findUnique({
+                where: { id: req.user.id },
+                select: { name: true },
+            });
+            await sendPushToUser(
+                otherUserId,
+                `💬 ${sender?.name || 'Someone'} sent you a message`,
+                text ? text.substring(0, 100) : '📷 Photo',
+                { type: 'DM_MESSAGE', chatId: req.params.chatId }
+            );
+        } catch (pushErr) {
+            console.error('DM push error:', pushErr.message);
+        }
 
         res.status(201).json(message);
     } catch (error) {

@@ -233,10 +233,14 @@ export default function App() {
       // Route based on notification type
       if (data?.type === 'TRADER_APPROVED') {
         navigationRef.current.navigate('Bazar');
-      } else if (data?.type === 'APPOINTMENT') {
+      } else if (data?.type === 'APPOINTMENT_APPROVED' || data?.type === 'PAYMENT_CONFIRMED') {
         navigationRef.current.navigate('Doctors');
-      } else if (data?.type === 'NEWS') {
-        navigationRef.current.navigate('News & Articles');
+      } else if (data?.type === 'JOB_APPLICATION') {
+        navigationRef.current.navigate('Jobs');
+      } else if (data?.type === 'DM_MESSAGE') {
+        navigationRef.current.navigate('DMList');
+      } else if (data?.type === 'RISHTA_INTEREST' || data?.type === 'RISHTA_ACCEPTED' || data?.type === 'RISHTA_APPROVED' || data?.type === 'RISHTA_REJECTED') {
+        navigationRef.current.navigate('Rishta');
       } else {
         navigationRef.current.navigate('Notifications');
       }

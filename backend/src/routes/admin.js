@@ -5,6 +5,7 @@ const { authenticate, adminOnly } = require('../middleware/auth');
 const { sendRishtaApprovalEmail, sendRishtaRejectionEmail } = require('../utils/email');
 const { deleteFromCloudinary } = require('../utils/cloudinaryUpload');
 const firebaseAdmin = require('../config/firebase');
+const { sendPushToUser } = require('../utils/pushNotification');
 
 const router = express.Router();
 
@@ -192,14 +193,13 @@ router.put('/rishta/:id/approve', async (req, res) => {
       data: { role: 'VERIFIED_USER' },
     });
 
-    // Create notification
-    await prisma.notification.create({
-      data: {
-        userId: profile.userId,
-        title: 'Rishta Profile Approved! ✅',
-        body: 'Congratulations! Your Rishta profile has been approved. You can now browse and connect with other verified profiles.',
-      },
-    });
+    // Push + in-app notification
+    await sendPushToUser(
+      profile.userId,
+      'Rishta Profile Approved! ✅',
+      'Congratulations! Your Rishta profile has been approved. You can now browse profiles.',
+      { type: 'RISHTA_APPROVED' }
+    );
 
     // Auto-delete CNIC images after approval (sensitive data — keep only profile photos)
     await prisma.rishtaProfile.update({
@@ -242,14 +242,13 @@ router.put('/rishta/:id/reject', async (req, res) => {
       },
     });
 
-    // Notification
-    await prisma.notification.create({
-      data: {
-        userId: profile.userId,
-        title: 'Rishta Profile Update',
-        body: reason || 'Your Rishta profile was not approved. Please review and resubmit.',
-      },
-    });
+    // Push + in-app notification
+    await sendPushToUser(
+      profile.userId,
+      'Rishta Profile Update',
+      reason || 'Your Rishta profile was not approved. Please review and resubmit.',
+      { type: 'RISHTA_REJECTED' }
+    );
 
     // Auto-delete CNIC images after rejection (sensitive data — no longer needed)
     await prisma.rishtaProfile.update({
