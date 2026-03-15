@@ -1,7 +1,11 @@
 require('dotenv').config();
 
 const bcrypt = require('bcryptjs');
-const prisma = require('../../src/config/database');
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = process.env.DATABASE_URL
+  ? new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } })
+  : new PrismaClient();
 
 const TEST_USER_COUNT = parseInt(process.env.TEST_USER_COUNT || '500', 10);
 const TEST_USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'Test@12345';
@@ -14,6 +18,9 @@ function buildPhone(index) {
 
 async function createTestUsers() {
   console.log(`Creating ${TEST_USER_COUNT} test users...`);
+  if (!process.env.DATABASE_URL) {
+    console.warn('DATABASE_URL is not set; Prisma will use default environment resolution.');
+  }
   const hashedPassword = await bcrypt.hash(TEST_USER_PASSWORD, 10);
 
   const users = [];

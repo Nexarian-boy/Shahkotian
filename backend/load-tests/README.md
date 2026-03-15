@@ -19,6 +19,8 @@ This folder contains k6 scripts and helper Node scripts to stress-test Shahkot b
 - `scripts/load-testing/test-cloudinary.js`: Validate Cloudinary manager status
 - `scripts/load-testing/cleanup-test-users.js`: Remove synthetic users and related data
 
+`create-test-users.js` and `cleanup-test-users.js` now use a direct Prisma client (`DATABASE_URL`) and do not import `src/config/database`, so they do not start DB manager timers.
+
 ## Prerequisites
 
 - Backend env configured and reachable (local or deployed)

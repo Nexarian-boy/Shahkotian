@@ -1,11 +1,18 @@
 require('dotenv').config();
 
-const prisma = require('../../src/config/database');
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = process.env.DATABASE_URL
+  ? new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } })
+  : new PrismaClient();
 
 const EMAIL_DOMAIN = process.env.TEST_USER_EMAIL_DOMAIN || 'shahkot-test.com';
 
 async function cleanupTestUsers() {
   console.log(`Cleaning up test users with domain @${EMAIL_DOMAIN} ...`);
+  if (!process.env.DATABASE_URL) {
+    console.warn('DATABASE_URL is not set; Prisma will use default environment resolution.');
+  }
 
   const testUsers = await prisma.user.findMany({
     where: { email: { endsWith: `@${EMAIL_DOMAIN}` } },
