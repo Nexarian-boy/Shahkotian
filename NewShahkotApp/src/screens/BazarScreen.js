@@ -55,6 +55,14 @@ export default function BazarScreen() {
 
   const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '👏'];
   const chatListRef = useRef(null);
+
+  // Load saved reactions when screen opens
+  useEffect(() => {
+    AsyncStorage.getItem('bazarReactions').then(val => {
+      if (val) setReactionsMap(JSON.parse(val));
+    }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => {
@@ -437,7 +445,9 @@ export default function BazarScreen() {
       } else {
         updated = { ...existing, [emoji]: [...users, myTrader?.id] };
       }
-      return { ...prev, [msgId]: updated };
+      const newMap = { ...prev, [msgId]: updated };
+      AsyncStorage.setItem('bazarReactions', JSON.stringify(newMap));
+      return newMap;
     });
     setShowReactions(null);
   };
@@ -916,24 +926,35 @@ export default function BazarScreen() {
       const myVote = votes.find(v => v.startsWith(myTrader?.id + ':'));
       const hasVoted = !!myVote;
       const totalVotes = votes.length;
+      const isPollOwn = item.trader?.userId === user?.id || item.traderId === myTrader?.id;
       return (
         <View style={{ marginBottom: 8 }}>
-          <View style={[styles.chatBubble, styles.pollBubble]}>
-            <Text style={styles.pollSender}>{item.trader?.fullName} – {item.trader?.shopName}</Text>
-            <Text style={styles.pollQuestion}>{item.pollQuestion}</Text>
-            {(item.pollOptions || []).map((opt, idx) => {
-              const optVotes = votes.filter(v => v.endsWith(':' + idx)).length;
-              const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
-              const voted = myVote?.endsWith(':' + idx);
-              return (
-                <TouchableOpacity key={idx} style={[styles.pollOption, voted && styles.pollOptionVoted]} onPress={() => votePoll(item.id, idx)}>
-                  <Text style={[styles.pollOptionText, voted && { fontWeight: '700' }]}>{opt}</Text>
-                  {hasVoted && <Text style={styles.pollPct}>{pct}% ({optVotes})</Text>}
-                </TouchableOpacity>
-              );
-            })}
-            <Text style={styles.pollTotal}>{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</Text>
-          </View>
+          <TouchableOpacity
+            onLongPress={() => isPollOwn && deleteChatMsg(item.id)}
+            activeOpacity={1}
+          >
+            <View style={[styles.chatBubble, styles.pollBubble]}>
+              <Text style={styles.pollSender}>{item.trader?.fullName} – {item.trader?.shopName}</Text>
+              <Text style={styles.pollQuestion}>{item.pollQuestion}</Text>
+              {(item.pollOptions || []).map((opt, idx) => {
+                const optVotes = votes.filter(v => v.endsWith(':' + idx)).length;
+                const pct = totalVotes > 0 ? Math.round((optVotes / totalVotes) * 100) : 0;
+                const voted = myVote?.endsWith(':' + idx);
+                return (
+                  <TouchableOpacity key={idx} style={[styles.pollOption, voted && styles.pollOptionVoted]} onPress={() => votePoll(item.id, idx)}>
+                    <Text style={[styles.pollOptionText, voted && { fontWeight: '700' }]}>{opt}</Text>
+                    {hasVoted && <Text style={styles.pollPct}>{pct}% ({optVotes})</Text>}
+                  </TouchableOpacity>
+                );
+              })}
+              <Text style={styles.pollTotal}>{totalVotes} vote{totalVotes !== 1 ? 's' : ''}</Text>
+              {isPollOwn && (
+                <Text style={{ fontSize: 10, color: COLORS.textLight, marginTop: 4, textAlign: 'right' }}>
+                  Hold to delete
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -964,7 +985,16 @@ export default function BazarScreen() {
             )}
 
             {item.replyTo && (
-              <View style={styles.replyPreview}>
+              <TouchableOpacity
+                style={styles.replyPreview}
+                onPress={() => {
+                  const index = messages.findIndex(m => m.id === item.replyTo.id);
+                  if (index !== -1) {
+                    chatListRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
+                  }
+                }}
+                activeOpacity={0.7}
+              >
                 <View style={styles.replyAccentBar} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.replyName}>{item.replyTo.trader?.fullName || 'User'}</Text>
@@ -972,7 +1002,7 @@ export default function BazarScreen() {
                     {item.replyTo.voiceUrl ? '🎤 Voice message' : (item.replyTo.text || '📷 Photo')}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             )}
 
             {item.voiceUrl && (
@@ -1080,6 +1110,11 @@ export default function BazarScreen() {
   onEndReachedThreshold={0.2}
         keyboardShouldPersistTaps="handled"
         onContentSizeChange={() => chatListRef.current?.scrollToEnd({ animated: false })}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            chatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+          }, 500);
+        }}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={{ fontSize: 72 }}>💬</Text>
@@ -1681,10 +1716,10 @@ const styles = StyleSheet.create({
   chatBubbleOwn: { backgroundColor: COLORS.primary, alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   chatBubbleOther: { backgroundColor: COLORS.surface, alignSelf: 'flex-start', borderBottomLeftRadius: 4, elevation: 1 },
   chatSenderName: { fontSize: 11, fontWeight: '700', color: COLORS.primary, marginBottom: 2 },
-  replyPreview: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 8, padding: 8, marginBottom: 6 },
-  replyAccentBar: { width: 3, backgroundColor: COLORS.primary, borderRadius: 2, marginRight: 8 },
-  replyName: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
-  replyText: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
+  replyPreview: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 8, padding: 8, marginBottom: 6 },
+  replyAccentBar: { width: 3, backgroundColor: '#fff', borderRadius: 2, marginRight: 8 },
+  replyName: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  replyText: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   chatMsgText: { fontSize: 14, color: COLORS.text, lineHeight: 20 },
   chatTime: { fontSize: 10, color: COLORS.textLight, marginTop: 4, textAlign: 'right' },
   chatImage: { width: 160, height: 160, borderRadius: 8, marginRight: 6, backgroundColor: COLORS.border },
