@@ -732,10 +732,13 @@ model BazarChatMessage {
   pollQuestion   String?
   pollOptions    String[] // JSON-encoded option strings
   pollVotes      String[] // JSON-encoded: ["optionIndex:oderId", ...]
+  replyToId      String?                          // ← ADD THIS
   createdAt      DateTime @default(now())
 
   trader Trader @relation(fields: [traderId], references: [id], onDelete: Cascade)
   bazar  Bazar? @relation(fields: [bazarId], references: [id], onDelete: SetNull)
+  replyTo BazarChatMessage? @relation("BazarReplyTo", fields: [replyToId], references: [id], onDelete: SetNull)  // ← ADD THIS
+  replies BazarChatMessage[] @relation("BazarReplyTo")  // ← ADD THIS
 
   @@index([createdAt(sort: Desc)])
   @@index([traderId])
