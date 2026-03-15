@@ -526,7 +526,7 @@ export default function LoginScreen({ navigation }) {
 
           {isRegister && (
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>{t('phoneWhatsapp')} *</Text>
+              <Text style={styles.label}>Phone / WhatsApp *</Text>
               <TextInput
                 style={styles.input}
                 placeholder={t('phoneFormat')}
