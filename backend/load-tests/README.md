@@ -43,8 +43,8 @@ Set these before running tests (or define in shell):
 
 Optional admin checks (for `/api/db-status`, `/api/cloudinary-status`):
 
-- `ADMIN_EMAIL`
-- `ADMIN_PASSWORD`
+- `ADMIN_TOKEN` (recommended)
+- `ADMIN_EMAIL` + `ADMIN_PASSWORD` (optional fallback for k6 admin checks)
 
 Feature matrix tuning:
 
@@ -57,6 +57,8 @@ Feature matrix tuning:
 
 ```powershell
 cd backend
+$env:BASE_URL="https://lionfish-app-tkr7y.ondigitalocean.app/api"
+$env:ADMIN_TOKEN="<admin_jwt_here>"
 node scripts/load-testing/create-test-users.js
 node scripts/load-testing/test-db-rotation.js
 node scripts/load-testing/test-cloudinary.js
@@ -82,6 +84,16 @@ powershell -ExecutionPolicy Bypass -File scripts/load-testing/run-all-load-tests
 powershell -ExecutionPolicy Bypass -File scripts/load-testing/run-all-load-tests.ps1 -SkipCreateUsers -SkipRotationChecks
 ```
 
+Run only remote rotation checks:
+
+```powershell
+cd backend
+$env:BASE_URL="https://lionfish-app-tkr7y.ondigitalocean.app/api"
+$env:ADMIN_TOKEN="<admin_jwt_here>"
+node scripts/load-testing/test-db-rotation.js
+node scripts/load-testing/test-cloudinary.js
+```
+
 Output location:
 
 - `backend/load-tests/results/<timestamp>/`
@@ -91,7 +103,7 @@ Output location:
 
 - The matrix script intentionally treats some write responses (`400`, `404`) as acceptable for synthetic payload checks.
 - `main-load-test.js` writes chat messages to exercise write pressure; run cleanup afterwards if desired.
-- Admin-only status checks are skipped if admin credentials are not provided.
+- Admin-only status checks require `ADMIN_TOKEN` (or credentials fallback in k6).
 
 ## Undo / rollback
 
