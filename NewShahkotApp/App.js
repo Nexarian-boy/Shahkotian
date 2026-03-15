@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text, View, TouchableOpacity } from 'react-native';
+import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -45,33 +45,6 @@ import OnboardingScreen from './src/screens/OnboardingScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
-
-const ISLAMIC_GREETINGS = [
-  {
-    arabic: 'الحمد للہ',
-    transliteration: 'Alhumdulillah',
-    meaning: 'All praise is for Allah',
-    urdu: 'تمام تعریفیں اللہ کے لیے ہیں',
-    emoji: '🤲',
-    color: '#0C8A43',
-  },
-  {
-    arabic: 'اللہ اکبر',
-    transliteration: 'Allah-Hu-Akbar',
-    meaning: 'Allah is the Greatest',
-    urdu: 'اللہ سب سے بڑا ہے',
-    emoji: '☪️',
-    color: '#1a5c8a',
-  },
-  {
-    arabic: 'سبحان اللہ',
-    transliteration: 'SubhanAllah',
-    meaning: 'Glory be to Allah',
-    urdu: 'اللہ پاک ہے',
-    emoji: '✨',
-    color: '#7c3aed',
-  },
-];
 
 // Bottom Tab Navigator — 5 Tabs: Home, Marketplace, Explore, Community, Profile
 function MainTabs() {
@@ -142,9 +115,10 @@ function MainTabs() {
 
 // Auth Flow Navigation
 function AppNavigator() {
-  const { isAuthenticated, loading, isNewUser } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [showGreeting, setShowGreeting] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
 
   useEffect(() => {
@@ -154,18 +128,53 @@ function AppNavigator() {
 
   // Check onboarding status when authentication changes
   useEffect(() => {
+    let greetingTimer;
+
     if (isAuthenticated) {
       AsyncStorage.getItem('hasSeenOnboarding').then((val) => {
-        setNeedsOnboarding(val !== 'true');
+        if (val !== 'true') {
+          // First time — show full onboarding
+          setNeedsOnboarding(true);
+          setShowGreeting(false);
+        } else {
+          // Returning user — show only greeting for 2.5s
+          setNeedsOnboarding(false);
+          setShowGreeting(true);
+          greetingTimer = setTimeout(() => setShowGreeting(false), 2500);
+        }
         setOnboardingChecked(true);
       });
     } else {
+      setNeedsOnboarding(false);
+      setShowGreeting(false);
       setOnboardingChecked(true);
     }
+
+    return () => {
+      if (greetingTimer) clearTimeout(greetingTimer);
+    };
   }, [isAuthenticated]);
 
   if (showSplash || loading || !onboardingChecked) {
     return <SplashScreen />;
+  }
+
+  // Show Alhumdulillah greeting overlay for returning users
+  if (showGreeting) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' }}>
+        <Text style={{ fontSize: 64, marginBottom: 16 }}>🤲</Text>
+        <Text style={{ fontSize: 42, fontWeight: '800', color: '#0C8A43', textAlign: 'center' }}>
+          الحمد للہ
+        </Text>
+        <Text style={{ fontSize: 22, fontWeight: '700', color: '#1a1a1a', marginTop: 8 }}>
+          Alhumdulillah
+        </Text>
+        <Text style={{ fontSize: 14, color: '#666', marginTop: 8 }}>
+          All praise is for Allah
+        </Text>
+      </View>
+    );
   }
 
   return (
@@ -212,16 +221,9 @@ function AppNavigator() {
 
 export default function App() {
   const navigationRef = useRef(null);
-  const [greeting, setGreeting] = useState(null);
 
   useEffect(() => {
     initAds();
-
-    // Show random Islamic greeting on every app open
-    const randomGreeting = ISLAMIC_GREETINGS[Math.floor(Math.random() * ISLAMIC_GREETINGS.length)];
-    setGreeting(randomGreeting);
-    // Auto dismiss after 3 seconds
-    const greetingTimer = setTimeout(() => setGreeting(null), 3000);
 
     // Handle notification tap when app is CLOSED or BACKGROUND
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
@@ -242,7 +244,6 @@ export default function App() {
 
     return () => {
       subscription.remove();
-      clearTimeout(greetingTimer);
     };
   }, []);
 
@@ -250,67 +251,6 @@ export default function App() {
     <LanguageProvider>
       <AuthProvider>
         <SafeAreaProvider>
-          {/* Islamic Greeting Modal — shows on every app open */}
-          {greeting && (
-            <TouchableOpacity
-              activeOpacity={1}
-              onPress={() => setGreeting(null)}
-              style={{
-                position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                backgroundColor: 'rgba(0,0,0,0.85)',
-                justifyContent: 'center', alignItems: 'center',
-                zIndex: 9999,
-              }}
-            >
-              <View
-                style={{
-                  backgroundColor: '#fff',
-                  borderRadius: 28,
-                  padding: 40,
-                  alignItems: 'center',
-                  width: '80%',
-                  elevation: 20,
-                  borderTopWidth: 6,
-                  borderTopColor: greeting.color,
-                }}
-              >
-                <Text style={{ fontSize: 56, marginBottom: 8 }}>{greeting.emoji}</Text>
-                <Text style={{
-                  fontSize: 42, fontWeight: '800',
-                  color: greeting.color, textAlign: 'center',
-                  marginBottom: 8,
-                }}>
-                  {greeting.arabic}
-                </Text>
-                <Text style={{
-                  fontSize: 22, fontWeight: '700',
-                  color: '#1a1a1a', textAlign: 'center',
-                  marginBottom: 4,
-                }}>
-                  {greeting.transliteration}
-                </Text>
-                <Text style={{
-                  fontSize: 14, color: '#666',
-                  textAlign: 'center', marginBottom: 4,
-                }}>
-                  {greeting.meaning}
-                </Text>
-                <Text style={{
-                  fontSize: 16, color: '#444',
-                  textAlign: 'center', marginTop: 4,
-                }}>
-                  {greeting.urdu}
-                </Text>
-                <Text style={{
-                  fontSize: 12, color: '#aaa',
-                  marginTop: 20,
-                }}>
-                  Tap anywhere to continue
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )}
-
           <NavigationContainer
             ref={navigationRef}
             onStateChange={() => onScreenView()}

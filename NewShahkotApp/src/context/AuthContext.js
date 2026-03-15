@@ -108,6 +108,7 @@ export function AuthProvider({ children }) {
     await Promise.all([
       AsyncStorage.setItem('token', newToken),
       AsyncStorage.setItem('user', JSON.stringify(newUser)),
+      AsyncStorage.removeItem('hasSeenOnboarding'),
     ]);
 
     setToken(newToken);
@@ -124,7 +125,8 @@ export function AuthProvider({ children }) {
     try {
       await notificationsAPI.removeFcmToken();
     } catch (_) {}
-    await AsyncStorage.multiRemove(['token', 'user', 'hasSeenOnboarding']);
+    // Keep hasSeenOnboarding so returning users only see greeting
+    await AsyncStorage.multiRemove(['token', 'user']);
     setToken(null);
     setUser(null);
   };
