@@ -4,7 +4,7 @@ const prisma = require('./src/config/database');
 async function run() {
   // Find a test user (not admin)
   const user = await prisma.user.findFirst({
-    where: { role: { not: 'ADMIN' }, name: { contains: 'test' } },
+    where: { role: { not: 'ADMIN' } },
     select: { id: true, name: true },
   });
   if (!user) { console.log('No test user found'); return; }
