@@ -124,7 +124,7 @@ export function AuthProvider({ children }) {
     try {
       await notificationsAPI.removeFcmToken();
     } catch (_) {}
-    await AsyncStorage.multiRemove(['token', 'user']);
+    await AsyncStorage.multiRemove(['token', 'user', 'hasSeenOnboarding']);
     setToken(null);
     setUser(null);
   };
