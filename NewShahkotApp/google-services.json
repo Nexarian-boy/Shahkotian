@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1038645539010:android:ceecf6b85886bf8dd20b5b",
+        "mobilesdk_app_id": "1:1038645539010:android:a9539beec55494c0d20b5b",
         "android_client_info": {
-          "package_name": "shahkot.apna"
+          "package_name": "com.salman39.shahkotapp"
         }
       },
       "oauth_client": [],

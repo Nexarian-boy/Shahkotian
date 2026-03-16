@@ -591,4 +591,55 @@ router.post('/profile/photo', authenticate, uploadPhoto, async (req, res) => {
   }
 });
 
+// ============ DELETE ACCOUNT ============
+router.delete('/delete-account', authenticate, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // Delete related records in safe order to avoid FK violations.
+    await prisma.bloodDonor.deleteMany({ where: { userId } });
+    await prisma.notification.deleteMany({ where: { userId } });
+    await prisma.jobApplication.deleteMany({ where: { userId } });
+    await prisma.job.deleteMany({ where: { userId } });
+    await prisma.listing.deleteMany({ where: { userId } });
+    await prisma.chatMessage.deleteMany({ where: { userId } });
+    await prisma.dMMessage.deleteMany({ where: { senderId: userId } });
+    await prisma.news.updateMany({ where: { userId }, data: { userId: null } });
+    await prisma.shop.updateMany({ where: { ownerId: userId }, data: { ownerId: null } });
+    await prisma.rishtaProfile.deleteMany({ where: { userId } });
+    await prisma.trader.deleteMany({ where: { userId } });
+    await prisma.appointment.deleteMany({ where: { userId } });
+    await prisma.report.deleteMany({
+      where: {
+        OR: [{ reporterUserId: userId }, { targetUserId: userId }],
+      },
+    });
+    await prisma.block.deleteMany({
+      where: {
+        OR: [{ blockerId: userId }, { blockedId: userId }],
+      },
+    });
+
+    const dmChats = await prisma.dMChat.findMany({
+      where: {
+        OR: [{ user1Id: userId }, { user2Id: userId }],
+      },
+      select: { id: true },
+    });
+    const dmChatIds = dmChats.map((c) => c.id);
+
+    if (dmChatIds.length > 0) {
+      await prisma.dMMessage.deleteMany({ where: { chatId: { in: dmChatIds } } });
+      await prisma.dMChat.deleteMany({ where: { id: { in: dmChatIds } } });
+    }
+
+    await prisma.user.delete({ where: { id: userId } });
+
+    res.json({ success: true, message: 'Account deleted successfully.' });
+  } catch (error) {
+    console.error('Delete account error:', error);
+    res.status(500).json({ error: 'Failed to delete account.' });
+  }
+});
+
 module.exports = router;

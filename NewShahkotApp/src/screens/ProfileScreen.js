@@ -16,6 +16,23 @@ export default function ProfileScreen({ navigation }) {
   const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [editWhatsapp, setEditWhatsapp] = useState(user?.whatsapp || '');
   const [savingPhone, setSavingPhone] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (!deleteConfirmed) return;
+    try {
+      setDeleting(true);
+      await authAPI.deleteAccount();
+      setShowDeleteModal(false);
+      await logout();
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to delete account.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -153,21 +170,21 @@ export default function ProfileScreen({ navigation }) {
         <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Market')}>
           <Text style={styles.actionIcon}>🛒</Text>
           <Text style={styles.actionText}>{t('myListings')}</Text>
-          <Text style={styles.actionArrow}>></Text>
+          <Text style={styles.actionArrow}>›</Text>
         </TouchableOpacity>
 
         {isAdmin && (
           <TouchableOpacity style={[styles.actionButton, styles.adminAction]} onPress={() => navigation.navigate('AdminDashboard')}>
             <Text style={styles.actionIcon}>⚙️</Text>
             <Text style={[styles.actionText, { color: COLORS.primary }]}>{t('adminDashboard')}</Text>
-            <Text style={styles.actionArrow}>></Text>
+            <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity style={styles.actionButton} onPress={showPhotoOptions}>
           <Text style={styles.actionIcon}>📸</Text>
           <Text style={styles.actionText}>{t('changePhoto')}</Text>
-          <Text style={styles.actionArrow}>></Text>
+          <Text style={styles.actionArrow}>›</Text>
         </TouchableOpacity>
 
         {/* Language Selector */}
@@ -217,13 +234,25 @@ export default function ProfileScreen({ navigation }) {
         <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('PrivacyPolicy')}>
           <Text style={styles.actionIcon}>🔒</Text>
           <Text style={styles.actionText}>Privacy Policy</Text>
-          <Text style={styles.actionArrow}>></Text>
+          <Text style={styles.actionArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionButton, styles.deleteAccountButton]}
+          onPress={() => {
+            setDeleteConfirmed(false);
+            setShowDeleteModal(true);
+          }}
+        >
+          <Text style={styles.actionIcon}>🗑️</Text>
+          <Text style={[styles.actionText, { color: COLORS.error }]}>Delete Account</Text>
+          <Text style={styles.actionArrow}>›</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={[styles.actionButton, styles.logoutButton]} onPress={handleLogout}>
           <Text style={styles.actionIcon}>🚪</Text>
           <Text style={[styles.actionText, { color: COLORS.error }]}>{t('logout')}</Text>
-          <Text style={styles.actionArrow}>></Text>
+          <Text style={styles.actionArrow}>›</Text>
         </TouchableOpacity>
       </View>
       <View style={{ height: 40 }} />
@@ -261,6 +290,84 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Delete Account Modal */}
+      <Modal visible={showDeleteModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>⚠️</Text>
+            <Text style={[styles.modalTitle, { color: COLORS.error, textAlign: 'center' }]}>Delete Account</Text>
+            <Text
+              style={{
+                fontSize: 14,
+                color: COLORS.textSecondary,
+                textAlign: 'center',
+                lineHeight: 22,
+                marginBottom: 8,
+              }}
+            >
+              This action is permanent and cannot be undone. All your data including listings, messages, profile and history will be permanently deleted.
+            </Text>
+            <Text style={{ fontSize: 13, color: COLORS.error, textAlign: 'center', marginBottom: 20, fontWeight: '600' }}>
+              آپ کا اکاؤنٹ مستقل طور پر حذف ہو جائے گا اور واپس نہیں آ سکتا۔
+            </Text>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 24,
+                padding: 12,
+                backgroundColor: COLORS.error + '08',
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: COLORS.error + '20',
+              }}
+              onPress={() => setDeleteConfirmed(!deleteConfirmed)}
+            >
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 6,
+                  borderWidth: 2,
+                  borderColor: deleteConfirmed ? COLORS.error : COLORS.border,
+                  backgroundColor: deleteConfirmed ? COLORS.error : 'transparent',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                {deleteConfirmed && <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>✓</Text>}
+              </View>
+              <Text style={{ flex: 1, fontSize: 13, color: COLORS.text, fontWeight: '600' }}>
+                I understand this cannot be undone and I want to permanently delete my account.
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowDeleteModal(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalSaveBtn,
+                  { backgroundColor: COLORS.error },
+                  (!deleteConfirmed || deleting) && { opacity: 0.5 },
+                ]}
+                onPress={handleDeleteAccount}
+                disabled={!deleteConfirmed || deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalSaveText}>Delete Forever</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </ScrollView>
   );
@@ -398,6 +505,7 @@ const styles = StyleSheet.create({
   actionArrow: { fontSize: 18, color: COLORS.textLight },
   adminAction: { borderWidth: 1, borderColor: COLORS.primary + '30' },
   logoutButton: { borderWidth: 1, borderColor: COLORS.error + '30' },
+  deleteAccountButton: { borderWidth: 1, borderColor: COLORS.error + '50', backgroundColor: COLORS.error + '08' },
   editPhoneBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderTopWidth: 1, borderTopColor: COLORS.border },
   editPhoneBtnText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
