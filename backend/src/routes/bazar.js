@@ -436,6 +436,32 @@ router.get('/pending', authenticate, async (req, res) => {
   }
 });
 
+// ============ ADMIN/PRESIDENT: APPROVED TRADERS ============
+router.get('/approved', authenticate, async (req, res) => {
+  try {
+    // Allow admin or president
+    if (req.user.role !== 'ADMIN') {
+      const presidentToken = req.headers['x-president-token'];
+      if (!presidentToken) return res.status(403).json({ error: 'Access denied.' });
+      try {
+        jwt.verify(presidentToken, process.env.JWT_SECRET);
+      } catch {
+        return res.status(403).json({ error: 'Invalid president token.' });
+      }
+    }
+
+    const traders = await prisma.trader.findMany({
+      where: { status: 'APPROVED' },
+      orderBy: { createdAt: 'desc' },
+      include: { bazar: true, user: { select: { name: true, email: true, phone: true } } },
+    });
+    res.json({ traders });
+  } catch (error) {
+    console.error('Approved traders error:', error);
+    res.status(500).json({ error: 'Failed to load approved traders.' });
+  }
+});
+
 // ============ ADMIN/PRESIDENT: APPROVE TRADER ============
 router.put('/:id/approve', authenticate, async (req, res) => {
   try {

@@ -101,6 +101,8 @@ export default function BazarScreen() {
   const [presidentEmail, setPresidentEmail] = useState('');
   const [presidentPassword, setPresidentPassword] = useState('');
   const [pendingTraders, setPendingTraders] = useState([]);
+  const [approvedTraders, setApprovedTraders] = useState([]);
+  const [approvedSearch, setApprovedSearch] = useState('');
   const [presidentLoading, setPresidentLoading] = useState(false);
   const [presidentBazars, setPresidentBazars] = useState([]);
   const [newBazarName, setNewBazarName] = useState('');
@@ -552,6 +554,8 @@ export default function BazarScreen() {
     setPresidentToken(null);
     setPresidentData(null);
     setPendingTraders([]);
+    setApprovedTraders([]);
+    setApprovedSearch('');
     setPresidentStats(null);
     await AsyncStorage.removeItem('presidentToken');
     if (myTrader?.status === 'APPROVED') setCurrentView('features');
@@ -561,14 +565,16 @@ export default function BazarScreen() {
   const loadPresidentData = async (token) => {
     try {
       setPresidentLoading(true);
-      const [dashRes, pendRes, bazarRes] = await Promise.all([
+      const [dashRes, pendRes, approvedRes, bazarRes] = await Promise.all([
         bazarAPI.presidentDashboard(token),
         bazarAPI.getPending(token),
+        bazarAPI.getApproved(token),
         bazarAPI.getBazars(),
       ]);
       setPresidentData(dashRes.data.president);
       setPresidentStats(dashRes.data.stats);
       setPendingTraders(pendRes.data.traders || []);
+      setApprovedTraders(approvedRes.data.traders || []);
       setPresidentBazars(bazarRes.data.bazars || []);
     } catch (e) {
       if (e.response?.status === 403) presidentLogout();
@@ -1272,6 +1278,12 @@ export default function BazarScreen() {
     return v.fullName.toLowerCase().includes(q) || v.shopName.toLowerCase().includes(q) || v.phone.includes(q);
   });
 
+  const filteredApproved = approvedTraders.filter(t =>
+    t.fullName?.toLowerCase().includes(approvedSearch.toLowerCase()) ||
+    t.shopName?.toLowerCase().includes(approvedSearch.toLowerCase()) ||
+    t.phone?.includes(approvedSearch)
+  );
+
   const renderVoters = () => {
     if (!votersBazar) {
       return (
@@ -1422,6 +1434,49 @@ export default function BazarScreen() {
                 <Text style={{ fontSize: 16 }}>🗑</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        ))}
+
+        {/* Approved Traders */}
+        <Text style={styles.dashSectionTitle}>✅ Approved Traders ({approvedTraders.length})</Text>
+
+        <View style={styles.searchBarContainer}>
+          <Text style={{ fontSize: 16 }}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search trader..."
+            value={approvedSearch}
+            onChangeText={setApprovedSearch}
+            placeholderTextColor={COLORS.textLight}
+          />
+        </View>
+
+        {filteredApproved.length === 0 && <Text style={styles.emptyMsg}>No approved traders found</Text>}
+        {filteredApproved.map(trader => (
+          <View key={trader.id} style={styles.pendingCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+              {trader.photoUrl ? (
+                <Image source={{ uri: trader.photoUrl }} style={styles.pendingPhoto} />
+              ) : (
+                <View style={[styles.pendingPhoto, styles.voterPhotoPlaceholder]}>
+                  <Text>🏪</Text>
+                </View>
+              )}
+
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                <Text style={{ fontWeight: '700', color: COLORS.text }}>{trader.fullName}</Text>
+                <Text style={{ fontSize: 13 }}>{trader.shopName}</Text>
+                <Text style={{ fontSize: 12 }}>{trader.bazar?.name}</Text>
+                <Text style={{ fontSize: 11 }}>📞 {trader.phone}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.trashBtn}
+              onPress={() => deleteTrader(trader.id)}
+            >
+              <Text style={{ fontSize: 16 }}>🗑 Delete</Text>
+            </TouchableOpacity>
           </View>
         ))}
 

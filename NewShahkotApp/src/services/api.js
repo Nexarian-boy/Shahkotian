@@ -398,6 +398,9 @@ export const bazarAPI = {
   getPending: (presidentToken) => api.get('/bazar/pending', {
     headers: presidentToken ? { 'x-president-token': presidentToken } : {},
   }),
+  getApproved: (presidentToken) => api.get('/bazar/approved', {
+    headers: presidentToken ? { 'x-president-token': presidentToken } : {},
+  }),
   approveTrader: (id, presidentToken) => api.put(`/bazar/${id}/approve`, {}, {
     headers: presidentToken ? { 'x-president-token': presidentToken } : {},
   }),
