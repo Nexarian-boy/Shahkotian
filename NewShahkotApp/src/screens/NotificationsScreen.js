@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,9 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS } from '../config/constants';
 import { notificationsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
@@ -18,42 +20,69 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const localReadIds = useRef(new Set());
+  const didFocusOnce = useRef(false);
 
-  const fetchNotifications = async () => {
+  const mergeWithLocalReads = (serverNotifications) => {
+    return serverNotifications.map((n) => (
+      localReadIds.current.has(n.id) ? { ...n, isRead: true } : n
+    ));
+  };
+
+  const fetchNotifications = async (showLoader = false) => {
+    if (showLoader) setLoading(true);
     try {
       const res = await notificationsAPI.getAll();
-      setNotifications(res.data.notifications || []);
+      const serverData = res.data.notifications || [];
+      setNotifications(mergeWithLocalReads(serverData));
     } catch (err) {
-      console.log('Failed to load notifications');
+      console.log('Failed to load notifications:', err?.response?.data || err?.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      const showLoader = !didFocusOnce.current;
+      didFocusOnce.current = true;
+      fetchNotifications(showLoader);
+    }, [])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchNotifications();
+    fetchNotifications(false);
   }, []);
 
   const markAsRead = async (id) => {
+    localReadIds.current.add(id);
+    setNotifications(prev =>
+      prev.map(n => (n.id === id ? { ...n, isRead: true } : n))
+    );
+
     try {
       await notificationsAPI.markRead(id);
-      setNotifications(prev =>
-        prev.map(n => (n.id === id ? { ...n, isRead: true } : n))
-      );
-    } catch (err) {}
+    } catch (err) {
+      console.warn('markRead API failed for id', id, ':', err?.response?.data || err?.message);
+    }
   };
 
   const markAllRead = async () => {
+    setNotifications((prev) => {
+      prev.forEach((n) => localReadIds.current.add(n.id));
+      return prev.map((n) => ({ ...n, isRead: true }));
+    });
+
     try {
       await notificationsAPI.markAllRead();
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch (err) {}
+    } catch (err) {
+      console.warn('markAllRead API failed:', err?.response?.data || err?.message);
+      Alert.alert('Error', 'Could not mark all as read. Please try again.');
+      localReadIds.current.clear();
+      fetchNotifications(false);
+    }
   };
 
   const getIcon = (type) => {
