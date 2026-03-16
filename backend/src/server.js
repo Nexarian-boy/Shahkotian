@@ -225,7 +225,7 @@ async function startServer() {
       const pingClient = require(pingUrl.startsWith('https') ? 'https' : 'http');
       setInterval(() => {
         pingClient.get(pingUrl, () => {}).on('error', () => {});
-      }, 14 * 60 * 1000); // Every 14 minutes
+      }, 5 * 60 * 1000); // Every 5 minutes keeps DB connection warm
 
       // ── Inactive Account Cleanup ──────────────────────────────────────────
       // Delete non-admin users who have been inactive for 3+ months.

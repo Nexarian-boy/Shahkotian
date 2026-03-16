@@ -27,6 +27,19 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    const originalRequest = error.config || {};
+
+    // Auto-retry once on timeout or network error.
+    if (
+      !originalRequest._retry &&
+      (error.code === 'ECONNABORTED' || !error.response)
+    ) {
+      originalRequest._retry = true;
+      console.log('Request failed, retrying once...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      return api(originalRequest);
+    }
+
     if (error.response?.status === 401) {
       // Token expired - clear storage
       await AsyncStorage.multiRemove(['token', 'user']);
@@ -48,6 +61,7 @@ export const authAPI = {
   uploadPhoto: (formData) => api.post('/auth/profile/photo', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
+  deleteAccount: () => api.delete('/auth/delete-account'),
 };
 
 // ============ LISTINGS API ============

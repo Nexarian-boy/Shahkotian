@@ -115,7 +115,7 @@ function MainTabs() {
 
 // Auth Flow Navigation
 function AppNavigator() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, isNewUser, setIsNewUser } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [showGreeting, setShowGreeting] = useState(false);
@@ -131,6 +131,15 @@ function AppNavigator() {
     let greetingTimer;
 
     if (isAuthenticated) {
+      // New signup path: bypass storage read to avoid race with navigator render.
+      if (isNewUser) {
+        setIsNewUser(false);
+        setNeedsOnboarding(true);
+        setShowGreeting(false);
+        setOnboardingChecked(true);
+        return;
+      }
+
       AsyncStorage.getItem('hasSeenOnboarding').then((val) => {
         if (val !== 'true') {
           // First time — show full onboarding
@@ -153,7 +162,7 @@ function AppNavigator() {
     return () => {
       if (greetingTimer) clearTimeout(greetingTimer);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isNewUser, setIsNewUser]);
 
   if (showSplash || loading || !onboardingChecked) {
     return <SplashScreen />;

@@ -11,6 +11,16 @@ import { bloodAPI } from '../services/api';
 
 const { width, height } = Dimensions.get('window');
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const BLOOD_GROUP_MAP = {
+  'A+': 'A_POSITIVE',
+  'A-': 'A_NEGATIVE',
+  'B+': 'B_POSITIVE',
+  'B-': 'B_NEGATIVE',
+  'AB+': 'AB_POSITIVE',
+  'AB-': 'AB_NEGATIVE',
+  'O+': 'O_POSITIVE',
+  'O-': 'O_NEGATIVE',
+};
 
 export default function OnboardingScreen({ navigation }) {
   const { user } = useAuth();
@@ -46,7 +56,7 @@ export default function OnboardingScreen({ navigation }) {
         name: user?.name,
         phone: user?.phone || user?.whatsapp || '',
         whatsapp: user?.whatsapp || user?.phone || '',
-        bloodGroup,
+        bloodGroup: BLOOD_GROUP_MAP[bloodGroup],
         isEmergency: false,
       });
     } catch (err) {

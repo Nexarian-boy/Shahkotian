@@ -20,6 +20,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isNewUser, setIsNewUser] = useState(false);
 
   useEffect(() => {
     loadStoredAuth();
@@ -114,6 +115,9 @@ export function AuthProvider({ children }) {
       AsyncStorage.setItem('user', JSON.stringify(newUser)),
     ]);
 
+    // Mark as new user before auth state flips, so onboarding shows reliably.
+    setIsNewUser(true);
+
     // STEP 3: Update state LAST — this triggers isAuthenticated = true
     // By this point hasSeenOnboarding is already cleared
     setToken(newToken);
@@ -157,6 +161,8 @@ export function AuthProvider({ children }) {
         isAdmin,
         isVerified,
         isAuthenticated: !!token,
+        isNewUser,
+        setIsNewUser,
       }}
     >
       {children}
