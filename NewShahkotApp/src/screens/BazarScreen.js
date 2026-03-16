@@ -12,6 +12,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import { io as socketIO } from 'socket.io-client';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, API_URL } from '../config/constants';
 import { bazarAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -19,6 +20,7 @@ import AdBanner from '../components/AdBanner';
 
 export default function BazarScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   // ========== NAVIGATION ==========
   const [currentView, setCurrentView] = useState('home');
@@ -1170,7 +1172,7 @@ export default function BazarScreen() {
         </View>
       )}
 
-      <View style={styles.chatInputContainer}>
+      <View style={[styles.chatInputContainer, { paddingBottom: insets.bottom + 6 }]}>
         {isRecording ? (
           <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <TouchableOpacity style={{ padding: 10 }} onPress={cancelRecording}>
@@ -1837,7 +1839,7 @@ const styles = StyleSheet.create({
   replyBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface, paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
   replyBarName: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
   replyBarText: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
-  chatInputContainer: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 4, paddingVertical: 6, paddingBottom: Platform.OS === 'android' ? 24 : 10, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
+  chatInputContainer: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 4, paddingVertical: 6, paddingBottom: 6, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
   chatActionBtn: { padding: 8, marginHorizontal: 2 },
   chatInput: { flex: 1, backgroundColor: COLORS.background, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7, fontSize: 14, color: COLORS.text, maxHeight: 100 },
   chatSendBtn: { backgroundColor: COLORS.primary, width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },

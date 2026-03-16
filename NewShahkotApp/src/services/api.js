@@ -48,6 +48,25 @@ api.interceptors.response.use(
   }
 );
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const shouldRetryDoctorRequest = (error) => {
+  const status = error?.response?.status;
+  return status === 401 || error?.code === 'ECONNABORTED' || !error?.response;
+};
+
+const withDoctorTokenRetry = async (requestFn) => {
+  try {
+    return await requestFn();
+  } catch (error) {
+    if (shouldRetryDoctorRequest(error)) {
+      await sleep(2000);
+      return requestFn();
+    }
+    throw error;
+  }
+};
+
 // ============ AUTH API ============
 export const authAPI = {
   sendOtp: (email) => api.post('/auth/send-otp', { email }, { timeout: 60000 }),
@@ -252,28 +271,28 @@ export const doctorsAPI = {
   delete: (id) => api.delete(`/doctors/${id}`),
   // Doctor auth
   doctorLogin: (data) => api.post('/doctors/auth/login', data),
-  doctorProfile: (token) => api.get('/doctors/me/profile', {
+  doctorProfile: (token) => withDoctorTokenRetry(() => api.get('/doctors/me/profile', {
     headers: { Authorization: `Bearer ${token}` },
-  }),
-  doctorUpdateProfile: (token, data) => api.put('/doctors/me/profile', data, {
+  })),
+  doctorUpdateProfile: (token, data) => withDoctorTokenRetry(() => api.put('/doctors/me/profile', data, {
     headers: { Authorization: `Bearer ${token}` },
-  }),
-  doctorDashboard: (token) => api.get('/doctors/me/dashboard', {
+  })),
+  doctorDashboard: (token) => withDoctorTokenRetry(() => api.get('/doctors/me/dashboard', {
     headers: { Authorization: `Bearer ${token}` },
-  }),
-  doctorUpdateToken: (token, currentToken) => api.put('/doctors/me/current-token', { currentToken }, {
+  })),
+  doctorUpdateToken: (token, currentToken) => withDoctorTokenRetry(() => api.put('/doctors/me/current-token', { currentToken }, {
     headers: { Authorization: `Bearer ${token}` },
-  }),
+  })),
 };
 
 // ============ APPOINTMENTS API ============
 export const appointmentsAPI = {
-  book: (data) => api.post('/appointments/book', data),
+  book: (data) => withDoctorTokenRetry(() => api.post('/appointments/book', data)),
   getMine: () => api.get('/appointments/my'),
-  getForDoctor: (token, params) => api.get('/appointments/doctor', {
+  getForDoctor: (token, params) => withDoctorTokenRetry(() => api.get('/appointments/doctor', {
     params,
     headers: { Authorization: `Bearer ${token}` },
-  }),
+  })),
   getOne: (id) => api.get(`/appointments/${id}`),
   uploadPaymentProof: (id, formData) => api.put(`/appointments/${id}/payment-proof`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -281,21 +300,21 @@ export const appointmentsAPI = {
   }),
   cancel: (id, reason) => api.put(`/appointments/${id}/cancel`, { reason }),
   // Doctor actions
-  approve: (token, id) => api.put(`/appointments/${id}/approve`, {}, {
+  approve: (token, id) => withDoctorTokenRetry(() => api.put(`/appointments/${id}/approve`, {}, {
     headers: { Authorization: `Bearer ${token}` },
-  }),
-  reject: (token, id, reason) => api.put(`/appointments/${id}/reject`, { reason }, {
+  })),
+  reject: (token, id, reason) => withDoctorTokenRetry(() => api.put(`/appointments/${id}/reject`, { reason }, {
     headers: { Authorization: `Bearer ${token}` },
-  }),
-  verifyPayment: (token, id) => api.put(`/appointments/${id}/verify-payment`, {}, {
+  })),
+  verifyPayment: (token, id) => withDoctorTokenRetry(() => api.put(`/appointments/${id}/verify-payment`, {}, {
     headers: { Authorization: `Bearer ${token}` },
-  }),
-  complete: (token, id) => api.put(`/appointments/${id}/complete`, {}, {
+  })),
+  complete: (token, id) => withDoctorTokenRetry(() => api.put(`/appointments/${id}/complete`, {}, {
     headers: { Authorization: `Bearer ${token}` },
-  }),
-  noShow: (token, id) => api.put(`/appointments/${id}/no-show`, {}, {
+  })),
+  noShow: (token, id) => withDoctorTokenRetry(() => api.put(`/appointments/${id}/no-show`, {}, {
     headers: { Authorization: `Bearer ${token}` },
-  }),
+  })),
   // Public — returns { currentToken, totalTokensToday } for live queue display
   getLiveToken: (doctorId) => api.get(`/appointments/live-token/${doctorId}`),
 };
