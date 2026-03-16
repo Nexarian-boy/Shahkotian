@@ -102,6 +102,7 @@ export default function BazarScreen() {
   const [presidentPassword, setPresidentPassword] = useState('');
   const [pendingTraders, setPendingTraders] = useState([]);
   const [approvedTraders, setApprovedTraders] = useState([]);
+  const [presidentTab, setPresidentTab] = useState('pending');
   const [approvedSearch, setApprovedSearch] = useState('');
   const [presidentLoading, setPresidentLoading] = useState(false);
   const [presidentBazars, setPresidentBazars] = useState([]);
@@ -541,6 +542,7 @@ export default function BazarScreen() {
       setPresidentToken(token);
       await AsyncStorage.setItem('presidentToken', token);
       setPresidentData(res.data.president);
+      setPresidentTab('pending');
       setCurrentView('presidentDashboard');
       loadPresidentData(token);
     } catch (e) {
@@ -555,6 +557,7 @@ export default function BazarScreen() {
     setPresidentData(null);
     setPendingTraders([]);
     setApprovedTraders([]);
+    setPresidentTab('pending');
     setApprovedSearch('');
     setPresidentStats(null);
     await AsyncStorage.removeItem('presidentToken');
@@ -1278,11 +1281,16 @@ export default function BazarScreen() {
     return v.fullName.toLowerCase().includes(q) || v.shopName.toLowerCase().includes(q) || v.phone.includes(q);
   });
 
-  const filteredApproved = approvedTraders.filter(t =>
-    t.fullName?.toLowerCase().includes(approvedSearch.toLowerCase()) ||
-    t.shopName?.toLowerCase().includes(approvedSearch.toLowerCase()) ||
-    t.phone?.includes(approvedSearch)
-  );
+  const approvedSearchQuery = approvedSearch.trim().toLowerCase();
+  const filteredApproved = approvedTraders.filter(t => {
+    if (!approvedSearchQuery) return true;
+    return (
+      t.fullName?.toLowerCase().includes(approvedSearchQuery) ||
+      t.shopName?.toLowerCase().includes(approvedSearchQuery) ||
+      t.phone?.includes(approvedSearch.trim()) ||
+      t.bazar?.name?.toLowerCase().includes(approvedSearchQuery)
+    );
+  });
 
   const renderVoters = () => {
     if (!votersBazar) {
@@ -1380,6 +1388,127 @@ export default function BazarScreen() {
     </ScrollView>
   );
 
+  const renderPendingTraders = () => (
+    <>
+      <Text style={styles.dashSectionTitle}>📋 Pending Approvals ({pendingTraders.length})</Text>
+      {pendingTraders.length === 0 && <Text style={styles.emptyMsg}>No pending registrations</Text>}
+      {pendingTraders.map(trader => (
+        <View key={trader.id} style={styles.pendingCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            {trader.photoUrl ? (
+              <Image source={{ uri: trader.photoUrl }} style={styles.pendingPhoto} />
+            ) : (
+              <View style={[styles.pendingPhoto, styles.voterPhotoPlaceholder]}><Text>🏪</Text></View>
+            )}
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={{ fontWeight: '700', color: COLORS.text, fontSize: 15 }}>{trader.fullName}</Text>
+              <Text style={{ fontSize: 13, color: COLORS.textSecondary }}>{trader.shopName}</Text>
+              <Text style={{ fontSize: 12, color: COLORS.primary }}>{trader.bazar?.name}</Text>
+              <Text style={{ fontSize: 11, color: COLORS.textLight }}>📞 {trader.phone}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity style={styles.approveBtn} onPress={() => approveTrader(trader.id)}>
+              <Text style={styles.approveBtnText}>✓ Approve</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.rejectBtn} onPress={() => rejectTrader(trader.id)}>
+              <Text style={styles.rejectBtnText}>✗ Reject</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.trashBtn} onPress={() => deleteTrader(trader.id)}>
+              <Text style={{ fontSize: 16 }}>🗑</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+    </>
+  );
+
+  const renderApprovedTraders = () => (
+    <>
+      <Text style={styles.dashSectionTitle}>✅ Approved Traders ({approvedTraders.length})</Text>
+      <View style={styles.searchBarContainer}>
+        <Text style={{ fontSize: 16 }}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search name, shop, phone, bazar..."
+          value={approvedSearch}
+          onChangeText={setApprovedSearch}
+          placeholderTextColor={COLORS.textLight}
+        />
+      </View>
+
+      {filteredApproved.length === 0 && <Text style={styles.emptyMsg}>No approved traders found</Text>}
+      {filteredApproved.map(trader => (
+        <View key={trader.id} style={styles.pendingCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+            {trader.photoUrl ? (
+              <Image source={{ uri: trader.photoUrl }} style={styles.pendingPhoto} />
+            ) : (
+              <View style={[styles.pendingPhoto, styles.voterPhotoPlaceholder]}>
+                <Text>🏪</Text>
+              </View>
+            )}
+
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={{ fontWeight: '700', color: COLORS.text }}>{trader.fullName}</Text>
+              <Text style={{ fontSize: 13 }}>{trader.shopName}</Text>
+              <Text style={{ fontSize: 12 }}>{trader.bazar?.name}</Text>
+              <Text style={{ fontSize: 11 }}>📞 {trader.phone}</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.trashBtn}
+            onPress={() => deleteTrader(trader.id)}
+          >
+            <Text style={{ fontSize: 16 }}>🗑 Delete</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+    </>
+  );
+
+  const renderBazarManagement = () => (
+    <>
+      <Text style={styles.dashSectionTitle}>🏪 Bazar Management</Text>
+      <View style={styles.addBazarRow}>
+        <TextInput style={[styles.input, { flex: 1 }]} placeholder="New bazar name..." value={newBazarName} onChangeText={setNewBazarName} placeholderTextColor={COLORS.textLight} />
+        <TouchableOpacity style={styles.addBazarBtn} onPress={addBazar}>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>+ Add</Text>
+        </TouchableOpacity>
+      </View>
+      {presidentBazars.map(b => (
+        <View key={b.id} style={styles.bazarManageRow}>
+          <Text style={{ flex: 1, fontWeight: '600', color: COLORS.text }}>{b.name}</Text>
+          <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginRight: 10 }}>{b._count?.traders || 0} traders</Text>
+          <TouchableOpacity onPress={() => deleteBazar(b.id)}>
+            <Text style={{ color: COLORS.error, fontSize: 13 }}>🗑 Delete</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+    </>
+  );
+
+  const renderExportSection = () => (
+    <>
+      <Text style={styles.dashSectionTitle}>📥 Export Traders (Excel/CSV)</Text>
+      <Text style={styles.sectionSub}>Download registered voters list bazar-wise</Text>
+      <View style={styles.bazarGrid}>
+        <TouchableOpacity style={[styles.bazarChip, exportBazarId === 'all' && styles.bazarChipSelected]} onPress={() => setExportBazarId('all')}>
+          <Text style={[styles.bazarChipText, exportBazarId === 'all' && { color: '#fff' }]}>All Bazars</Text>
+        </TouchableOpacity>
+        {presidentBazars.map(b => (
+          <TouchableOpacity key={b.id} style={[styles.bazarChip, exportBazarId === b.id && styles.bazarChipSelected]} onPress={() => setExportBazarId(b.id)}>
+            <Text style={[styles.bazarChipText, exportBazarId === b.id && { color: '#fff' }]}>{b.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <TouchableOpacity style={[styles.submitBtn, { marginTop: 12 }]} onPress={downloadExcel}>
+        <Text style={styles.submitBtnText}>📥 Download Excel File (.xlsx)</Text>
+      </TouchableOpacity>
+    </>
+  );
+
   // ========== PRESIDENT DASHBOARD ==========
   const renderPresidentDashboard = () => (
     <ScrollView style={styles.viewContainer} refreshControl={<RefreshControl refreshing={presidentLoading} onRefresh={() => loadPresidentData(presidentToken)} colors={[COLORS.primary]} />}>
@@ -1405,115 +1534,40 @@ export default function BazarScreen() {
           </View>
         )}
 
-        {/* Pending Approvals */}
-        <Text style={styles.dashSectionTitle}>📋 Pending Approvals ({pendingTraders.length})</Text>
-        {pendingTraders.length === 0 && <Text style={styles.emptyMsg}>No pending registrations</Text>}
-        {pendingTraders.map(trader => (
-          <View key={trader.id} style={styles.pendingCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              {trader.photoUrl ? (
-                <Image source={{ uri: trader.photoUrl }} style={styles.pendingPhoto} />
-              ) : (
-                <View style={[styles.pendingPhoto, styles.voterPhotoPlaceholder]}><Text>🏪</Text></View>
-              )}
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={{ fontWeight: '700', color: COLORS.text, fontSize: 15 }}>{trader.fullName}</Text>
-                <Text style={{ fontSize: 13, color: COLORS.textSecondary }}>{trader.shopName}</Text>
-                <Text style={{ fontSize: 12, color: COLORS.primary }}>{trader.bazar?.name}</Text>
-                <Text style={{ fontSize: 11, color: COLORS.textLight }}>📞 {trader.phone}</Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity style={styles.approveBtn} onPress={() => approveTrader(trader.id)}>
-                <Text style={styles.approveBtnText}>✓ Approve</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.rejectBtn} onPress={() => rejectTrader(trader.id)}>
-                <Text style={styles.rejectBtnText}>✗ Reject</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.trashBtn} onPress={() => deleteTrader(trader.id)}>
-                <Text style={{ fontSize: 16 }}>🗑</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-
-        {/* Approved Traders */}
-        <Text style={styles.dashSectionTitle}>✅ Approved Traders ({approvedTraders.length})</Text>
-
-        <View style={styles.searchBarContainer}>
-          <Text style={{ fontSize: 16 }}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search trader..."
-            value={approvedSearch}
-            onChangeText={setApprovedSearch}
-            placeholderTextColor={COLORS.textLight}
-          />
-        </View>
-
-        {filteredApproved.length === 0 && <Text style={styles.emptyMsg}>No approved traders found</Text>}
-        {filteredApproved.map(trader => (
-          <View key={trader.id} style={styles.pendingCard}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-              {trader.photoUrl ? (
-                <Image source={{ uri: trader.photoUrl }} style={styles.pendingPhoto} />
-              ) : (
-                <View style={[styles.pendingPhoto, styles.voterPhotoPlaceholder]}>
-                  <Text>🏪</Text>
-                </View>
-              )}
-
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={{ fontWeight: '700', color: COLORS.text }}>{trader.fullName}</Text>
-                <Text style={{ fontSize: 13 }}>{trader.shopName}</Text>
-                <Text style={{ fontSize: 12 }}>{trader.bazar?.name}</Text>
-                <Text style={{ fontSize: 11 }}>📞 {trader.phone}</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.trashBtn}
-              onPress={() => deleteTrader(trader.id)}
-            >
-              <Text style={{ fontSize: 16 }}>🗑 Delete</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-
-        {/* Bazar Management */}
-        <Text style={styles.dashSectionTitle}>🏪 Bazar Management</Text>
-        <View style={styles.addBazarRow}>
-          <TextInput style={[styles.input, { flex: 1 }]} placeholder="New bazar name..." value={newBazarName} onChangeText={setNewBazarName} placeholderTextColor={COLORS.textLight} />
-          <TouchableOpacity style={styles.addBazarBtn} onPress={addBazar}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>+ Add</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presidentTabs}>
+          <TouchableOpacity
+            style={[styles.tabBtn, presidentTab === 'pending' && styles.activeTab]}
+            onPress={() => setPresidentTab('pending')}
+          >
+            <Text style={[styles.tabText, presidentTab === 'pending' && styles.activeTabText]}>📥 Pending</Text>
           </TouchableOpacity>
-        </View>
-        {presidentBazars.map(b => (
-          <View key={b.id} style={styles.bazarManageRow}>
-            <Text style={{ flex: 1, fontWeight: '600', color: COLORS.text }}>{b.name}</Text>
-            <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginRight: 10 }}>{b._count?.traders || 0} traders</Text>
-            <TouchableOpacity onPress={() => deleteBazar(b.id)}>
-              <Text style={{ color: COLORS.error, fontSize: 13 }}>🗑 Delete</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-
-        {/* Export CSV */}
-        <Text style={styles.dashSectionTitle}>📥 Export Traders (Excel/CSV)</Text>
-        <Text style={styles.sectionSub}>Download registered voters list bazar-wise</Text>
-        <View style={styles.bazarGrid}>
-          <TouchableOpacity style={[styles.bazarChip, exportBazarId === 'all' && styles.bazarChipSelected]} onPress={() => setExportBazarId('all')}>
-            <Text style={[styles.bazarChipText, exportBazarId === 'all' && { color: '#fff' }]}>All Bazars</Text>
+          <TouchableOpacity
+            style={[styles.tabBtn, presidentTab === 'approved' && styles.activeTab]}
+            onPress={() => setPresidentTab('approved')}
+          >
+            <Text style={[styles.tabText, presidentTab === 'approved' && styles.activeTabText]}>✅ Approved</Text>
           </TouchableOpacity>
-          {presidentBazars.map(b => (
-            <TouchableOpacity key={b.id} style={[styles.bazarChip, exportBazarId === b.id && styles.bazarChipSelected]} onPress={() => setExportBazarId(b.id)}>
-              <Text style={[styles.bazarChipText, exportBazarId === b.id && { color: '#fff' }]}>{b.name}</Text>
-            </TouchableOpacity>
-          ))}
+          <TouchableOpacity
+            style={[styles.tabBtn, presidentTab === 'bazars' && styles.activeTab]}
+            onPress={() => setPresidentTab('bazars')}
+          >
+            <Text style={[styles.tabText, presidentTab === 'bazars' && styles.activeTabText]}>🏪 Bazars</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tabBtn, presidentTab === 'export' && styles.activeTab]}
+            onPress={() => setPresidentTab('export')}
+          >
+            <Text style={[styles.tabText, presidentTab === 'export' && styles.activeTabText]}>📊 Export</Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <View style={styles.presidentTabContent}>
+          {presidentTab === 'pending' && renderPendingTraders()}
+          {presidentTab === 'approved' && renderApprovedTraders()}
+          {presidentTab === 'bazars' && renderBazarManagement()}
+          {presidentTab === 'export' && renderExportSection()}
         </View>
-        <TouchableOpacity style={[styles.submitBtn, { marginTop: 12 }]} onPress={downloadExcel}>
-          <Text style={styles.submitBtnText}>📥 Download Excel File (.xlsx)</Text>
-        </TouchableOpacity>
+
         <View style={{ height: 40 }} />
       </View>
     </ScrollView>
@@ -1844,6 +1898,12 @@ const styles = StyleSheet.create({
   presidentEmailText: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   logoutBtn: { backgroundColor: COLORS.error + '15', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   logoutText: { color: COLORS.error, fontWeight: '600', fontSize: 13 },
+  presidentTabs: { paddingBottom: 4, marginBottom: 12, gap: 8 },
+  tabBtn: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 10, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  activeTab: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  tabText: { color: COLORS.text, fontWeight: '600', fontSize: 13 },
+  activeTabText: { color: COLORS.white },
+  presidentTabContent: { minHeight: 220 },
 
   // Stats
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
