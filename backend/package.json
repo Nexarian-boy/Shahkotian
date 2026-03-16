@@ -12,14 +12,7 @@
     "db:migrate": "npx prisma migrate dev",
     "db:push": "npx prisma db push",
     "db:studio": "npx prisma studio",
-    "db:seed": "node src/seed.js",
-    "loadtest:users:create": "node scripts/load-testing/create-test-users.js",
-    "loadtest:db": "node scripts/load-testing/test-db-rotation.js",
-    "loadtest:cloudinary": "node scripts/load-testing/test-cloudinary.js",
-    "loadtest:k6:main": "k6 run load-tests/main-load-test.js",
-    "loadtest:k6:matrix": "k6 run load-tests/feature-matrix-load-test.js",
-    "loadtest:users:cleanup": "node scripts/load-testing/cleanup-test-users.js",
-    "loadtest:run:all": "powershell -ExecutionPolicy Bypass -File scripts/load-testing/run-all-load-tests.ps1"
+    "db:seed": "node src/seed.js"
   },
   "keywords": [],
   "author": "",
