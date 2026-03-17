@@ -207,4 +207,29 @@ router.delete('/:id', authenticate, adminOnly, async (req, res) => {
   }
 });
 
+router.post('/:id/view', authenticate, async (req, res) => {
+  try {
+    await prisma.news.update({ where: { id: req.params.id }, data: { views: { increment: 1 } } });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Failed.' });
+  }
+});
+
+router.post('/:id/like', authenticate, async (req, res) => {
+  try {
+    const item = await prisma.news.findUnique({ where: { id: req.params.id }, select: { likedBy: true } });
+    if (!item) return res.status(404).json({ error: 'Not found.' });
+    const alreadyLiked = item.likedBy.includes(req.user.id);
+    const updated = await prisma.news.update({
+      where: { id: req.params.id },
+      data: { likedBy: alreadyLiked ? { set: item.likedBy.filter(id => id !== req.user.id) } : { push: req.user.id } },
+      select: { likedBy: true },
+    });
+    res.json({ liked: !alreadyLiked, likeCount: updated.likedBy.length });
+  } catch {
+    res.status(500).json({ error: 'Failed.' });
+  }
+});
+
 module.exports = router;

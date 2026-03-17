@@ -359,4 +359,20 @@ router.delete('/owner/deals/:dealId', authenticateBrand, async (req, res) => {
   }
 });
 
+router.post('/deals/:dealId/like', authenticate, async (req, res) => {
+  try {
+    const deal = await prisma.brandDeal.findUnique({ where: { id: req.params.dealId }, select: { likedBy: true } });
+    if (!deal) return res.status(404).json({ error: 'Not found.' });
+    const alreadyLiked = deal.likedBy.includes(req.user.id);
+    const updated = await prisma.brandDeal.update({
+      where: { id: req.params.dealId },
+      data: { likedBy: alreadyLiked ? { set: deal.likedBy.filter(id => id !== req.user.id) } : { push: req.user.id } },
+      select: { likedBy: true },
+    });
+    res.json({ liked: !alreadyLiked, likeCount: updated.likedBy.length });
+  } catch {
+    res.status(500).json({ error: 'Failed.' });
+  }
+});
+
 module.exports = router;

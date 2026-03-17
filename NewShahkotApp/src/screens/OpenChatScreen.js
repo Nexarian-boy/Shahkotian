@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { chatAPI } from '../services/api';
 import AdBanner from '../components/AdBanner';
@@ -37,7 +38,8 @@ export default function OpenChatScreen({ navigation }) {
     const insets = useSafeAreaInsets();
     const { user } = useAuth();
     const [messages, setMessages]             = useState([]);
-    const [reactionsMap, setReactionsMap]     = useState({}); // separate state, survives polls
+    const [reactionsMap, setReactionsMap]     = useState({});
+    const reactionsKey = 'openchat_reactions_v1';
     const [text, setText]                     = useState('');
     const [selectedImages, setSelectedImages] = useState([]);
     const [replyTo, setReplyTo]               = useState(null);
@@ -92,6 +94,13 @@ export default function OpenChatScreen({ navigation }) {
 
     // Initial load + polling every 10s
     useEffect(() => {
+        // Load saved reactions from storage first
+        AsyncStorage.getItem(reactionsKey)
+            .then(saved => {
+                if (saved) setReactionsMap(JSON.parse(saved));
+            })
+            .catch(() => {});
+
         loadMessages(1);
         pollRef.current = setInterval(() => loadMessages(1), 10000);
         return () => {
@@ -300,7 +309,10 @@ export default function OpenChatScreen({ navigation }) {
             } else {
                 updated = { ...existing, [emoji]: [...users, user?.id] };
             }
-            return { ...prev, [msgId]: updated };
+            const newMap = { ...prev, [msgId]: updated };
+            // Persist to AsyncStorage so reactions survive navigation
+            AsyncStorage.setItem(reactionsKey, JSON.stringify(newMap)).catch(() => {});
+            return newMap;
         });
         setShowReactions(null);
     };

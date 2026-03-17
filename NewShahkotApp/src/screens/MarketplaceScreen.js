@@ -40,6 +40,13 @@ export default function MarketplaceScreen() {
     loadListings();
   }, [selectedCategory]);
 
+  useEffect(() => {
+    if (!selectedListing?.id) return;
+    listingsAPI.view(selectedListing.id).catch(() => {});
+    setSelectedListing(prev => (prev ? { ...prev, views: (prev.views || 0) + 1 } : prev));
+    setListings(prev => prev.map(l => (l.id === selectedListing.id ? { ...l, views: (l.views || 0) + 1 } : l)));
+  }, [selectedListing?.id]);
+
   const loadListings = async () => {
     try {
       setLoading(true);
@@ -217,12 +224,20 @@ export default function MarketplaceScreen() {
           <Text style={styles.listingDesc} numberOfLines={2}>{item.description}</Text>
           <View style={styles.listingFooter}>
             <Text style={styles.listingUser}>👤 {item.user?.name || 'Unknown'}</Text>
-            <TouchableOpacity
-              style={styles.whatsappButton}
-              onPress={() => openWhatsApp(item.whatsapp, item.title)}
-            >
-              <Text style={styles.whatsappText}>💬 Chat</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Text style={{ fontSize: 10, color: COLORS.textLight }}>❤️ {item.likedBy?.length || 0}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Text style={{ fontSize: 10, color: COLORS.textLight }}>👁️ {item.views || 0}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.whatsappButton}
+                onPress={() => openWhatsApp(item.whatsapp, item.title)}
+              >
+                <Text style={styles.whatsappText}>💬 Chat</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </TouchableOpacity>
@@ -294,6 +309,35 @@ export default function MarketplaceScreen() {
               </View>
               <Text style={styles.detailTitle}>{item.title}</Text>
               <Text style={styles.detailPrice}>Rs. {Number(item.price || 0).toLocaleString()}</Text>
+              <View style={{ flexDirection: 'row', gap: 16, marginBottom: 12 }}>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8,
+                    backgroundColor: COLORS.surface, borderRadius: 20, paddingHorizontal: 14,
+                    borderWidth: 1, borderColor: COLORS.border }}
+                  onPress={async () => {
+                    try {
+                      const res = await listingsAPI.like(item.id);
+                      const likeCount = Number(res?.data?.likeCount || 0);
+                      const likedBy = Array.from({ length: likeCount }, () => 'x');
+                      setSelectedListing(prev => (prev ? { ...prev, likedBy } : prev));
+                      setListings(prev => prev.map(l => (l.id === item.id ? { ...l, likedBy } : l)));
+                    } catch {}
+                  }}
+                >
+                  <Text style={{ fontSize: 16 }}>❤️</Text>
+                  <Text style={{ fontSize: 13, color: COLORS.text, fontWeight: '600' }}>
+                    {item.likedBy?.length || 0} Likes
+                  </Text>
+                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8,
+                  backgroundColor: COLORS.surface, borderRadius: 20, paddingHorizontal: 14,
+                  borderWidth: 1, borderColor: COLORS.border }}>
+                  <Text style={{ fontSize: 16 }}>👁️</Text>
+                  <Text style={{ fontSize: 13, color: COLORS.text, fontWeight: '600' }}>
+                    {item.views || 0} Views
+                  </Text>
+                </View>
+              </View>
               
               {item.isSold && (
                 <View style={styles.soldBanner}>

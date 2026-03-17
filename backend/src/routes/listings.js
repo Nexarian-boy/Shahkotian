@@ -211,4 +211,46 @@ router.get('/my/all', authenticate, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/listings/:id/view  — increment view count
+ */
+router.post('/:id/view', authenticate, async (req, res) => {
+  try {
+    await prisma.listing.update({
+      where: { id: req.params.id },
+      data: { views: { increment: 1 } },
+    });
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to record view.' });
+  }
+});
+
+/**
+ * POST /api/listings/:id/like  — toggle like
+ */
+router.post('/:id/like', authenticate, async (req, res) => {
+  try {
+    const listing = await prisma.listing.findUnique({
+      where: { id: req.params.id },
+      select: { likedBy: true },
+    });
+    if (!listing) return res.status(404).json({ error: 'Not found.' });
+
+    const alreadyLiked = listing.likedBy.includes(req.user.id);
+    const updated = await prisma.listing.update({
+      where: { id: req.params.id },
+      data: {
+        likedBy: alreadyLiked
+          ? { set: listing.likedBy.filter(id => id !== req.user.id) }
+          : { push: req.user.id },
+      },
+      select: { likedBy: true },
+    });
+    res.json({ liked: !alreadyLiked, likeCount: updated.likedBy.length });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to toggle like.' });
+  }
+});
+
 module.exports = router;

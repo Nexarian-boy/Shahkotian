@@ -87,6 +87,8 @@ export const authAPI = {
 export const listingsAPI = {
   getAll: (params) => api.get('/listings', { params }),
   getOne: (id) => api.get(`/listings/${id}`),
+  like: (id) => api.post(`/listings/${id}/like`),
+  view: (id) => api.post(`/listings/${id}/view`),
   create: (formData) => api.post('/listings', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 300000,
@@ -158,6 +160,8 @@ export const newsAPI = {
   getAll: (params) => api.get('/news', { params }),
   getCategories: () => api.get('/news/categories'),
   getOne: (id) => api.get(`/news/${id}`),
+  like: (id) => api.post(`/news/${id}/like`),
+  view: (id) => api.post(`/news/${id}/view`),
   create: (formData) => api.post('/news', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 300000,
@@ -342,6 +346,7 @@ export const restaurantsAPI = {
   getAll: (params) => api.get('/restaurants', { params }),
   getOne: (id) => api.get(`/restaurants/${id}`),
   getAllDeals: () => api.get('/restaurants/deals/all'),
+  likeDeal: (dealId) => api.post(`/restaurants/deals/${dealId}/like`),
   // Admin
   adminCreate: (formData) => api.post('/restaurants/admin/create', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -369,6 +374,7 @@ export const clothBrandsAPI = {
   getAll: (params) => api.get('/cloth-brands', { params }),
   getOne: (id) => api.get(`/cloth-brands/${id}`),
   getAllDeals: () => api.get('/cloth-brands/deals/all'),
+  likeDeal: (dealId) => api.post(`/cloth-brands/deals/${dealId}/like`),
   // Admin
   adminCreate: (formData) => api.post('/cloth-brands/admin/create', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

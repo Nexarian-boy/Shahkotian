@@ -1,5 +1,3 @@
-// backend/prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,7 +7,591 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============ ENUMS ============
+model User {
+  id               String            @id @default(uuid())
+  name             String
+  phone            String?           @unique
+  email            String?           @unique
+  whatsapp         String?
+  password         String?
+  photoUrl         String?
+  role             Role              @default(USER)
+  firebaseUid      String?           @unique
+  latitude         Float?
+  longitude        Float?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  isBlocked        Boolean           @default(false)
+  lastSeenAt       DateTime?
+  fcmToken         String?
+  appointments     Appointment[]
+  blockedByUsers   Block[]           @relation("Blocked")
+  blockedUsers     Block[]           @relation("Blocker")
+  bloodDonors      BloodDonor[]
+  chatMessages     ChatMessage[]
+  dmChatsAsUser1   DMChat[]          @relation("DMUser1")
+  dmChatsAsUser2   DMChat[]          @relation("DMUser2")
+  dmMessages       DMMessage[]       @relation("DMSender")
+  jobs             Job[]
+  jobApplications  JobApplication[]
+  listings         Listing[]
+  newsArticles     News[]
+  notifications    Notification[]
+  reportsSubmitted Report[]          @relation("ReportSubmitter")
+  reportsReceived  Report[]          @relation("ReportTarget")
+  sentInterests    RishtaInterest[]  @relation("SentInterests")
+  rishtaProfile    RishtaProfile?
+  shortlists       RishtaShortlist[] @relation("UserShortlists")
+  shops            Shop[]
+  traderProfile    Trader?
+
+  @@index([latitude, longitude])
+}
+
+model Listing {
+  id          String          @id @default(uuid())
+  userId      String
+  title       String
+  description String
+  price       Float
+  category    ListingCategory
+  images      String[]
+  whatsapp    String
+  isSold      Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  views       Int             @default(0)
+  likedBy     String[]        @default([])
+  videos      String[]
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([category])
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([isSold, category, createdAt(sort: Desc)])
+}
+
+model Tournament {
+  id            String    @id @default(uuid())
+  sport         SportType
+  name          String
+  description   String
+  image         String?
+  venue         String
+  startDate     DateTime
+  endDate       DateTime?
+  createdById   String?
+  teams         String[]  @default([])
+  prize         String?
+  entryFee      Int?
+  contactNumber String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  matches       Match[]
+
+  @@index([sport])
+  @@index([endDate])
+}
+
+model Match {
+  id           String     @id @default(uuid())
+  tournamentId String
+  team1        String
+  team2        String
+  date         DateTime   @default(now())
+  time         String     @default("")
+  venue        String     @default("")
+  result       String?
+  round        String?
+  score        String?
+  createdAt    DateTime   @default(now())
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+  @@index([tournamentId])
+}
+
+model GovtOffice {
+  id          String   @id @default(uuid())
+  name        String
+  address     String
+  latitude    Float?
+  longitude   Float?
+  helplines   String[]
+  timings     String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Shop {
+  id          String   @id @default(uuid())
+  name        String
+  address     String
+  contact     String
+  categories  String[]
+  description String?
+  ownerId     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  owner       User?    @relation(fields: [ownerId], references: [id], onUpdate: NoAction)
+
+  @@index([categories])
+  @@index([ownerId])
+}
+
+model RishtaProfile {
+  id              String            @id @default(uuid())
+  userId          String            @unique
+  cnicFront       String?
+  cnicBack        String?
+  age             Int
+  gender          String
+  education       String
+  occupation      String
+  familyDetails   String?
+  preferences     String?
+  images          String[]
+  signatureAgreed Boolean           @default(false)
+  agreementText   String?
+  status          RishtaStatus      @default(PENDING)
+  adminNote       String?
+  approvedAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  interests       RishtaInterest[]  @relation("ReceivedInterests")
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shortlistedBy   RishtaShortlist[]
+
+  @@index([status])
+}
+
+model RishtaInterest {
+  id         String        @id @default(uuid())
+  fromUserId String
+  profileId  String
+  status     String        @default("PENDING")
+  createdAt  DateTime      @default(now())
+  fromUser   User          @relation("SentInterests", fields: [fromUserId], references: [id], onDelete: Cascade)
+  profile    RishtaProfile @relation("ReceivedInterests", fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([fromUserId, profileId])
+  @@index([profileId])
+  @@index([fromUserId])
+}
+
+model RishtaShortlist {
+  id        String        @id @default(uuid())
+  userId    String
+  profileId String
+  createdAt DateTime      @default(now())
+  profile   RishtaProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user      User          @relation("UserShortlists", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, profileId])
+  @@index([userId])
+}
+
+model NewsReporter {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  news      News[]
+}
+
+model News {
+  id         String        @id @default(uuid())
+  reporterId String?
+  title      String
+  content    String
+  images     String[]
+  category   NewsCategory
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  views      Int           @default(0)
+  likedBy    String[]      @default([])
+  userId     String?
+  videos     String[]
+  reporter   NewsReporter? @relation(fields: [reporterId], references: [id])
+  user       User?         @relation(fields: [userId], references: [id])
+
+  @@index([createdAt(sort: Desc)])
+  @@index([category])
+  @@index([userId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model ChatMessage {
+  id            String        @id @default(uuid())
+  userId        String
+  text          String?
+  images        String[]
+  videos        String[]
+  voiceUrl      String?
+  voiceDuration Int?
+  replyToId     String?
+  createdAt     DateTime      @default(now())
+  replyTo       ChatMessage?  @relation("ReplyTo", fields: [replyToId], references: [id])
+  replies       ChatMessage[] @relation("ReplyTo")
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+}
+
+model BloodDonor {
+  id          String     @id @default(uuid())
+  userId      String
+  name        String
+  phone       String
+  whatsapp    String?
+  bloodGroup  BloodGroup
+  address     String?
+  isAvailable Boolean    @default(true)
+  isEmergency Boolean    @default(false)
+  lastDonated DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([bloodGroup])
+  @@index([isAvailable])
+  @@index([isEmergency])
+  @@index([userId])
+}
+
+model DMChat {
+  id        String      @id @default(uuid())
+  user1Id   String
+  user2Id   String
+  source    String      @default("GENERAL")
+  isBlocked Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user1     User        @relation("DMUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2     User        @relation("DMUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  messages  DMMessage[]
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([updatedAt(sort: Desc)])
+}
+
+model DMMessage {
+  id        String   @id @default(uuid())
+  chatId    String
+  senderId  String
+  text      String?
+  images    String[]
+  createdAt DateTime @default(now())
+  chat      DMChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender    User     @relation("DMSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt(sort: Desc)])
+  @@index([senderId])
+}
+
+model Report {
+  id             String   @id @default(uuid())
+  reporterUserId String
+  targetUserId   String
+  targetType     String
+  targetId       String
+  reason         String
+  status         String   @default("PENDING")
+  createdAt      DateTime @default(now())
+  reporter       User     @relation("ReportSubmitter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  target         User     @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([reporterUserId])
+  @@index([targetUserId])
+  @@index([status])
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+model EmailOtp {
+  id        String   @id @default(uuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model Job {
+  id           String           @id @default(uuid())
+  userId       String
+  title        String
+  company      String
+  description  String
+  category     JobCategory
+  type         JobType          @default(FULL_TIME)
+  salary       String?
+  location     String           @default("Shahkot")
+  phone        String
+  whatsapp     String?
+  requirements String?
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications JobApplication[]
+
+  @@index([category])
+  @@index([type])
+  @@index([createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([isActive, createdAt(sort: Desc)])
+}
+
+model JobApplication {
+  id        String   @id @default(uuid())
+  jobId     String
+  userId    String
+  message   String?
+  phone     String
+  createdAt DateTime @default(now())
+  job       Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, userId])
+  @@index([jobId])
+  @@index([userId])
+}
+
+model Doctor {
+  id               String          @id @default(uuid())
+  name             String
+  specialty        DoctorSpecialty
+  clinicName       String?
+  address          String
+  phone            String
+  whatsapp         String?
+  timings          String?
+  fee              Int?
+  education        String?
+  experience       String?
+  isVerified       Boolean         @default(false)
+  latitude         Float?
+  longitude        Float?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  avgConsultTime   Int             @default(15)
+  currentToken     Int             @default(0)
+  email            String?         @unique
+  endTime          String?
+  onlineBooking    Boolean         @default(false)
+  password         String?
+  paymentAccount   String?
+  paymentMethod    String?
+  startTime        String?
+  totalTokensToday Int             @default(0)
+  isAvailableNow   Boolean         @default(false)
+  weekdays         String?
+  appointments     Appointment[]
+
+  @@index([specialty])
+  @@index([name])
+  @@index([email])
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  doctorId        String
+  userId          String
+  status          AppointmentStatus @default(PENDING)
+  tokenNumber     Int?
+  appointmentDate DateTime
+  estimatedTime   String?
+  fee             Int?
+  paymentMethod   String?
+  paymentAccount  String?
+  paymentProof    String?
+  paymentVerified Boolean           @default(false)
+  notes           String?
+  cancelReason    String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  doctor          Doctor            @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([doctorId, appointmentDate])
+  @@index([userId])
+  @@index([status])
+}
+
+model Restaurant {
+  id          String   @id @default(uuid())
+  name        String
+  address     String
+  phone       String?
+  whatsapp    String?
+  description String?
+  image       String?
+  email       String   @unique
+  password    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deals       Deal[]
+
+  @@index([name])
+  @@index([isActive])
+}
+
+model Deal {
+  id            String     @id @default(uuid())
+  restaurantId  String
+  title         String
+  description   String?
+  price         String?
+  originalPrice String?
+  image         String?
+  isActive      Boolean    @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  views         Int        @default(0)
+  likedBy       String[]   @default([])
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  @@index([restaurantId])
+  @@index([isActive, createdAt(sort: Desc)])
+}
+
+model ClothBrand {
+  id          String      @id @default(uuid())
+  name        String
+  address     String
+  phone       String?
+  whatsapp    String?
+  description String?
+  image       String?
+  email       String      @unique
+  password    String
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  deals       BrandDeal[]
+
+  @@index([name])
+  @@index([isActive])
+}
+
+model BrandDeal {
+  id            String     @id @default(uuid())
+  brandId       String
+  title         String
+  description   String?
+  price         String?
+  originalPrice String?
+  images        String[]
+  videos        String[]
+  isActive      Boolean    @default(true)
+  expiresAt     DateTime?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  views         Int        @default(0)
+  likedBy       String[]   @default([])
+  brand         ClothBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId])
+  @@index([isActive, createdAt(sort: Desc)])
+}
+
+model Bazar {
+  id                String             @id @default(uuid())
+  name              String             @unique
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  bazarChatMessages BazarChatMessage[]
+  traders           Trader[]
+
+  @@index([isActive])
+}
+
+model Trader {
+  id           String             @id @default(uuid())
+  userId       String             @unique
+  fullName     String
+  shopName     String
+  phone        String
+  photoUrl     String?
+  bazarId      String
+  status       TraderStatus       @default(PENDING)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  chatMessages BazarChatMessage[]
+  bazar        Bazar              @relation(fields: [bazarId], references: [id], onDelete: Cascade)
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([bazarId, status])
+  @@index([status])
+}
+
+model BazarChatMessage {
+  id            String             @id @default(uuid())
+  traderId      String
+  bazarId       String?
+  text          String?
+  images        String[]
+  videos        String[]
+  voiceUrl      String?
+  voiceDuration Int?
+  pollQuestion  String?
+  pollOptions   String[]
+  pollVotes     String[]
+  createdAt     DateTime           @default(now())
+  replyToId     String?
+  bazar         Bazar?             @relation(fields: [bazarId], references: [id])
+  replyTo       BazarChatMessage?  @relation("BazarReplyTo", fields: [replyToId], references: [id])
+  replies       BazarChatMessage[] @relation("BazarReplyTo")
+  trader        Trader             @relation(fields: [traderId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([traderId])
+}
+
+model President {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
 
 enum Role {
   USER
@@ -70,370 +652,6 @@ enum BloodGroup {
   O_NEGATIVE
 }
 
-// ============ MODELS ============
-
-model User {
-  id            String   @id @default(uuid())
-  name          String
-  phone         String?  @unique
-  email         String?  @unique
-  whatsapp      String?
-  password      String?  // Hashed password - required for new users
-  photoUrl      String?
-  role          Role     @default(USER)
-  firebaseUid   String?  @unique
-  latitude      Float?
-  longitude     Float?
-  isActive      Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  isBlocked     Boolean  @default(false)
-  lastSeenAt    DateTime?
-  fcmToken      String?  // Device token for push notifications (FCM/APNs)
-
-  listings      Listing[]
-  rishtaProfile RishtaProfile?
-  notifications Notification[]
-  bloodDonors   BloodDonor[]
-  shops         Shop[]
-  newsArticles  News[]
-  chatMessages  ChatMessage[]
-  sentInterests RishtaInterest[]  @relation("SentInterests")
-  shortlists    RishtaShortlist[] @relation("UserShortlists")
-
-  // DM relations
-  dmChatsAsUser1  DMChat[]    @relation("DMUser1")
-  dmChatsAsUser2  DMChat[]    @relation("DMUser2")
-  dmMessages      DMMessage[] @relation("DMSender")
-  reportsSubmitted Report[]   @relation("ReportSubmitter")
-  reportsReceived  Report[]   @relation("ReportTarget")
-  blockedUsers     Block[]    @relation("Blocker")
-  blockedByUsers   Block[]    @relation("Blocked")
-  jobs             Job[]
-  jobApplications  JobApplication[]
-  appointments     Appointment[]
-  traderProfile    Trader?
-
-  @@index([latitude, longitude])
-}
-
-model Listing {
-  id          String          @id @default(uuid())
-  userId      String
-  title       String
-  description String
-  price       Float
-  category    ListingCategory
-  images      String[]
-  videos      String[]
-  whatsapp    String // Mandatory
-  isSold      Boolean         @default(false)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([category])
-  @@index([createdAt(sort: Desc)])
-  @@index([userId])
-  @@index([isSold, category, createdAt(sort: Desc)])
-}
-
-model Tournament {
-  id            String    @id @default(uuid())
-  sport         SportType
-  name          String
-  description   String
-  image         String?
-  venue         String
-  startDate     DateTime
-  endDate       DateTime?
-  createdById   String?
-  teams         String[]  @default([])
-  prize         String?
-  entryFee      Int?
-  contactNumber String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  matches Match[]
-
-  @@index([sport])
-  @@index([endDate])
-}
-
-model Match {
-  id           String    @id @default(uuid())
-  tournamentId String
-  team1        String
-  team2        String
-  date         DateTime  @default(now())
-  time         String    @default("")
-  venue        String    @default("")
-  result       String?
-  round        String?
-  score        String?
-  createdAt    DateTime  @default(now())
-
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-
-  @@index([date])
-  @@index([tournamentId])
-}
-
-model GovtOffice {
-  id          String   @id @default(uuid())
-  name        String
-  address     String
-  latitude    Float?
-  longitude   Float?
-  helplines   String[] // Array of phone numbers
-  timings     String?
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model Shop {
-  id          String   @id @default(uuid())
-  name        String
-  address     String
-  contact     String
-  categories  String[] // What they sell: "shoes", "mobile", etc.
-  description String?
-  ownerId     String?
-  owner       User?    @relation(fields: [ownerId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([categories])
-  @@index([ownerId])
-}
-
-model RishtaProfile {
-  id             String       @id @default(uuid())
-  userId         String       @unique
-  cnicFront      String? // Image URL — auto-deleted after admin decision (privacy)
-  cnicBack       String? // Image URL — auto-deleted after admin decision (privacy)
-  age            Int
-  gender         String
-  education      String
-  occupation     String
-  familyDetails  String?
-  preferences    String?
-  images         String[] // Profile images, NO videos
-  signatureAgreed Boolean     @default(false) // Digital agreement
-  agreementText  String? // The actual agreement text signed
-  status         RishtaStatus @default(PENDING)
-  adminNote      String?
-  approvedAt     DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  interests     RishtaInterest[]  @relation("ReceivedInterests")
-  shortlistedBy RishtaShortlist[]
-
-  @@index([status])
-}
-
-model RishtaInterest {
-  id         String   @id @default(uuid())
-  fromUserId String
-  profileId  String
-  status     String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
-  createdAt  DateTime @default(now())
-
-  fromUser User          @relation("SentInterests", fields: [fromUserId], references: [id], onDelete: Cascade)
-  profile  RishtaProfile @relation("ReceivedInterests", fields: [profileId], references: [id], onDelete: Cascade)
-
-  @@unique([fromUserId, profileId])
-  @@index([profileId])
-  @@index([fromUserId])
-}
-
-model RishtaShortlist {
-  id        String   @id @default(uuid())
-  userId    String
-  profileId String
-  createdAt DateTime @default(now())
-
-  user    User          @relation("UserShortlists", fields: [userId], references: [id], onDelete: Cascade)
-  profile RishtaProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, profileId])
-  @@index([userId])
-}
-
-model NewsReporter {
-  id         String   @id @default(uuid())
-  email      String   @unique
-  password   String // Hashed
-  name       String
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-
-  news News[]
-}
-
-model News {
-  id         String       @id @default(uuid())
-  reporterId String?
-  userId     String?      // Allow regular users to post news
-  title      String
-  content    String
-  images     String[]
-  videos     String[]
-  category   NewsCategory
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
-
-  reporter NewsReporter? @relation(fields: [reporterId], references: [id], onDelete: SetNull)
-  user     User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([createdAt(sort: Desc)])
-  @@index([category])
-  @@index([userId])
-}
-
-model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  title     String
-  body      String
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isRead])
-}
-
-model ChatMessage {
-  id        String   @id @default(uuid())
-  userId    String
-  text      String?
-  images    String[]
-  videos    String[]
-  voiceUrl       String?
-  voiceDuration  Int?     // duration in seconds
-  replyToId String?
-  createdAt DateTime @default(now())
-
-  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  replyTo ChatMessage? @relation("ReplyTo", fields: [replyToId], references: [id], onDelete: SetNull)
-  replies ChatMessage[] @relation("ReplyTo")
-
-  @@index([createdAt(sort: Desc)])
-  @@index([userId])
-}
-
-model BloodDonor {
-  id          String     @id @default(uuid())
-  userId      String
-  name        String
-  phone       String
-  whatsapp    String?
-  bloodGroup  BloodGroup
-  address     String?
-  isAvailable Boolean    @default(true)
-  isEmergency Boolean    @default(false)
-  lastDonated DateTime?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([bloodGroup])
-  @@index([isAvailable])
-  @@index([isEmergency])
-  @@index([userId])
-}
-
-// ============ DM (DIRECT MESSAGING) ============
-
-model DMChat {
-  id        String   @id @default(uuid())
-  user1Id   String
-  user2Id   String
-  source    String   @default("GENERAL") // RISHTA, GENERAL
-  isBlocked Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user1    User        @relation("DMUser1", fields: [user1Id], references: [id], onDelete: Cascade)
-  user2    User        @relation("DMUser2", fields: [user2Id], references: [id], onDelete: Cascade)
-  messages DMMessage[]
-
-  @@unique([user1Id, user2Id])
-  @@index([user1Id])
-  @@index([user2Id])
-  @@index([updatedAt(sort: Desc)])
-}
-
-model DMMessage {
-  id        String   @id @default(uuid())
-  chatId    String
-  senderId  String
-  text      String?
-  images    String[] // Cloudinary URLs
-  createdAt DateTime @default(now())
-
-  chat   DMChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  sender User   @relation("DMSender", fields: [senderId], references: [id], onDelete: Cascade)
-
-  @@index([chatId, createdAt(sort: Desc)])
-  @@index([senderId])
-}
-
-model Report {
-  id             String   @id @default(uuid())
-  reporterUserId String
-  targetUserId   String
-  targetType     String   // DM_MESSAGE, POST, USER, etc.
-  targetId       String
-  reason         String
-  status         String   @default("PENDING") // PENDING, REVIEWED, RESOLVED
-  createdAt      DateTime @default(now())
-
-  reporter User @relation("ReportSubmitter", fields: [reporterUserId], references: [id], onDelete: Cascade)
-  target   User @relation("ReportTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
-
-  @@index([reporterUserId])
-  @@index([targetUserId])
-  @@index([status])
-}
-
-model Block {
-  id        String   @id @default(uuid())
-  blockerId String
-  blockedId String
-  createdAt DateTime @default(now())
-
-  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
-  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
-
-  @@unique([blockerId, blockedId])
-  @@index([blockerId])
-  @@index([blockedId])
-}
-
-// ============ EMAIL OTP ============
-
-model EmailOtp {
-  id        String   @id @default(uuid())
-  email     String
-  otp       String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  @@index([email])
-}
-
-// ============ JOBS ============
-
 enum JobType {
   FULL_TIME
   PART_TIME
@@ -456,51 +674,6 @@ enum JobCategory {
   OTHER
 }
 
-model Job {
-  id           String      @id @default(uuid())
-  userId       String
-  title        String
-  company      String
-  description  String
-  category     JobCategory
-  type         JobType     @default(FULL_TIME)
-  salary       String?     // e.g., "20,000 - 30,000 PKR" or "Negotiable"
-  location     String      @default("Shahkot")
-  phone        String
-  whatsapp     String?
-  requirements String?
-  isActive     Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-
-  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  applications JobApplication[]
-
-  @@index([category])
-  @@index([type])
-  @@index([createdAt(sort: Desc)])
-  @@index([userId])
-  @@index([isActive, createdAt(sort: Desc)])
-}
-
-model JobApplication {
-  id        String   @id @default(uuid())
-  jobId     String
-  userId    String
-  message   String?
-  phone     String
-  createdAt DateTime @default(now())
-
-  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([jobId, userId])
-  @@index([jobId])
-  @@index([userId])
-}
-
-// ============ DOCTORS & CLINICS ============
-
 enum DoctorSpecialty {
   GENERAL_PHYSICIAN
   PEDIATRICIAN
@@ -519,46 +692,6 @@ enum DoctorSpecialty {
   OTHER
 }
 
-model Doctor {
-  id              String           @id @default(uuid())
-  name            String
-  specialty       DoctorSpecialty
-  clinicName      String?
-  address         String
-  phone           String
-  whatsapp        String?
-  timings         String?          // e.g., "Mon-Sat: 5PM-9PM"
-  fee             Int?             // Consultation fee in PKR
-  education       String?          // e.g., "MBBS, FCPS"
-  experience      String?          // e.g., "15 years"
-  isVerified      Boolean          @default(false)
-  latitude        Float?
-  longitude       Float?
-  // Doctor login & online booking
-  email           String?          @unique
-  password        String?          // Hashed
-  onlineBooking   Boolean          @default(false)
-  paymentMethod   String?          // e.g., "EasyPaisa", "JazzCash"
-  paymentAccount  String?          // Account number
-  startTime       String?          // e.g., "17:00"
-  endTime         String?          // e.g., "21:00"
-  avgConsultTime  Int              @default(15) // minutes per patient
-  currentToken    Int              @default(0)
-  totalTokensToday Int             @default(0)
-  weekdays        String?          // comma-separated: "Mon,Tue,Wed,Thu,Fri"
-  isAvailableNow  Boolean          @default(false)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-
-  appointments    Appointment[]
-
-  @@index([specialty])
-  @@index([name])
-  @@index([email])
-}
-
-// ============ APPOINTMENTS ============
-
 enum AppointmentStatus {
   PENDING
   APPROVED
@@ -569,190 +702,8 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
-model Appointment {
-  id              String            @id @default(uuid())
-  doctorId        String
-  userId          String
-  status          AppointmentStatus @default(PENDING)
-  tokenNumber     Int?
-  appointmentDate DateTime
-  estimatedTime   String?
-  fee             Int?
-  paymentMethod   String?
-  paymentAccount  String?
-  paymentProof    String?           // Cloudinary URL of payment screenshot
-  paymentVerified Boolean           @default(false)
-  notes           String?
-  cancelReason    String?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
-  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([doctorId, appointmentDate])
-  @@index([userId])
-  @@index([status])
-}
-
-// ============ RESTAURANTS & DEALS ============
-
-model Restaurant {
-  id          String   @id @default(uuid())
-  name        String
-  address     String
-  phone       String?
-  whatsapp    String?
-  description String?
-  image       String?  // Logo / cover image
-  email       String   @unique // Login email for restaurant owner
-  password    String   // Hashed password for restaurant owner
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  deals Deal[]
-
-  @@index([name])
-  @@index([isActive])
-}
-
-model Deal {
-  id           String   @id @default(uuid())
-  restaurantId String
-  title        String
-  description  String?
-  price        String?  // e.g., "Rs. 500" or "50% OFF"
-  originalPrice String? // e.g., "Rs. 1000"
-  image        String?
-  isActive     Boolean  @default(true)
-  expiresAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-
-  @@index([restaurantId])
-  @@index([isActive, createdAt(sort: Desc)])
-}
-
-// ============ CLOTH BRANDS & DEALS ============
-
-model ClothBrand {
-  id          String   @id @default(uuid())
-  name        String
-  address     String
-  phone       String?
-  whatsapp    String?
-  description String?
-  image       String?  // Logo / cover image
-  email       String   @unique // Login email for brand owner
-  password    String   // Hashed password for brand owner
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  deals BrandDeal[]
-
-  @@index([name])
-  @@index([isActive])
-}
-
-model BrandDeal {
-  id           String   @id @default(uuid())
-  brandId      String
-  title        String
-  description  String?
-  price        String?
-  originalPrice String?
-  images       String[]
-  videos       String[]
-  isActive     Boolean  @default(true)
-  expiresAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  brand ClothBrand @relation(fields: [brandId], references: [id], onDelete: Cascade)
-
-  @@index([brandId])
-  @@index([isActive, createdAt(sort: Desc)])
-}
-
-// ============ BAZAR / TRADER SYSTEM ============
-
 enum TraderStatus {
   PENDING
   APPROVED
   REJECTED
-}
-
-model Bazar {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  traders          Trader[]
-  bazarChatMessages BazarChatMessage[]
-
-  @@index([isActive])
-}
-
-model Trader {
-  id        String       @id @default(uuid())
-  userId    String
-  fullName  String
-  shopName  String
-  phone     String
-  photoUrl  String?
-  bazarId   String
-  status    TraderStatus @default(PENDING)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bazar Bazar @relation(fields: [bazarId], references: [id], onDelete: Cascade)
-  chatMessages BazarChatMessage[]
-
-  @@unique([userId])
-  @@index([bazarId, status])
-  @@index([status])
-}
-
-model BazarChatMessage {
-  id             String   @id @default(uuid())
-  traderId       String
-  bazarId        String?
-  text           String?
-  images         String[]
-  videos         String[]
-  voiceUrl       String?
-  voiceDuration  Int?
-  // Poll fields (inline for simplicity)
-  pollQuestion   String?
-  pollOptions    String[] // JSON-encoded option strings
-  pollVotes      String[] // JSON-encoded: ["optionIndex:oderId", ...]
-  replyToId      String?                          // ← ADD THIS
-  createdAt      DateTime @default(now())
-
-  trader Trader @relation(fields: [traderId], references: [id], onDelete: Cascade)
-  bazar  Bazar? @relation(fields: [bazarId], references: [id], onDelete: SetNull)
-  replyTo BazarChatMessage? @relation("BazarReplyTo", fields: [replyToId], references: [id], onDelete: SetNull)  // ← ADD THIS
-  replies BazarChatMessage[] @relation("BazarReplyTo")  // ← ADD THIS
-
-  @@index([createdAt(sort: Desc)])
-  @@index([traderId])
-}
-
-// ============ PRESIDENT ============
-
-model President {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-
-  @@index([email])
 }

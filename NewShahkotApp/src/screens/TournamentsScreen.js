@@ -4,6 +4,7 @@ import {
   ScrollView, Alert, Modal, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { COLORS, SPORT_TYPES } from '../config/constants';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { tournamentsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -22,8 +23,12 @@ export default function TournamentsScreen({ navigation }) {
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({
     name: '', sport: 'CRICKET', description: '', venue: '',
-    startDate: '', endDate: '', prize: '', entryFee: '', contactNumber: '',
+    prize: '', entryFee: '', contactNumber: '',
   });
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [teamInput, setTeamInput] = useState('');
   const [teams, setTeams] = useState([]);
 
@@ -75,7 +80,7 @@ export default function TournamentsScreen({ navigation }) {
   };
 
   const handleCreate = async () => {
-    if (!form.name || !form.description || !form.venue || !form.startDate) {
+    if (!form.name || !form.description || !form.venue) {
       Alert.alert('Missing Fields', 'Please fill all required fields.');
       return;
     }
@@ -83,11 +88,17 @@ export default function TournamentsScreen({ navigation }) {
       setCreating(true);
       await tournamentsAPI.createJSON({
         ...form,
+        startDate: startDate.toISOString(),
+        endDate: endDate.toISOString(),
         entryFee: form.entryFee ? parseFloat(form.entryFee) : 0,
         teams,
       });
       setShowCreate(false);
-      setForm({ name: '', sport: 'CRICKET', description: '', venue: '', startDate: '', endDate: '', prize: '', entryFee: '', contactNumber: '' });
+      setForm({ name: '', sport: 'CRICKET', description: '', venue: '', prize: '', entryFee: '', contactNumber: '' });
+      setStartDate(new Date());
+      setEndDate(new Date());
+      setShowStartPicker(false);
+      setShowEndPicker(false);
       setTeams([]);
       setTeamInput('');
       loadTournaments();
@@ -250,10 +261,46 @@ export default function TournamentsScreen({ navigation }) {
               <TextInput style={styles.input} value={form.venue} onChangeText={s => setForm({ ...form, venue: s })} placeholder={t('venuePlaceholder')} />
 
               <Text style={styles.label}>{t('startDateField')}</Text>
-              <TextInput style={styles.input} value={form.startDate} onChangeText={s => setForm({ ...form, startDate: s })} placeholder="2026-03-15" keyboardType="numbers-and-punctuation" />
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setShowStartPicker(true)}
+              >
+                <Text style={{ color: COLORS.text, fontSize: 14 }}>
+                  📅 {startDate.toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+              </TouchableOpacity>
+              {showStartPicker && (
+                <DateTimePicker
+                  value={startDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowStartPicker(Platform.OS === 'ios');
+                    if (selectedDate) setStartDate(selectedDate);
+                  }}
+                />
+              )}
 
               <Text style={styles.label}>{t('endDateField')}</Text>
-              <TextInput style={styles.input} value={form.endDate} onChangeText={s => setForm({ ...form, endDate: s })} placeholder="2026-04-01" keyboardType="numbers-and-punctuation" />
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setShowEndPicker(true)}
+              >
+                <Text style={{ color: COLORS.text, fontSize: 14 }}>
+                  📅 {endDate.toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </Text>
+              </TouchableOpacity>
+              {showEndPicker && (
+                <DateTimePicker
+                  value={endDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event, selectedDate) => {
+                    setShowEndPicker(Platform.OS === 'ios');
+                    if (selectedDate) setEndDate(selectedDate);
+                  }}
+                />
+              )}
 
               <Text style={styles.label}>{t('prizeField')}</Text>
               <TextInput style={styles.input} value={form.prize} onChangeText={s => setForm({ ...form, prize: s })} placeholder={t('prizePlaceholder')} />

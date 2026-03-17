@@ -387,7 +387,7 @@ export default function TournamentDetailScreen({ route, navigation }) {
 
         {/* Details Grid */}
         <View style={styles.detailsGrid}>
-          <DetailItem icon="📍" label="Location" value={tournament.location} />
+          <DetailItem icon="📍" label="Location" value={tournament.venue} />
           <DetailItem icon="📅" label="Start" value={formatDate(tournament.startDate)} />
           <DetailItem icon="🏁" label="End" value={formatDate(tournament.endDate)} />
           <DetailItem icon="👥" label="Teams" value={tournament.teams?.length || 0} />

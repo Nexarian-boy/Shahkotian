@@ -34,6 +34,13 @@ export default function NewsScreen() {
     loadNews();
   }, [selectedCategory]);
 
+  useEffect(() => {
+    if (!selectedArticle?.id) return;
+    newsAPI.view(selectedArticle.id).catch(() => {});
+    setSelectedArticle(prev => (prev ? { ...prev, views: (prev.views || 0) + 1 } : prev));
+    setNews(prev => prev.map(n => (n.id === selectedArticle.id ? { ...n, views: (n.views || 0) + 1 } : n)));
+  }, [selectedArticle?.id]);
+
   const loadNews = async () => {
     try {
       setLoading(true);
@@ -154,11 +161,15 @@ export default function NewsScreen() {
         <Text style={styles.articleContent} numberOfLines={3}>{item.content}</Text>
         <View style={styles.articleFooter}>
           <Text style={styles.reporterName}>✍️ {item.user?.name || item.reporter?.name || 'Admin'}</Text>
-          <Text style={styles.articleDate}>
-            {new Date(item.createdAt).toLocaleDateString('en-PK', {
-              day: 'numeric', month: 'short', year: 'numeric',
-            })}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={{ fontSize: 11, color: COLORS.textLight }}>❤️ {item.likedBy?.length || 0}</Text>
+            <Text style={{ fontSize: 11, color: COLORS.textLight }}>👁️ {item.views || 0}</Text>
+            <Text style={styles.articleDate}>
+              {new Date(item.createdAt).toLocaleDateString('en-PK', {
+                day: 'numeric', month: 'short', year: 'numeric',
+              })}
+            </Text>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -241,6 +252,35 @@ export default function NewsScreen() {
                 <Text style={styles.categoryBadgeText}>{selectedArticle.category}</Text>
               </View>
               <Text style={[styles.articleTitle, { fontSize: 22 }]}>{selectedArticle.title}</Text>
+              <View style={{ flexDirection: 'row', gap: 12, marginVertical: 10 }}>
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                    backgroundColor: COLORS.surface, paddingHorizontal: 14, paddingVertical: 8,
+                    borderRadius: 20, borderWidth: 1, borderColor: COLORS.border }}
+                  onPress={async () => {
+                    try {
+                      const res = await newsAPI.like(selectedArticle.id);
+                      const likeCount = Number(res?.data?.likeCount || 0);
+                      const likedBy = Array.from({ length: likeCount }, () => 'x');
+                      setSelectedArticle(prev => (prev ? { ...prev, likedBy } : prev));
+                      setNews(prev => prev.map(n => (n.id === selectedArticle.id ? { ...n, likedBy } : n)));
+                    } catch {}
+                  }}
+                >
+                  <Text style={{ fontSize: 16 }}>❤️</Text>
+                  <Text style={{ fontSize: 13, color: COLORS.text, fontWeight: '600' }}>
+                    {selectedArticle.likedBy?.length || 0} Likes
+                  </Text>
+                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6,
+                  backgroundColor: COLORS.surface, paddingHorizontal: 14, paddingVertical: 8,
+                  borderRadius: 20, borderWidth: 1, borderColor: COLORS.border }}>
+                  <Text style={{ fontSize: 16 }}>👁️</Text>
+                  <Text style={{ fontSize: 13, color: COLORS.text, fontWeight: '600' }}>
+                    {selectedArticle.views || 0} Views
+                  </Text>
+                </View>
+              </View>
               <Text style={styles.reporterName}>✍️ {selectedArticle.user?.name || selectedArticle.reporter?.name || 'Admin'}</Text>
               <Text style={styles.articleDate}>
                 {new Date(selectedArticle.createdAt).toLocaleDateString('en-PK', {

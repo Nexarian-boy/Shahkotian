@@ -270,6 +270,15 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
     }
   };
 
+  const toggleDealLike = async (dealId) => {
+    try {
+      const res = await clothBrandsAPI.likeDeal(dealId);
+      const likeCount = Number(res?.data?.likeCount || 0);
+      const likedBy = Array.from({ length: likeCount }, () => 'x');
+      setAllDeals(prev => prev.map(d => (d.id === dealId ? { ...d, likedBy } : d)));
+    } catch {}
+  };
+
   // Render deal card
   const renderDealCard = ({ item }) => {
     if (item.type === 'AD_ITEM') return <AdBanner />;
@@ -289,6 +298,17 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
           <View style={styles.priceRow}>
             {item.originalPrice && <Text style={styles.originalPrice}>{item.originalPrice}</Text>}
             {item.price && <Text style={styles.dealPrice}>{item.price}</Text>}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 6, marginBottom: 2 }}>
+            <TouchableOpacity
+              onPress={() => toggleDealLike(item.id)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            >
+              <Text style={{ fontSize: 13 }}>❤️</Text>
+              <Text style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' }}>
+                {item.likedBy?.length || 0}
+              </Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.brandTag}>
             {item.brand?.image && <Image source={{ uri: item.brand.image }} style={styles.miniLogo} />}
