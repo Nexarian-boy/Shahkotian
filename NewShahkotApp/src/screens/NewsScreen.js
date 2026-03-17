@@ -36,9 +36,16 @@ export default function NewsScreen() {
 
   useEffect(() => {
     if (!selectedArticle?.id) return;
-    newsAPI.view(selectedArticle.id).catch(() => {});
-    setSelectedArticle(prev => (prev ? { ...prev, views: (prev.views || 0) + 1 } : prev));
-    setNews(prev => prev.map(n => (n.id === selectedArticle.id ? { ...n, views: (n.views || 0) + 1 } : n)));
+    newsAPI.view(selectedArticle.id)
+      .then(() => {
+        setSelectedArticle(prev => prev ? { ...prev, views: (prev.views || 0) + 1 } : prev);
+        setNews(prev => prev.map(n => (
+          n.id === selectedArticle.id
+            ? { ...n, views: (n.views || 0) + 1 }
+            : n
+        )));
+      })
+      .catch(() => {});
   }, [selectedArticle?.id]);
 
   const loadNews = async () => {
@@ -260,10 +267,13 @@ export default function NewsScreen() {
                   onPress={async () => {
                     try {
                       const res = await newsAPI.like(selectedArticle.id);
-                      const likeCount = Number(res?.data?.likeCount || 0);
-                      const likedBy = Array.from({ length: likeCount }, () => 'x');
-                      setSelectedArticle(prev => (prev ? { ...prev, likedBy } : prev));
-                      setNews(prev => prev.map(n => (n.id === selectedArticle.id ? { ...n, likedBy } : n)));
+                      const newLikedBy = res.data.liked
+                        ? [...(selectedArticle.likedBy || []), 'me']
+                        : (selectedArticle.likedBy || []).filter(id => id !== 'me');
+                      setSelectedArticle(prev => ({ ...prev, likedBy: newLikedBy }));
+                      setNews(prev => prev.map(n => (
+                        n.id === selectedArticle.id ? { ...n, likedBy: newLikedBy } : n
+                      )));
                     } catch {}
                   }}
                 >

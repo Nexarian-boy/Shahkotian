@@ -273,9 +273,16 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
   const toggleDealLike = async (dealId) => {
     try {
       const res = await clothBrandsAPI.likeDeal(dealId);
-      const likeCount = Number(res?.data?.likeCount || 0);
-      const likedBy = Array.from({ length: likeCount }, () => 'x');
-      setAllDeals(prev => prev.map(d => (d.id === dealId ? { ...d, likedBy } : d)));
+      setAllDeals(prev => prev.map(d => (
+        d.id === dealId
+          ? {
+            ...d,
+            likedBy: res.data.liked
+              ? [...(d.likedBy || []), 'me']
+              : (d.likedBy || []).filter(id => id !== 'me'),
+          }
+          : d
+      )));
     } catch {}
   };
 

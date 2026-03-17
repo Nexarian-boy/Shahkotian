@@ -42,9 +42,16 @@ export default function MarketplaceScreen() {
 
   useEffect(() => {
     if (!selectedListing?.id) return;
-    listingsAPI.view(selectedListing.id).catch(() => {});
-    setSelectedListing(prev => (prev ? { ...prev, views: (prev.views || 0) + 1 } : prev));
-    setListings(prev => prev.map(l => (l.id === selectedListing.id ? { ...l, views: (l.views || 0) + 1 } : l)));
+    listingsAPI.view(selectedListing.id)
+      .then(() => {
+        setSelectedListing(prev => (prev ? { ...prev, views: (prev.views || 0) + 1 } : prev));
+        setListings(prev => prev.map(l => (
+          l.id === selectedListing.id
+            ? { ...l, views: (l.views || 0) + 1 }
+            : l
+        )));
+      })
+      .catch(() => {});
   }, [selectedListing?.id]);
 
   const loadListings = async () => {
@@ -225,18 +232,8 @@ export default function MarketplaceScreen() {
           <View style={styles.listingFooter}>
             <Text style={styles.listingUser}>👤 {item.user?.name || 'Unknown'}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                <Text style={{ fontSize: 10, color: COLORS.textLight }}>❤️ {item.likedBy?.length || 0}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                <Text style={{ fontSize: 10, color: COLORS.textLight }}>👁️ {item.views || 0}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.whatsappButton}
-                onPress={() => openWhatsApp(item.whatsapp, item.title)}
-              >
-                <Text style={styles.whatsappText}>💬 Chat</Text>
-              </TouchableOpacity>
+              <Text style={{ fontSize: 10, color: COLORS.textLight }}>❤️ {item.likedBy?.length || 0}</Text>
+              <Text style={{ fontSize: 10, color: COLORS.textLight }}>👁️ {item.views || 0}</Text>
             </View>
           </View>
         </View>
@@ -317,16 +314,21 @@ export default function MarketplaceScreen() {
                   onPress={async () => {
                     try {
                       const res = await listingsAPI.like(item.id);
-                      const likeCount = Number(res?.data?.likeCount || 0);
-                      const likedBy = Array.from({ length: likeCount }, () => 'x');
-                      setSelectedListing(prev => (prev ? { ...prev, likedBy } : prev));
-                      setListings(prev => prev.map(l => (l.id === item.id ? { ...l, likedBy } : l)));
-                    } catch {}
+                      const newLikedBy = res.data.liked
+                        ? [...(item.likedBy || []), user?.id || 'me']
+                        : (item.likedBy || []).filter(id => id !== (user?.id || 'me'));
+                      setSelectedListing(prev => ({ ...prev, likedBy: newLikedBy }));
+                      setListings(prev => prev.map(l => (
+                        l.id === item.id ? { ...l, likedBy: newLikedBy } : l
+                      )));
+                    } catch (e) {
+                      Alert.alert('Error', 'Failed to like.');
+                    }
                   }}
                 >
                   <Text style={{ fontSize: 16 }}>❤️</Text>
                   <Text style={{ fontSize: 13, color: COLORS.text, fontWeight: '600' }}>
-                    {item.likedBy?.length || 0} Likes
+                    {selectedListing?.likedBy?.length || 0} Likes
                   </Text>
                 </TouchableOpacity>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8,
