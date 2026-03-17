@@ -68,6 +68,7 @@ export default function DoctorsScreen({ navigation, route }) {
   // Image viewer for payment proof
   const [viewerImages, setViewerImages] = useState([]);
   const [viewerVisible, setViewerVisible] = useState(false);
+  const [selectedPaymentProof, setSelectedPaymentProof] = useState(null); // { uri, type, name }
 
   // User appointments
   const [myAppointments, setMyAppointments] = useState([]);
@@ -224,18 +225,37 @@ export default function DoctorsScreen({ navigation, route }) {
   };
 
   // ── Upload Payment Proof ───────────────────────────────────────────
-  const handleUploadPaymentProof = async () => {
+  const handleSelectPaymentProof = async () => {
     if (!showPaymentModal) return;
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
     if (result.canceled) return;
 
+    const asset = result.assets?.[0];
+    if (!asset?.uri) return;
+    setSelectedPaymentProof({
+      uri: asset.uri,
+      type: 'image/jpeg',
+      name: 'payment.jpg',
+    });
+  };
+
+  const handleSendPaymentProof = async () => {
+    if (!showPaymentModal || !selectedPaymentProof?.uri) return;
     setSaving(true);
     try {
       const fd = new FormData();
-      fd.append('image', { uri: result.assets[0].uri, type: 'image/jpeg', name: 'payment.jpg' });
+      fd.append('image', {
+        uri: selectedPaymentProof.uri,
+        type: selectedPaymentProof.type || 'image/jpeg',
+        name: selectedPaymentProof.name || 'payment.jpg',
+      });
       await appointmentsAPI.uploadPaymentProof(showPaymentModal.id, fd);
       Alert.alert('Done! ✅', 'Payment proof uploaded. Doctor will verify shortly.');
       setShowPaymentModal(null);
+      setSelectedPaymentProof(null);
       loadMyAppointments();
     } catch (e) {
       Alert.alert('Error', e.response?.data?.error || 'Failed to upload.');
@@ -947,7 +967,12 @@ export default function DoctorsScreen({ navigation, route }) {
       </Modal>
 
       {/* Payment Proof Modal */}
-      <Modal visible={!!showPaymentModal} transparent animationType="fade" onRequestClose={() => setShowPaymentModal(null)}>
+      <Modal
+        visible={!!showPaymentModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setShowPaymentModal(null); setSelectedPaymentProof(null); }}
+      >
         <View style={styles.overlay}>
           <View style={styles.popup}>
             <Text style={styles.popupTitle}>Upload Payment Proof</Text>
@@ -956,10 +981,63 @@ export default function DoctorsScreen({ navigation, route }) {
               Account: {showPaymentModal?.paymentAccount || showPaymentModal?.doctor?.paymentAccount || 'N/A'}
             </Text>
             <Text style={styles.popupSub}>Take a screenshot of your payment and upload below.</Text>
-            <TouchableOpacity style={[styles.popupBtn, { backgroundColor: COLORS.primary, marginTop: 16 }]} onPress={handleUploadPaymentProof} disabled={saving}>
-              {saving ? <ActivityIndicator color={COLORS.white} /> : <Text style={{ color: COLORS.white, fontWeight: '700' }}>📷 Select & Upload Screenshot</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={{ marginTop: 10, alignItems: 'center' }} onPress={() => setShowPaymentModal(null)}>
+
+            <View style={{ marginTop: 16 }}>
+              {!selectedPaymentProof?.uri ? (
+                <TouchableOpacity
+                  style={[styles.selectProofBtn, saving && { opacity: 0.6 }]}
+                  onPress={handleSelectPaymentProof}
+                  disabled={saving}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="image-outline" size={18} color={COLORS.white} />
+                  <Text style={styles.selectProofBtnText}>Select Screenshot</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.proofPreviewWrap}>
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    onPress={() => { setViewerImages([selectedPaymentProof.uri]); setViewerVisible(true); }}
+                  >
+                    <Image source={{ uri: selectedPaymentProof.uri }} style={styles.proofPreviewImg} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.proofRemoveBtn}
+                    onPress={() => setSelectedPaymentProof(null)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="close" size={16} color="#FFF" />
+                  </TouchableOpacity>
+
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                    <TouchableOpacity
+                      style={[styles.secondaryBtn, { flex: 1 }]}
+                      onPress={handleSelectPaymentProof}
+                      disabled={saving}
+                    >
+                      <Text style={styles.secondaryBtnText}>Change</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.primaryBtn, { flex: 1 }, saving && { opacity: 0.7 }]}
+                      onPress={handleSendPaymentProof}
+                      disabled={saving}
+                    >
+                      {saving
+                        ? <ActivityIndicator color={COLORS.white} />
+                        : <Text style={styles.primaryBtnText}>Send to Doctor</Text>
+                      }
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={{ marginTop: 12, alignItems: 'center' }}
+              onPress={() => { setShowPaymentModal(null); setSelectedPaymentProof(null); }}
+              disabled={saving}
+            >
               <Text style={{ color: COLORS.textLight }}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -1425,6 +1503,53 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24,
   },
   sheetTitle: { fontSize: 20, fontWeight: '700', color: COLORS.text },
+  // Payment proof select/preview (avoid weird Android touch area)
+  selectProofBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  selectProofBtnText: { color: COLORS.white, fontWeight: '800', fontSize: 14 },
+  proofPreviewWrap: {
+    backgroundColor: COLORS.background,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 12,
+    position: 'relative',
+  },
+  proofPreviewImg: { width: '100%', height: 160, borderRadius: 12, backgroundColor: COLORS.border },
+  proofRemoveBtn: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryBtn: {
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  secondaryBtnText: { color: COLORS.text, fontWeight: '700' },
+  primaryBtn: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  primaryBtnText: { color: COLORS.white, fontWeight: '800' },
   // Form
   fieldLabel: { fontSize: 13, fontWeight: '600', color: COLORS.text, marginBottom: 6, marginTop: 8 },
   input: {
