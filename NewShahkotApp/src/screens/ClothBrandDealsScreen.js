@@ -52,6 +52,11 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
   const [dealSubmitting, setDealSubmitting] = useState(false);
   const [showOwnerLoginModal, setShowOwnerLoginModal] = useState(false);
 
+  // Image viewer (for deal photos)
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [imageViewerImages, setImageViewerImages] = useState([]);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
+
   useEffect(() => {
     loadData();
     const p = route?.params;
@@ -61,6 +66,14 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
       setActiveTab('owner');
     }
   }, []);
+
+  const openImageViewer = (images = [], index = 0) => {
+    if (!Array.isArray(images) || images.length === 0) return;
+    const safeIndex = Math.max(0, Math.min(index, images.length - 1));
+    setImageViewerImages(images);
+    setImageViewerIndex(safeIndex);
+    setImageViewerVisible(true);
+  };
 
   const loadData = async () => {
     try {
@@ -292,7 +305,11 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
     const firstImage = item.images?.[0];
     return (
       <TouchableOpacity style={styles.dealCard} onPress={() => loadBrandDetail(item.brand?.id || item.brandId)}>
-        {firstImage && <Image source={{ uri: firstImage }} style={styles.dealImage} />}
+        {firstImage && (
+          <TouchableOpacity activeOpacity={0.9} onPress={() => openImageViewer(item.images || [], 0)}>
+            <Image source={{ uri: firstImage }} style={styles.dealImage} />
+          </TouchableOpacity>
+        )}
         {item.videos?.length > 0 && (
           <View style={styles.videoBadge}>
             <Ionicons name="videocam" size={14} color="#FFF" />
@@ -623,11 +640,22 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
 
                 {(selectedBrand.deals || []).map(deal => (
                   <View key={deal.id} style={styles.detailDeal}>
-                    {deal.images?.[0] && <Image source={{ uri: deal.images[0] }} style={styles.detailDealImage} />}
+                    {deal.images?.[0] && (
+                      <TouchableOpacity activeOpacity={0.9} onPress={() => openImageViewer(deal.images || [], 0)}>
+                        <Image source={{ uri: deal.images[0] }} style={styles.detailDealImage} />
+                      </TouchableOpacity>
+                    )}
                     {deal.images?.length > 1 && (
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
                         {deal.images.slice(1).map((img, idx) => (
-                          <Image key={idx} source={{ uri: img }} style={{ width: 100, height: 80, borderRadius: 8, marginRight: 8 }} />
+                          <TouchableOpacity
+                            key={idx}
+                            activeOpacity={0.9}
+                            onPress={() => openImageViewer(deal.images || [], idx + 1)}
+                            style={{ marginRight: 8 }}
+                          >
+                            <Image source={{ uri: img }} style={{ width: 100, height: 80, borderRadius: 8 }} />
+                          </TouchableOpacity>
                         ))}
                       </ScrollView>
                     )}
@@ -652,6 +680,48 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
               </ScrollView>
             )}
           </View>
+        </View>
+      </Modal>
+
+      {/* Deal Image Viewer */}
+      <Modal
+        visible={imageViewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImageViewerVisible(false)}
+      >
+        <View style={styles.viewerOverlay}>
+          <View style={styles.viewerTopBar}>
+            <Text style={styles.viewerCounter}>
+              {(imageViewerIndex || 0) + 1}/{imageViewerImages.length || 0}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setImageViewerVisible(false)}
+              style={styles.viewerCloseBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={26} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+
+          <FlatList
+            data={imageViewerImages}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(uri, idx) => `${uri}-${idx}`}
+            initialScrollIndex={imageViewerIndex}
+            getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+            onMomentumScrollEnd={(e) => {
+              const next = Math.round(e.nativeEvent.contentOffset.x / width);
+              setImageViewerIndex(next);
+            }}
+            renderItem={({ item: uri }) => (
+              <View style={styles.viewerPage}>
+                <Image source={{ uri }} style={styles.viewerImage} resizeMode="contain" />
+              </View>
+            )}
+          />
         </View>
       </Modal>
 
@@ -901,4 +971,19 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 40 },
   emptyText: { fontSize: 16, color: COLORS.textSecondary, fontWeight: '600' },
   emptySubText: { fontSize: 13, color: COLORS.textLight, marginTop: 4, textAlign: 'center' },
+
+  // Image viewer
+  viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.96)' },
+  viewerTopBar: {
+    paddingTop: 52,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  viewerCounter: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  viewerCloseBtn: { padding: 6 },
+  viewerPage: { width, flex: 1, justifyContent: 'center', alignItems: 'center' },
+  viewerImage: { width, height: '80%' },
 });
