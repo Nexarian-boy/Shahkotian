@@ -306,13 +306,21 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
             {item.originalPrice && <Text style={styles.originalPrice}>{item.originalPrice}</Text>}
             {item.price && <Text style={styles.dealPrice}>{item.price}</Text>}
           </View>
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 6, marginBottom: 2 }}>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4 }}>
             <TouchableOpacity
               onPress={() => toggleDealLike(item.id)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 14,
+                backgroundColor: '#FFF1F2',
+              }}
             >
-              <Text style={{ fontSize: 13 }}>❤️</Text>
-              <Text style={{ fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' }}>
+              <Text style={{ fontSize: 18 }}>❤️</Text>
+              <Text style={{ fontSize: 15, color: COLORS.textPrimary, fontWeight: '700' }}>
                 {item.likedBy?.length || 0}
               </Text>
             </TouchableOpacity>
