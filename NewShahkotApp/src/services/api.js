@@ -107,6 +107,7 @@ export const tournamentsAPI = {
   // JSON-based create (no image upload needed)
   createJSON: (data) => api.post('/tournaments', data),
   addMatch: (id, data) => api.post(`/tournaments/${id}/matches`, data),
+  deleteMatch: (matchId) => api.delete(`/tournaments/matches/${matchId}`),
   update: (id, data) => api.put(`/tournaments/${id}`, data),
   updateMatch: (matchId, data) => api.put(`/tournaments/matches/${matchId}`, data),
   delete: (id) => api.delete(`/tournaments/${id}`),

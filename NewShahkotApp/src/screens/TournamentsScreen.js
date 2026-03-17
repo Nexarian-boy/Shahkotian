@@ -128,7 +128,7 @@ export default function TournamentsScreen({ navigation }) {
         {isExpanded && (
           <View style={styles.expandedContent}>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>{t('venue')}</Text>
+              <Text style={styles.infoLabel}>📍</Text>
               <Text style={styles.infoValue}>{item.venue}</Text>
             </View>
             <View style={styles.infoRow}>

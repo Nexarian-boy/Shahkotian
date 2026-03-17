@@ -250,6 +250,30 @@ router.put('/:id', authenticate, async (req, res) => {
 });
 
 /**
+ * DELETE /api/tournaments/matches/:matchId (Creator or Admin)
+ */
+router.delete('/matches/:matchId', authenticate, async (req, res) => {
+  try {
+    const match = await prisma.match.findUnique({
+      where: { id: req.params.matchId },
+      include: { tournament: true },
+    });
+
+    if (!match) return res.status(404).json({ error: 'Match not found.' });
+
+    if (match.tournament.createdById !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only the tournament creator or admin can delete matches.' });
+    }
+
+    await prisma.match.delete({ where: { id: req.params.matchId } });
+    res.json({ message: 'Match deleted.' });
+  } catch (error) {
+    console.error('Delete match error:', error);
+    res.status(500).json({ error: 'Failed to delete match.' });
+  }
+});
+
+/**
  * PUT /api/tournaments/matches/:matchId (ADMIN ONLY)
  * Update match result
  */

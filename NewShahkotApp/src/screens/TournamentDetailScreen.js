@@ -9,7 +9,9 @@ import {
   Modal,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { COLORS, SPORT_TYPES } from '../config/constants';
 import { tournamentsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -26,7 +28,11 @@ export default function TournamentDetailScreen({ route, navigation }) {
   const [editForm, setEditForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [showAddMatch, setShowAddMatch] = useState(false);
-  const [matchForm, setMatchForm] = useState({ team1: '', team2: '', date: '', round: '' });
+  const [matchForm, setMatchForm] = useState({ team1: '', team2: '', round: '' });
+  const [matchDate, setMatchDate] = useState(new Date());
+  const [matchTime, setMatchTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const isCreator = user && tournament && (tournament.createdById === user.id || tournament.userId === user.id);
   const canManage = isAdmin || isCreator;
@@ -94,14 +100,43 @@ export default function TournamentDetailScreen({ route, navigation }) {
       return;
     }
     try {
-      await tournamentsAPI.addMatch(tid, matchForm);
+      // Format date as ISO string and time as HH:MM
+      const hours = matchTime.getHours().toString().padStart(2, '0');
+      const minutes = matchTime.getMinutes().toString().padStart(2, '0');
+      const timeString = `${hours}:${minutes}`;
+
+      await tournamentsAPI.addMatch(tid, {
+        ...matchForm,
+        date: matchDate.toISOString(),
+        time: timeString,
+      });
       Alert.alert('Success', 'Match added!');
       setShowAddMatch(false);
-      setMatchForm({ team1: '', team2: '', date: '', round: '' });
+      setMatchForm({ team1: '', team2: '', round: '' });
+      setMatchDate(new Date());
+      setMatchTime(new Date());
       loadTournament();
     } catch (error) {
       Alert.alert('Error', 'Failed to add match');
     }
+  };
+
+  const deleteMatch = (matchId) => {
+    Alert.alert('Delete Match', 'Are you sure you want to delete this match?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await tournamentsAPI.deleteMatch(matchId);
+            loadTournament();
+          } catch (error) {
+            Alert.alert('Error', 'Failed to delete match');
+          }
+        },
+      },
+    ]);
   };
 
   const getSportEmoji = (sport) => {
@@ -249,7 +284,7 @@ export default function TournamentDetailScreen({ route, navigation }) {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>➕ Add Match</Text>
-            
+
             <Text style={styles.inputLabel}>Team 1 *</Text>
             <TextInput
               style={styles.formInput}
@@ -257,7 +292,7 @@ export default function TournamentDetailScreen({ route, navigation }) {
               onChangeText={(t) => setMatchForm({ ...matchForm, team1: t })}
               placeholder="First team name"
             />
-            
+
             <Text style={styles.inputLabel}>Team 2 *</Text>
             <TextInput
               style={styles.formInput}
@@ -265,7 +300,7 @@ export default function TournamentDetailScreen({ route, navigation }) {
               onChangeText={(t) => setMatchForm({ ...matchForm, team2: t })}
               placeholder="Second team name"
             />
-            
+
             <Text style={styles.inputLabel}>Round</Text>
             <TextInput
               style={styles.formInput}
@@ -273,9 +308,60 @@ export default function TournamentDetailScreen({ route, navigation }) {
               onChangeText={(t) => setMatchForm({ ...matchForm, round: t })}
               placeholder="e.g. Semi-Final, Final"
             />
-            
+
+            <Text style={styles.inputLabel}>Match Date</Text>
+            <TouchableOpacity
+              style={styles.datePickerBtn}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.datePickerBtnText}>
+                📅 {matchDate.toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.inputLabel}>Match Time</Text>
+            <TouchableOpacity
+              style={styles.datePickerBtn}
+              onPress={() => setShowTimePicker(true)}
+            >
+              <Text style={styles.datePickerBtnText}>
+                🕐 {matchTime.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })}
+              </Text>
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={matchDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(Platform.OS === 'ios');
+                  if (selectedDate) setMatchDate(selectedDate);
+                }}
+              />
+            )}
+
+            {showTimePicker && (
+              <DateTimePicker
+                value={matchTime}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedTime) => {
+                  setShowTimePicker(Platform.OS === 'ios');
+                  if (selectedTime) setMatchTime(selectedTime);
+                }}
+              />
+            )}
+
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowAddMatch(false)}>
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => {
+                  setShowAddMatch(false);
+                  setShowDatePicker(false);
+                  setShowTimePicker(false);
+                }}
+              >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveBtn} onPress={addMatch}>
@@ -330,7 +416,22 @@ export default function TournamentDetailScreen({ route, navigation }) {
               <View key={match.id || idx} style={styles.matchCard}>
                 <View style={styles.matchHeader}>
                   <Text style={styles.matchRound}>{match.round || `Match ${idx + 1}`}</Text>
-                  <Text style={styles.matchDate}>{formatDate(match.date)}</Text>
+                  <View style={styles.matchHeaderRight}>
+                    <View>
+                      <Text style={styles.matchDate}>📅 {formatDate(match.date)}</Text>
+                      {match.time ? (
+                        <Text style={styles.matchTime}>🕐 {match.time}</Text>
+                      ) : null}
+                    </View>
+                    {canManage && match.id ? (
+                      <TouchableOpacity
+                        style={styles.matchDeleteBtn}
+                        onPress={() => deleteMatch(match.id)}
+                      >
+                        <Text style={styles.matchDeleteText}>🗑️</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
                 </View>
                 <View style={styles.matchTeams}>
                   <Text style={styles.matchTeam}>{match.team1}</Text>
@@ -549,4 +650,37 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   saveBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 15 },
+  // Date picker button styles
+  datePickerBtn: {
+    backgroundColor: COLORS.background,
+    borderRadius: 10,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 4,
+  },
+  datePickerBtnText: {
+    fontSize: 14,
+    color: COLORS.text,
+    fontWeight: '500',
+  },
+  // Match header right section (date + delete)
+  matchHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  matchTime: {
+    fontSize: 11,
+    color: COLORS.textLight,
+    textAlign: 'right',
+    marginTop: 2,
+  },
+  matchDeleteBtn: {
+    padding: 4,
+    marginLeft: 6,
+  },
+  matchDeleteText: {
+    fontSize: 16,
+  },
 });
