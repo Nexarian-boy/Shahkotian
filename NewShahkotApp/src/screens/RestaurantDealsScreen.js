@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList,
   Alert, ActivityIndicator, RefreshControl, TextInput, Image, Modal,
-  KeyboardAvoidingView, Platform, Linking,
+  KeyboardAvoidingView, Platform, Linking, Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,8 @@ import { useAuth } from '../context/AuthContext';
 import { restaurantsAPI } from '../services/api';
 import AdBanner from '../components/AdBanner';
 import { useLanguage } from '../context/LanguageContext';
+
+const { width } = Dimensions.get('window');
 
 export default function RestaurantDealsScreen({ navigation, route }) {
   const { isAdmin } = useAuth();
@@ -47,7 +49,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
   const [dealDesc, setDealDesc] = useState('');
   const [dealPrice, setDealPrice] = useState('');
   const [dealOriginalPrice, setDealOriginalPrice] = useState('');
-  const [dealImage, setDealImage] = useState(null);
+  const [dealMedia, setDealMedia] = useState([]); // images + optional video
   const [dealSubmitting, setDealSubmitting] = useState(false);
   const [showOwnerLoginModal, setShowOwnerLoginModal] = useState(false);
 
@@ -55,10 +57,23 @@ export default function RestaurantDealsScreen({ navigation, route }) {
   const [videoViewerVisible, setVideoViewerVisible] = useState(false);
   const [videoViewerUrl, setVideoViewerUrl] = useState(null);
 
+  // Image viewer for deal photos
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [imageViewerImages, setImageViewerImages] = useState([]);
+  const [imageViewerIndex, setImageViewerIndex] = useState(0);
+
   const openVideoViewer = (url) => {
     if (!url) return;
     setVideoViewerUrl(url);
     setVideoViewerVisible(true);
+  };
+
+  const openImageViewer = (images = [], index = 0) => {
+    if (!Array.isArray(images) || images.length === 0) return;
+    const safeIndex = Math.max(0, Math.min(index, images.length - 1));
+    setImageViewerImages(images);
+    setImageViewerIndex(safeIndex);
+    setImageViewerVisible(true);
   };
 
   useEffect(() => {
@@ -226,18 +241,18 @@ export default function RestaurantDealsScreen({ navigation, route }) {
       fd.append('description', dealDesc.trim());
       fd.append('price', dealPrice.trim());
       fd.append('originalPrice', dealOriginalPrice.trim());
-      if (dealImage) {
-        const isVideo = dealImage.type === 'video';
-        fd.append(isVideo ? 'media' : 'image', {
-          uri: dealImage.uri,
+      dealMedia.forEach((asset, i) => {
+        const isVideo = asset.type === 'video';
+        fd.append('media', {
+          uri: asset.uri,
           type: isVideo ? 'video/mp4' : 'image/jpeg',
-          name: isVideo ? 'deal_video.mp4' : 'deal.jpg',
+          name: isVideo ? `deal_video_${i}.mp4` : `deal_img_${i}.jpg`,
         });
-      }
+      });
       await restaurantsAPI.ownerCreateDeal(ownerToken, fd);
       Alert.alert(t('done') + ' 🎉', t('dealAdded'));
       setShowAddDeal(false);
-      setDealTitle(''); setDealDesc(''); setDealPrice(''); setDealOriginalPrice(''); setDealImage(null);
+      setDealTitle(''); setDealDesc(''); setDealPrice(''); setDealOriginalPrice(''); setDealMedia([]);
       reloadOwnerProfile();
       loadData();
     } catch (err) {
@@ -264,12 +279,15 @@ export default function RestaurantDealsScreen({ navigation, route }) {
     ]);
   };
 
-  const pickDealImage = async () => {
+  const pickDealMedia = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsMultipleSelection: true,
       quality: 0.8,
+      selectionLimit: 6,
+      videoMaxDuration: 120,
     });
-    if (!result.canceled) setDealImage(result.assets[0]);
+    if (!result.canceled) setDealMedia(result.assets.slice(0, 6));
   };
 
   const callPhone = (phone) => {
@@ -302,6 +320,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
   // Render deal card
   const renderDealCard = ({ item }) => {
     if (item.type === 'AD_ITEM') return <AdBanner />;
+    const cardImages = (item.images?.length ? item.images : (item.image ? [item.image] : []));
     return (
     <TouchableOpacity
       style={styles.dealCard}
@@ -315,8 +334,12 @@ export default function RestaurantDealsScreen({ navigation, route }) {
         loadRestaurantDetail(item.restaurant?.id || item.restaurantId);
       }}
     >
-      {item.image && <Image source={{ uri: item.image }} style={styles.dealImage} />}
-      {!item.image && item.videos?.[0] ? (
+      {cardImages?.[0] ? (
+        <TouchableOpacity activeOpacity={0.9} onPress={() => openImageViewer(cardImages, 0)}>
+          <Image source={{ uri: cardImages[0] }} style={styles.dealImage} />
+        </TouchableOpacity>
+      ) : null}
+      {!item.images?.[0] && !item.image && item.videos?.[0] ? (
         <View style={[styles.dealImage, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
           <Ionicons name="videocam" size={26} color="#FFF" />
         </View>
@@ -369,6 +392,16 @@ export default function RestaurantDealsScreen({ navigation, route }) {
             🍽️ {item.restaurant?.name || 'Restaurant'}
           </Text>
         </View>
+        {item.restaurant?.phone ? (
+          <TouchableOpacity
+            onPress={() => callPhone(item.restaurant.phone)}
+            style={styles.dealPhoneRow}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="call" size={14} color={COLORS.primary} />
+            <Text style={styles.dealPhoneText}>{item.restaurant.phone}</Text>
+          </TouchableOpacity>
+        ) : null}
         {item.expiresAt && (
           <Text style={styles.expiresText}>
             ⏰ Expires: {new Date(item.expiresAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}
@@ -655,14 +688,37 @@ export default function RestaurantDealsScreen({ navigation, route }) {
 
                 {(selectedRestaurant.deals || []).map(deal => (
                   <View key={deal.id} style={styles.detailDeal}>
-                    {deal.image && <Image source={{ uri: deal.image }} style={styles.detailDealImage} />}
-                    {!deal.image && deal.videos?.[0] ? (
+                    {deal.images?.[0] ? (
+                      <TouchableOpacity activeOpacity={0.9} onPress={() => openImageViewer(deal.images || [], 0)}>
+                        <Image source={{ uri: deal.images[0] }} style={styles.detailDealImage} />
+                      </TouchableOpacity>
+                    ) : null}
+                    {!deal.images?.[0] && deal.image ? (
+                      <TouchableOpacity activeOpacity={0.9} onPress={() => openImageViewer([deal.image], 0)}>
+                        <Image source={{ uri: deal.image }} style={styles.detailDealImage} />
+                      </TouchableOpacity>
+                    ) : null}
+                    {!deal.images?.[0] && !deal.image && deal.videos?.[0] ? (
                       <TouchableOpacity onPress={() => openVideoViewer(deal.videos[0])} activeOpacity={0.85}>
                         <View style={[styles.detailDealImage, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
                           <Ionicons name="play-circle" size={44} color="#FFF" />
                         </View>
                       </TouchableOpacity>
                     ) : null}
+                    {deal.images?.length > 1 && (
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
+                        {deal.images.slice(1).map((img, idx) => (
+                          <TouchableOpacity
+                            key={idx}
+                            activeOpacity={0.9}
+                            onPress={() => openImageViewer(deal.images || [], idx + 1)}
+                            style={{ marginRight: 8 }}
+                          >
+                            <Image source={{ uri: img }} style={{ width: 100, height: 80, borderRadius: 8 }} />
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    )}
                     <Text style={styles.detailDealTitle}>{deal.title}</Text>
                     {deal.description && <Text style={styles.detailDealDesc}>{deal.description}</Text>}
                     <View style={styles.priceRow}>
@@ -789,10 +845,26 @@ export default function RestaurantDealsScreen({ navigation, route }) {
                 <TextInput style={[styles.input, { height: 80 }]} placeholder="Description (optional)" value={dealDesc} onChangeText={setDealDesc} multiline placeholderTextColor={COLORS.textLight} />
                 <TextInput style={styles.input} placeholder="Price (e.g. Rs. 500 or 30% OFF)" value={dealPrice} onChangeText={setDealPrice} placeholderTextColor={COLORS.textLight} />
                 <TextInput style={styles.input} placeholder="Original Price (e.g. Rs. 800)" value={dealOriginalPrice} onChangeText={setDealOriginalPrice} placeholderTextColor={COLORS.textLight} />
-                <TouchableOpacity style={styles.imagePicker} onPress={pickDealImage}>
-                  <Text style={{ fontSize: 24 }}>{dealImage ? '✅' : '📷'}</Text>
-                  <Text style={styles.imagePickerText}>{dealImage ? 'Image Selected' : 'Add Deal Image (optional)'}</Text>
+                <TouchableOpacity style={styles.imagePicker} onPress={pickDealMedia}>
+                  <Text style={{ fontSize: 24 }}>{dealMedia.length > 0 ? '✅' : '📷'}</Text>
+                  <Text style={styles.imagePickerText}>
+                    {dealMedia.length > 0 ? `${dealMedia.length} file(s) selected` : 'Add Images / Video (max 6, 30MB)'}
+                  </Text>
                 </TouchableOpacity>
+                {dealMedia.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                    {dealMedia.map((asset, i) => (
+                      <View key={i} style={{ marginRight: 8, position: 'relative' }}>
+                        <Image source={{ uri: asset.uri }} style={{ width: 70, height: 70, borderRadius: 8 }} />
+                        {asset.type === 'video' && (
+                          <View style={{ position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 4, padding: 2 }}>
+                            <Ionicons name="videocam" size={12} color="#FFF" />
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </ScrollView>
+                )}
                 <TouchableOpacity
                   style={[styles.submitBtn, dealSubmitting && { opacity: 0.5 }]}
                   onPress={handleAddDeal}
@@ -829,6 +901,48 @@ export default function RestaurantDealsScreen({ navigation, route }) {
               />
             ) : null}
           </View>
+        </View>
+      </Modal>
+
+      {/* Deal Image Viewer */}
+      <Modal
+        visible={imageViewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setImageViewerVisible(false)}
+      >
+        <View style={styles.viewerOverlay}>
+          <View style={styles.viewerTopBar}>
+            <Text style={styles.viewerCounter}>
+              {(imageViewerIndex || 0) + 1}/{imageViewerImages.length || 0}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setImageViewerVisible(false)}
+              style={styles.viewerCloseBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={26} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+
+          <FlatList
+            data={imageViewerImages}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(uri, idx) => `${uri}-${idx}`}
+            initialScrollIndex={imageViewerIndex}
+            getItemLayout={(_, index) => ({ length: width, offset: width * index, index })}
+            onMomentumScrollEnd={(e) => {
+              const next = Math.round(e.nativeEvent.contentOffset.x / width);
+              setImageViewerIndex(next);
+            }}
+            renderItem={({ item: uri }) => (
+              <View style={styles.viewerPage}>
+                <Image source={{ uri }} style={styles.viewerImage} resizeMode="contain" />
+              </View>
+            )}
+          />
         </View>
       </Modal>
     </View>
@@ -868,6 +982,8 @@ const styles = StyleSheet.create({
   miniLogo: { width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.border },
   restaurantName: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
   expiresText: { fontSize: 11, color: '#F59E0B', marginTop: 4 },
+  dealPhoneRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  dealPhoneText: { fontSize: 12, color: COLORS.primary, fontWeight: '700' },
   viewsPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -888,6 +1004,20 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   playVideoText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
+  // Image viewer
+  viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.96)' },
+  viewerTopBar: {
+    paddingTop: 52,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  viewerCounter: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  viewerCloseBtn: { padding: 6 },
+  viewerPage: { width, flex: 1, justifyContent: 'center', alignItems: 'center' },
+  viewerImage: { width, height: '80%' },
   // Restaurant card
   restaurantCard: {
     backgroundColor: COLORS.surface, borderRadius: 14, padding: 14, marginBottom: 12,

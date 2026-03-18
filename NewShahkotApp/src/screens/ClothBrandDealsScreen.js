@@ -383,6 +383,16 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
             {item.brand?.image && <Image source={{ uri: item.brand.image }} style={styles.miniLogo} />}
             <Text style={styles.brandName} numberOfLines={1}>👔 {item.brand?.name || 'Brand'}</Text>
           </View>
+          {item.brand?.phone ? (
+            <TouchableOpacity
+              onPress={() => callPhone(item.brand.phone)}
+              style={styles.dealPhoneRow}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="call" size={14} color={COLORS.primary} />
+              <Text style={styles.dealPhoneText}>{item.brand.phone}</Text>
+            </TouchableOpacity>
+          ) : null}
           {item.expiresAt && (
             <Text style={styles.expiresText}>
               ⏰ Expires: {new Date(item.expiresAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}
@@ -969,6 +979,8 @@ const styles = StyleSheet.create({
   miniLogo: { width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.border },
   brandName: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
   expiresText: { fontSize: 11, color: '#F59E0B', marginTop: 4 },
+  dealPhoneRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  dealPhoneText: { fontSize: 12, color: COLORS.primary, fontWeight: '700' },
   // Brand card
   brandCard: {
     backgroundColor: COLORS.surface, borderRadius: 14, padding: 14, marginBottom: 12,

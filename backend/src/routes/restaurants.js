@@ -4,7 +4,7 @@ const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
 const { authenticate, adminOnly } = require('../middleware/auth');
 const { upload, uploadListingMedia, ALLOWED_VIDEO_TYPES } = require('../utils/upload');
-const { uploadImageFile } = require('../utils/imageUpload');
+const { uploadImageFile, uploadMultipleImages } = require('../utils/imageUpload');
 const { uploadMultipleVideosToCloudinary } = require('../utils/cloudinaryUpload');
 
 const router = express.Router();
@@ -109,7 +109,7 @@ router.get('/:id', async (req, res) => {
           orderBy: { createdAt: 'desc' },
           select: {
             id: true, title: true, description: true, price: true,
-            originalPrice: true, image: true, videos: true, expiresAt: true, createdAt: true,
+            originalPrice: true, image: true, images: true, videos: true, expiresAt: true, createdAt: true,
           },
         },
       },
@@ -298,11 +298,15 @@ router.post('/owner/deals', authenticateRestaurant, uploadListingMedia.array('me
     }
 
     let imageUrl = null;
+    let imageUrls = [];
     let videoUrls = [];
     if (req.files && req.files.length > 0) {
-      const imageFile = req.files.find(f => !ALLOWED_VIDEO_TYPES.includes(f.mimetype));
+      const imageFiles = req.files.filter(f => !ALLOWED_VIDEO_TYPES.includes(f.mimetype));
       const videoFiles = req.files.filter(f => ALLOWED_VIDEO_TYPES.includes(f.mimetype));
-      if (imageFile) imageUrl = await uploadImageFile(imageFile);
+      if (imageFiles.length > 0) {
+        imageUrls = await uploadMultipleImages(imageFiles);
+        imageUrl = imageUrls[0] || null; // keep legacy single image populated
+      }
       if (videoFiles.length > 0) videoUrls = await uploadMultipleVideosToCloudinary(videoFiles, 'shahkot/restaurants');
     }
 
@@ -314,6 +318,7 @@ router.post('/owner/deals', authenticateRestaurant, uploadListingMedia.array('me
         price: price || null,
         originalPrice: originalPrice || null,
         image: imageUrl,
+        images: imageUrls,
         videos: videoUrls,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
       },
