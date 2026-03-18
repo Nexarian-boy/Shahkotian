@@ -216,7 +216,12 @@ export default function RestaurantDealsScreen({ navigation, route }) {
       fd.append('price', dealPrice.trim());
       fd.append('originalPrice', dealOriginalPrice.trim());
       if (dealImage) {
-        fd.append('image', { uri: dealImage.uri, type: 'image/jpeg', name: 'deal.jpg' });
+        const isVideo = dealImage.type === 'video';
+        fd.append(isVideo ? 'media' : 'image', {
+          uri: dealImage.uri,
+          type: isVideo ? 'video/mp4' : 'image/jpeg',
+          name: isVideo ? 'deal_video.mp4' : 'deal.jpg',
+        });
       }
       await restaurantsAPI.ownerCreateDeal(ownerToken, fd);
       Alert.alert(t('done') + ' 🎉', t('dealAdded'));
@@ -249,7 +254,10 @@ export default function RestaurantDealsScreen({ navigation, route }) {
   };
 
   const pickDealImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      quality: 0.8,
+    });
     if (!result.canceled) setDealImage(result.assets[0]);
   };
 

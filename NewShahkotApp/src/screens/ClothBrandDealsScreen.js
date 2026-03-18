@@ -213,7 +213,7 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
   // ── Owner: pick media (images + video) ────────────────────────────────
   const pickDealMedia = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images', 'videos'],
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsMultipleSelection: true,
       quality: 0.8,
       selectionLimit: 6,
