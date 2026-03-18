@@ -347,6 +347,7 @@ export const restaurantsAPI = {
   getOne: (id) => api.get(`/restaurants/${id}`),
   getAllDeals: () => api.get('/restaurants/deals/all'),
   likeDeal: (dealId) => api.post(`/restaurants/deals/${dealId}/like`),
+  viewDeal: (dealId) => api.post(`/restaurants/deals/${dealId}/view`),
   // Admin
   adminCreate: (formData) => api.post('/restaurants/admin/create', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -375,6 +376,7 @@ export const clothBrandsAPI = {
   getOne: (id) => api.get(`/cloth-brands/${id}`),
   getAllDeals: () => api.get('/cloth-brands/deals/all'),
   likeDeal: (dealId) => api.post(`/cloth-brands/deals/${dealId}/like`),
+  viewDeal: (dealId) => api.post(`/cloth-brands/deals/${dealId}/view`),
   // Admin
   adminCreate: (formData) => api.post('/cloth-brands/admin/create', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

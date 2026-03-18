@@ -477,6 +477,7 @@ model Deal {
   price         String?
   originalPrice String?
   image         String?
+  videos        String[]   @default([])
   isActive      Boolean    @default(true)
   expiresAt     DateTime?
   createdAt     DateTime   @default(now())

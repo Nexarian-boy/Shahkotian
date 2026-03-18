@@ -375,4 +375,17 @@ router.post('/deals/:dealId/like', authenticate, async (req, res) => {
   }
 });
 
+router.post('/deals/:dealId/view', async (req, res) => {
+  try {
+    const updated = await prisma.brandDeal.update({
+      where: { id: req.params.dealId },
+      data: { views: { increment: 1 } },
+      select: { views: true },
+    });
+    res.json({ views: updated.views });
+  } catch {
+    res.status(500).json({ error: 'Failed.' });
+  }
+});
+
 module.exports = router;

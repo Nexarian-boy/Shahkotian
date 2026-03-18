@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { Video } from 'expo-av';
 import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { clothBrandsAPI } from '../services/api';
@@ -57,6 +58,10 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
   const [imageViewerImages, setImageViewerImages] = useState([]);
   const [imageViewerIndex, setImageViewerIndex] = useState(0);
 
+  // Video viewer (for deal videos)
+  const [videoViewerVisible, setVideoViewerVisible] = useState(false);
+  const [videoViewerUrl, setVideoViewerUrl] = useState(null);
+
   useEffect(() => {
     loadData();
     const p = route?.params;
@@ -73,6 +78,12 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
     setImageViewerImages(images);
     setImageViewerIndex(safeIndex);
     setImageViewerVisible(true);
+  };
+
+  const openVideoViewer = (url) => {
+    if (!url) return;
+    setVideoViewerUrl(url);
+    setVideoViewerVisible(true);
   };
 
   const loadData = async () => {
@@ -304,7 +315,18 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
     if (item.type === 'AD_ITEM') return <AdBanner />;
     const firstImage = item.images?.[0];
     return (
-      <TouchableOpacity style={styles.dealCard} onPress={() => loadBrandDetail(item.brand?.id || item.brandId)}>
+      <TouchableOpacity
+        style={styles.dealCard}
+        onPress={() => {
+          clothBrandsAPI.viewDeal(item.id).then((res) => {
+            const views = res?.data?.views;
+            if (typeof views === 'number') {
+              setAllDeals(prev => prev.map(d => (d.id === item.id ? { ...d, views } : d)));
+            }
+          }).catch(() => {});
+          loadBrandDetail(item.brand?.id || item.brandId);
+        }}
+      >
         {firstImage && (
           <TouchableOpacity activeOpacity={0.9} onPress={() => openImageViewer(item.images || [], 0)}>
             <Image source={{ uri: firstImage }} style={styles.dealImage} />
@@ -323,7 +345,7 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
             {item.originalPrice && <Text style={styles.originalPrice}>{item.originalPrice}</Text>}
             {item.price && <Text style={styles.dealPrice}>{item.price}</Text>}
           </View>
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4 }}>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4, flexWrap: 'wrap' }}>
             <TouchableOpacity
               onPress={() => toggleDealLike(item.id)}
               style={{
@@ -341,6 +363,21 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
                 {item.likedBy?.length || 0}
               </Text>
             </TouchableOpacity>
+
+            <View style={styles.viewsPill}>
+              <Ionicons name="eye" size={16} color={COLORS.textPrimary} />
+              <Text style={styles.viewsText}>{item.views || 0}</Text>
+            </View>
+
+            {item.videos?.[0] ? (
+              <TouchableOpacity
+                onPress={() => openVideoViewer(item.videos[0])}
+                style={styles.playVideoBtn}
+              >
+                <Ionicons name="play" size={16} color="#FFF" />
+                <Text style={styles.playVideoText}>Play</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
           <View style={styles.brandTag}>
             {item.brand?.image && <Image source={{ uri: item.brand.image }} style={styles.miniLogo} />}
@@ -725,6 +762,38 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
         </View>
       </Modal>
 
+      {/* Deal Video Viewer */}
+      <Modal
+        visible={videoViewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setVideoViewerVisible(false); setVideoViewerUrl(null); }}
+      >
+        <View style={styles.viewerOverlay}>
+          <View style={styles.viewerTopBar}>
+            <Text style={styles.viewerCounter}>Video</Text>
+            <TouchableOpacity
+              onPress={() => { setVideoViewerVisible(false); setVideoViewerUrl(null); }}
+              style={styles.viewerCloseBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={26} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.viewerPage}>
+            {videoViewerUrl ? (
+              <Video
+                source={{ uri: videoViewerUrl }}
+                style={styles.viewerVideo}
+                useNativeControls
+                resizeMode="contain"
+                shouldPlay
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
       {/* Add Brand Modal */}
       <Modal visible={showAddBrand} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
@@ -986,4 +1055,26 @@ const styles = StyleSheet.create({
   viewerCloseBtn: { padding: 6 },
   viewerPage: { width, flex: 1, justifyContent: 'center', alignItems: 'center' },
   viewerImage: { width, height: '80%' },
+  viewerVideo: { width, height: '80%', backgroundColor: '#000' },
+
+  viewsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+  },
+  viewsText: { fontSize: 15, color: COLORS.textPrimary, fontWeight: '700' },
+  playVideoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+  },
+  playVideoText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
 });

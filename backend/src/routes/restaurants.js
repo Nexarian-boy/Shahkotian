@@ -3,8 +3,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/database');
 const { authenticate, adminOnly } = require('../middleware/auth');
-const { upload } = require('../utils/upload');
+const { upload, uploadListingMedia, ALLOWED_VIDEO_TYPES } = require('../utils/upload');
 const { uploadImageFile } = require('../utils/imageUpload');
+const { uploadMultipleVideosToCloudinary } = require('../utils/cloudinaryUpload');
 
 const router = express.Router();
 
@@ -108,7 +109,7 @@ router.get('/:id', async (req, res) => {
           orderBy: { createdAt: 'desc' },
           select: {
             id: true, title: true, description: true, price: true,
-            originalPrice: true, image: true, expiresAt: true, createdAt: true,
+            originalPrice: true, image: true, videos: true, expiresAt: true, createdAt: true,
           },
         },
       },
@@ -289,7 +290,7 @@ function authenticateRestaurant(req, res, next) {
  * POST /api/restaurants/owner/deals
  * Restaurant owner creates a deal
  */
-router.post('/owner/deals', authenticateRestaurant, upload.single('image'), async (req, res) => {
+router.post('/owner/deals', authenticateRestaurant, uploadListingMedia.array('media', 6), async (req, res) => {
   try {
     const { title, description, price, originalPrice, expiresAt } = req.body;
     if (!title) {
@@ -297,8 +298,12 @@ router.post('/owner/deals', authenticateRestaurant, upload.single('image'), asyn
     }
 
     let imageUrl = null;
-    if (req.file) {
-      imageUrl = await uploadImageFile(req.file);
+    let videoUrls = [];
+    if (req.files && req.files.length > 0) {
+      const imageFile = req.files.find(f => !ALLOWED_VIDEO_TYPES.includes(f.mimetype));
+      const videoFiles = req.files.filter(f => ALLOWED_VIDEO_TYPES.includes(f.mimetype));
+      if (imageFile) imageUrl = await uploadImageFile(imageFile);
+      if (videoFiles.length > 0) videoUrls = await uploadMultipleVideosToCloudinary(videoFiles, 'shahkot/restaurants');
     }
 
     const deal = await prisma.deal.create({
@@ -309,6 +314,7 @@ router.post('/owner/deals', authenticateRestaurant, upload.single('image'), asyn
         price: price || null,
         originalPrice: originalPrice || null,
         image: imageUrl,
+        videos: videoUrls,
         expiresAt: expiresAt ? new Date(expiresAt) : null,
       },
     });
@@ -378,6 +384,19 @@ router.post('/deals/:dealId/like', authenticate, async (req, res) => {
       select: { likedBy: true },
     });
     res.json({ liked: !alreadyLiked, likeCount: updated.likedBy.length });
+  } catch {
+    res.status(500).json({ error: 'Failed.' });
+  }
+});
+
+router.post('/deals/:dealId/view', async (req, res) => {
+  try {
+    const updated = await prisma.deal.update({
+      where: { id: req.params.dealId },
+      data: { views: { increment: 1 } },
+      select: { views: true },
+    });
+    res.json({ views: updated.views });
   } catch {
     res.status(500).json({ error: 'Failed.' });
   }

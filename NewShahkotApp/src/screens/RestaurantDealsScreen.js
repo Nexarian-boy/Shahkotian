@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { Video } from 'expo-av';
 import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { restaurantsAPI } from '../services/api';
@@ -49,6 +50,16 @@ export default function RestaurantDealsScreen({ navigation, route }) {
   const [dealImage, setDealImage] = useState(null);
   const [dealSubmitting, setDealSubmitting] = useState(false);
   const [showOwnerLoginModal, setShowOwnerLoginModal] = useState(false);
+
+  // Video viewer for deals
+  const [videoViewerVisible, setVideoViewerVisible] = useState(false);
+  const [videoViewerUrl, setVideoViewerUrl] = useState(null);
+
+  const openVideoViewer = (url) => {
+    if (!url) return;
+    setVideoViewerUrl(url);
+    setVideoViewerVisible(true);
+  };
 
   useEffect(() => {
     loadData();
@@ -294,9 +305,22 @@ export default function RestaurantDealsScreen({ navigation, route }) {
     return (
     <TouchableOpacity
       style={styles.dealCard}
-      onPress={() => loadRestaurantDetail(item.restaurant?.id || item.restaurantId)}
+      onPress={() => {
+        restaurantsAPI.viewDeal(item.id).then((res) => {
+          const views = res?.data?.views;
+          if (typeof views === 'number') {
+            setAllDeals(prev => prev.map(d => (d.id === item.id ? { ...d, views } : d)));
+          }
+        }).catch(() => {});
+        loadRestaurantDetail(item.restaurant?.id || item.restaurantId);
+      }}
     >
       {item.image && <Image source={{ uri: item.image }} style={styles.dealImage} />}
+      {!item.image && item.videos?.[0] ? (
+        <View style={[styles.dealImage, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+          <Ionicons name="videocam" size={26} color="#FFF" />
+        </View>
+      ) : null}
       <View style={styles.dealInfo}>
         <Text style={styles.dealTitle} numberOfLines={2}>{item.title}</Text>
         {item.description && <Text style={styles.dealDesc} numberOfLines={2}>{item.description}</Text>}
@@ -306,7 +330,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
           )}
           {item.price && <Text style={styles.dealPrice}>{item.price}</Text>}
         </View>
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4 }}>
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4, flexWrap: 'wrap' }}>
           <TouchableOpacity
             onPress={() => toggleDealLike(item.id)}
             style={{
@@ -324,6 +348,18 @@ export default function RestaurantDealsScreen({ navigation, route }) {
               {item.likedBy?.length || 0}
             </Text>
           </TouchableOpacity>
+
+          <View style={styles.viewsPill}>
+            <Ionicons name="eye" size={16} color={COLORS.textPrimary} />
+            <Text style={styles.viewsText}>{item.views || 0}</Text>
+          </View>
+
+          {item.videos?.[0] ? (
+            <TouchableOpacity onPress={() => openVideoViewer(item.videos[0])} style={styles.playVideoBtn}>
+              <Ionicons name="play" size={16} color="#FFF" />
+              <Text style={styles.playVideoText}>Play</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
         <View style={styles.restaurantTag}>
           {item.restaurant?.image && (
@@ -620,6 +656,13 @@ export default function RestaurantDealsScreen({ navigation, route }) {
                 {(selectedRestaurant.deals || []).map(deal => (
                   <View key={deal.id} style={styles.detailDeal}>
                     {deal.image && <Image source={{ uri: deal.image }} style={styles.detailDealImage} />}
+                    {!deal.image && deal.videos?.[0] ? (
+                      <TouchableOpacity onPress={() => openVideoViewer(deal.videos[0])} activeOpacity={0.85}>
+                        <View style={[styles.detailDealImage, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+                          <Ionicons name="play-circle" size={44} color="#FFF" />
+                        </View>
+                      </TouchableOpacity>
+                    ) : null}
                     <Text style={styles.detailDealTitle}>{deal.title}</Text>
                     {deal.description && <Text style={styles.detailDealDesc}>{deal.description}</Text>}
                     <View style={styles.priceRow}>
@@ -763,6 +806,31 @@ export default function RestaurantDealsScreen({ navigation, route }) {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* Deal Video Viewer */}
+      <Modal
+        visible={videoViewerVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => { setVideoViewerVisible(false); setVideoViewerUrl(null); }}
+      >
+        <View style={[styles.modalOverlay, { justifyContent: 'center' }]}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <TouchableOpacity style={styles.modalClose} onPress={() => { setVideoViewerVisible(false); setVideoViewerUrl(null); }}>
+              <Ionicons name="close" size={24} color={COLORS.text} />
+            </TouchableOpacity>
+            {videoViewerUrl ? (
+              <Video
+                source={{ uri: videoViewerUrl }}
+                style={{ width: '100%', height: 260, borderRadius: 12, backgroundColor: '#000' }}
+                useNativeControls
+                resizeMode="contain"
+                shouldPlay
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -800,6 +868,26 @@ const styles = StyleSheet.create({
   miniLogo: { width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.border },
   restaurantName: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
   expiresText: { fontSize: 11, color: '#F59E0B', marginTop: 4 },
+  viewsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+  },
+  viewsText: { fontSize: 15, color: COLORS.textPrimary, fontWeight: '700' },
+  playVideoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+  },
+  playVideoText: { color: '#FFF', fontSize: 14, fontWeight: '800' },
   // Restaurant card
   restaurantCard: {
     backgroundColor: COLORS.surface, borderRadius: 14, padding: 14, marginBottom: 12,
