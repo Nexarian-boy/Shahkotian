@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, FlatList,
   Alert, ActivityIndicator, RefreshControl, TextInput, Image, Modal,
-  KeyboardAvoidingView, Platform, Linking, Dimensions,
+  KeyboardAvoidingView, Platform, Linking, Dimensions, Animated,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { restaurantsAPI } from '../services/api';
@@ -14,6 +15,42 @@ import AdBanner from '../components/AdBanner';
 import { useLanguage } from '../context/LanguageContext';
 
 const { width } = Dimensions.get('window');
+
+function Toast({ visible, message, onHide }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!visible) return;
+    Animated.sequence([
+      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }),
+      Animated.delay(1800),
+      Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+    ]).start(() => onHide?.());
+  }, [visible, opacity, onHide]);
+
+  if (!visible) return null;
+  return (
+    <Animated.View style={[styles.toastContainer, { opacity }]}>
+      <View style={styles.toastContent}>
+        <Ionicons name="checkmark-circle" size={18} color="#FFF" />
+        <Text style={styles.toastText} numberOfLines={2}>{message}</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+function SkeletonCard() {
+  return (
+    <View style={styles.skeletonCard}>
+      <View style={styles.skeletonImage} />
+      <View style={styles.skeletonContent}>
+        <View style={styles.skeletonLine} />
+        <View style={[styles.skeletonLine, { width: '60%' }]} />
+        <View style={styles.skeletonFooter} />
+      </View>
+    </View>
+  );
+}
 
 export default function RestaurantDealsScreen({ navigation, route }) {
   const { isAdmin } = useAuth();
@@ -26,6 +63,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
   const [showAddRestaurant, setShowAddRestaurant] = useState(false);
   const [search, setSearch] = useState('');
+  const [toast, setToast] = useState({ visible: false, message: '' });
 
   // Add restaurant form
   const [formName, setFormName] = useState('');
@@ -78,6 +116,8 @@ export default function RestaurantDealsScreen({ navigation, route }) {
     setImageViewerIndex(safeIndex);
     setImageViewerVisible(true);
   };
+
+  const showToast = (message) => setToast({ visible: true, message });
 
   useEffect(() => {
     loadData();
@@ -325,6 +365,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
           }
           : d
       )));
+      showToast('Saved ❤️');
     } catch {}
   };
 
@@ -332,95 +373,116 @@ export default function RestaurantDealsScreen({ navigation, route }) {
   const renderDealCard = ({ item }) => {
     if (item.type === 'AD_ITEM') return <AdBanner />;
     const cardImages = (item.images?.length ? item.images : (item.image ? [item.image] : []));
+    const isLiked = (item.likedBy || []).includes('me');
     return (
-    <TouchableOpacity
-      style={styles.dealCard}
-      onPress={() => {
-        restaurantsAPI.viewDeal(item.id).then((res) => {
-          const views = res?.data?.views;
-          if (typeof views === 'number') {
-            setAllDeals(prev => prev.map(d => (d.id === item.id ? { ...d, views } : d)));
-          }
-        }).catch(() => {});
-        loadRestaurantDetail(item.restaurant?.id || item.restaurantId);
-      }}
-    >
-      {cardImages?.[0] ? (
-        <TouchableOpacity activeOpacity={0.9} onPress={() => openImageViewer(cardImages, 0)}>
-          <Image source={{ uri: cardImages[0] }} style={styles.dealImage} />
-        </TouchableOpacity>
-      ) : null}
-      {!item.images?.[0] && !item.image && item.videos?.[0] ? (
-        <View style={[styles.dealImage, { backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
-          <Ionicons name="videocam" size={26} color="#FFF" />
-        </View>
-      ) : null}
-      <View style={styles.dealInfo}>
-        <Text style={styles.dealTitle} numberOfLines={2}>{item.title}</Text>
-        {item.description && <Text style={styles.dealDesc} numberOfLines={2}>{item.description}</Text>}
-        <View style={styles.priceRow}>
-          {item.originalPrice && (
-            <Text style={styles.originalPrice}>{item.originalPrice}</Text>
+      <TouchableOpacity
+        style={styles.dealCardNew}
+        activeOpacity={0.95}
+        onPress={() => {
+          restaurantsAPI.viewDeal(item.id).then((res) => {
+            const views = res?.data?.views;
+            if (typeof views === 'number') {
+              setAllDeals(prev => prev.map(d => (d.id === item.id ? { ...d, views } : d)));
+            }
+          }).catch(() => {});
+          loadRestaurantDetail(item.restaurant?.id || item.restaurantId);
+        }}
+      >
+        <View style={styles.dealMediaNew}>
+          {cardImages?.[0] ? (
+            <TouchableOpacity activeOpacity={0.95} onPress={() => openImageViewer(cardImages, 0)}>
+              <Image source={{ uri: cardImages[0] }} style={styles.dealImageNew} />
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.dealImageNew, styles.dealImagePlaceholder]}>
+              <Ionicons name="restaurant" size={40} color="#9CA3AF" />
+            </View>
           )}
-          {item.price && <Text style={styles.dealPrice}>{item.price}</Text>}
-        </View>
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-          <TouchableOpacity
-            onPress={() => toggleDealLike(item.id)}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 8,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 14,
-              backgroundColor: '#FFF1F2',
-            }}
-          >
-            <Text style={{ fontSize: 18 }}>❤️</Text>
-            <Text style={{ fontSize: 15, color: COLORS.textPrimary, fontWeight: '700' }}>
-              {item.likedBy?.length || 0}
-            </Text>
-          </TouchableOpacity>
 
-          <View style={styles.viewsPill}>
-            <Ionicons name="eye" size={16} color={COLORS.textPrimary} />
-            <Text style={styles.viewsText}>{item.views || 0}</Text>
-          </View>
+          <LinearGradient
+            colors={['rgba(0,0,0,0.55)', 'transparent']}
+            style={styles.dealGradientTop}
+            pointerEvents="none"
+          />
 
           {item.videos?.[0] ? (
-            <TouchableOpacity onPress={() => openVideoViewer(item.videos[0])} style={styles.playVideoBtn}>
-              <Ionicons name="play" size={16} color="#FFF" />
-              <Text style={styles.playVideoText}>Play</Text>
+            <TouchableOpacity style={styles.playOverlayBtn} onPress={() => openVideoViewer(item.videos[0])} activeOpacity={0.9}>
+              <Ionicons name="play" size={22} color="#FFF" />
             </TouchableOpacity>
           ) : null}
-        </View>
-        <View style={styles.restaurantTag}>
-          {item.restaurant?.image && (
-            <Image source={{ uri: item.restaurant.image }} style={styles.miniLogo} />
-          )}
-          <Text style={styles.restaurantName} numberOfLines={1}>
-            🍽️ {item.restaurant?.name || 'Restaurant'}
-          </Text>
-        </View>
-        {item.restaurant?.phone ? (
+
           <TouchableOpacity
-            onPress={() => callPhone(item.restaurant.phone)}
-            style={styles.dealPhoneRow}
-            activeOpacity={0.8}
+            style={[styles.saveOverlayBtn, isLiked && { backgroundColor: 'rgba(239,68,68,0.20)' }]}
+            onPress={() => toggleDealLike(item.id)}
+            activeOpacity={0.85}
           >
-            <Ionicons name="call" size={14} color={COLORS.primary} />
-            <Text style={styles.dealPhoneText}>{item.restaurant.phone}</Text>
+            <Ionicons name={isLiked ? 'heart' : 'heart-outline'} size={22} color={isLiked ? '#EF4444' : '#FFF'} />
           </TouchableOpacity>
-        ) : null}
-        {item.expiresAt && (
-          <Text style={styles.expiresText}>
-            ⏰ Expires: {new Date(item.expiresAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}
-          </Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );};
+        </View>
+
+        <View style={styles.dealBodyNew}>
+          <View style={styles.dealHeaderRowNew}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={styles.dealTitleNew} numberOfLines={2}>{item.title}</Text>
+              {item.description ? (
+                <Text style={styles.dealDescNew} numberOfLines={2}>{item.description}</Text>
+              ) : null}
+            </View>
+            <View style={{ alignItems: 'flex-end' }}>
+              {item.price ? <Text style={styles.currentPriceNew}>{item.price}</Text> : null}
+              {item.originalPrice ? <Text style={styles.originalPriceNew}>{item.originalPrice}</Text> : null}
+            </View>
+          </View>
+
+          <View style={styles.statsRowNew}>
+            <View style={styles.statItemNew}>
+              <Ionicons name="heart" size={14} color="#EF4444" />
+              <Text style={styles.statTextNew}>{item.likedBy?.length || 0}</Text>
+            </View>
+            <View style={styles.statItemNew}>
+              <Ionicons name="eye" size={14} color="#6B7280" />
+              <Text style={styles.statTextNew}>{item.views || 0}</Text>
+            </View>
+            {item.expiresAt ? (
+              <View style={styles.statItemNew}>
+                <Ionicons name="time" size={14} color="#F59E0B" />
+                <Text style={[styles.statTextNew, { color: '#F59E0B' }]}>
+                  {new Date(item.expiresAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' })}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.dealFooterNew}>
+            <TouchableOpacity style={styles.restaurantRowNew} onPress={() => loadRestaurantDetail(item.restaurant?.id || item.restaurantId)} activeOpacity={0.9}>
+              {item.restaurant?.image ? (
+                <Image source={{ uri: item.restaurant.image }} style={styles.restaurantAvatarNew} />
+              ) : (
+                <View style={styles.restaurantAvatarFallback}>
+                  <Text style={styles.restaurantAvatarLetter}>
+                    {(item.restaurant?.name || 'R').slice(0, 1).toUpperCase()}
+                  </Text>
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.restaurantNameNew} numberOfLines={1}>{item.restaurant?.name || 'Restaurant'}</Text>
+                <Text style={styles.restaurantAddrNew} numberOfLines={1}>📍 {item.restaurant?.address || ''}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {item.restaurant?.phone ? (
+              <TouchableOpacity style={styles.callChip} onPress={() => callPhone(item.restaurant.phone)} activeOpacity={0.9}>
+                <Ionicons name="call" size={14} color="#FFF" />
+                <Text style={styles.callChipText}>Call</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={{ width: 0, height: 0 }} />
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   // Render restaurant card
   const renderRestaurantCard = ({ item }) => {
@@ -478,41 +540,67 @@ export default function RestaurantDealsScreen({ navigation, route }) {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={styles.container}>
+        <LinearGradient colors={[COLORS.primary, '#047857']} style={styles.headerNew}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
+            <Ionicons name="arrow-back" size={22} color="#FFF" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitleNew}>{t('restaurantsTitle') || 'Restaurants & Deals'}</Text>
+          <View style={{ width: 40 }} />
+        </LinearGradient>
+        <View style={{ padding: 12 }}>
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      <Toast
+        visible={toast.visible}
+        message={toast.message}
+        onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+      />
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={24} color={COLORS.white} />
+      <LinearGradient colors={[COLORS.primary, '#047857']} style={styles.headerNew}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
+          <Ionicons name="arrow-back" size={22} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('restaurantsTitle')}</Text>
-        <View style={{ width: 24 }} />
-      </View>
+        <Text style={styles.headerTitleNew}>{t('restaurantsTitle') || 'Restaurants & Deals'}</Text>
+        <View style={styles.headerBtn} />
+      </LinearGradient>
 
       {/* Tabs */}
-      <View style={styles.tabsRow}>
-        {[
-          { key: 'deals', label: '🔥 Deals', count: allDeals.length },
-          { key: 'restaurants', label: '🍽️ Restaurants', count: restaurants.length },
-          ...(ownerToken ? [{ key: 'owner', label: '👤 Owner', count: 0 }] : []),
-          ...(isAdmin ? [{ key: 'admin', label: '⚙️ Admin', count: 0 }] : []),
-        ].map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.tabsWrapNew}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScrollNew}>
+          {[
+            { key: 'deals', icon: 'flame', label: 'Deals', badge: allDeals.length },
+            { key: 'restaurants', icon: 'storefront', label: 'Restaurants', badge: null },
+            ...(ownerToken ? [{ key: 'owner', icon: 'person-circle', label: 'Owner', badge: 'NEW' }] : []),
+            ...(isAdmin ? [{ key: 'admin', icon: 'settings', label: 'Admin', badge: null }] : []),
+          ].map(tab => {
+            const active = activeTab === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.tabNew, active && styles.tabNewActive]}
+                onPress={() => setActiveTab(tab.key)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name={tab.icon} size={18} color={active ? COLORS.primary : '#6B7280'} />
+                <Text style={[styles.tabNewText, active && styles.tabNewTextActive]}>{tab.label}</Text>
+                {tab.badge != null ? (
+                  <View style={[styles.tabBadgeNew, typeof tab.badge === 'string' && { backgroundColor: '#F59E0B' }]}>
+                    <Text style={styles.tabBadgeNewText}>{tab.badge}</Text>
+                  </View>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Deals Tab */}
@@ -974,8 +1062,53 @@ export default function RestaurantDealsScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: '#F3F4F6' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  headerNew: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 52 : 24,
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+  },
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleNew: { fontSize: 19, fontWeight: '800', color: '#FFF' },
+  tabsWrapNew: {
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  tabsScrollNew: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  tabNew: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFF',
+  },
+  tabNewActive: { borderColor: COLORS.primary, backgroundColor: (COLORS.primary + '15') },
+  tabNewText: { fontSize: 13, fontWeight: '800', color: '#6B7280' },
+  tabNewTextActive: { color: COLORS.primary },
+  tabBadgeNew: {
+    backgroundColor: '#EF4444',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 2,
+  },
+  tabBadgeNewText: { color: '#FFF', fontSize: 10, fontWeight: '900' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: COLORS.primary, paddingTop: 48, paddingBottom: 14, paddingHorizontal: 16,
@@ -990,18 +1123,117 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '600' },
   tabTextActive: { color: COLORS.secondary },
   // Deal card
-  dealCard: {
-    backgroundColor: COLORS.surface, borderRadius: 14, marginBottom: 12,
-    overflow: 'hidden', elevation: 3,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6,
+  dealCardNew: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  dealImage: { width: '100%', height: 160, backgroundColor: COLORS.border },
-  dealInfo: { padding: 14 },
-  dealTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 4 },
-  dealDesc: { fontSize: 13, color: COLORS.textSecondary, marginBottom: 8, lineHeight: 18 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  originalPrice: { fontSize: 13, color: COLORS.textLight, textDecorationLine: 'line-through' },
-  dealPrice: { fontSize: 16, fontWeight: '700', color: '#10B981' },
+  dealMediaNew: { height: 200, backgroundColor: '#E5E7EB' },
+  dealImageNew: { width: '100%', height: '100%' },
+  dealImagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  dealGradientTop: { position: 'absolute', top: 0, left: 0, right: 0, height: 70 },
+  playOverlayBtn: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -26,
+    marginTop: -26,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 2,
+    borderColor: '#FFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveOverlayBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(0,0,0,0.30)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dealBodyNew: { padding: 16 },
+  dealHeaderRowNew: { flexDirection: 'row', alignItems: 'flex-start' },
+  dealTitleNew: { fontSize: 18, fontWeight: '900', color: '#111827', lineHeight: 22 },
+  dealDescNew: { fontSize: 13, color: '#6B7280', marginTop: 4, lineHeight: 18 },
+  currentPriceNew: { fontSize: 22, fontWeight: '900', color: '#059669' },
+  originalPriceNew: { fontSize: 13, color: '#9CA3AF', textDecorationLine: 'line-through', marginTop: 2 },
+  statsRowNew: {
+    flexDirection: 'row',
+    gap: 14,
+    marginTop: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  statItemNew: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statTextNew: { fontSize: 12, fontWeight: '800', color: '#6B7280' },
+  dealFooterNew: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, gap: 10 },
+  restaurantRowNew: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  restaurantAvatarNew: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#E5E7EB' },
+  restaurantAvatarFallback: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: (COLORS.primary + '20'),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restaurantAvatarLetter: { fontSize: 15, fontWeight: '900', color: COLORS.primary },
+  restaurantNameNew: { fontSize: 14, fontWeight: '900', color: '#111827' },
+  restaurantAddrNew: { fontSize: 11, color: '#6B7280', marginTop: 2 },
+  callChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: COLORS.primary,
+  },
+  callChipText: { color: '#FFF', fontSize: 12, fontWeight: '900' },
+  // Toast
+  toastContainer: { position: 'absolute', left: 0, right: 0, bottom: 90, alignItems: 'center', zIndex: 9999 },
+  toastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#111827',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 999,
+    maxWidth: '92%',
+  },
+  toastText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+
+  // Skeleton
+  skeletonCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  skeletonImage: { height: 200, backgroundColor: '#E5E7EB' },
+  skeletonContent: { padding: 16 },
+  skeletonLine: { height: 14, backgroundColor: '#E5E7EB', borderRadius: 6, marginBottom: 10, width: '80%' },
+  skeletonFooter: { height: 38, backgroundColor: '#E5E7EB', borderRadius: 10, marginTop: 10 },
   restaurantTag: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
   miniLogo: { width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.border },
   restaurantName: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
