@@ -93,6 +93,31 @@ router.get('/owner/profile', authenticateRestaurant, async (req, res) => {
 });
 
 /**
+ * GET /api/restaurants/owner/stats
+ * Aggregated deal stats for restaurant owner dashboard
+ */
+router.get('/owner/stats', authenticateRestaurant, async (req, res) => {
+  try {
+    const deals = await prisma.deal.findMany({
+      where: { restaurantId: req.restaurantId },
+      select: { views: true, likedBy: true, isActive: true },
+    });
+    const totalViews = deals.reduce((sum, d) => sum + (d.views || 0), 0);
+    const totalLikes = deals.reduce((sum, d) => sum + (d.likedBy?.length || 0), 0);
+    const activeDeals = deals.filter(d => d.isActive).length;
+    res.json({
+      totalViews,
+      totalLikes,
+      activeDeals,
+      totalRedemptions: 0,
+    });
+  } catch (error) {
+    console.error('Owner stats error:', error);
+    res.status(500).json({ error: 'Failed to load stats.' });
+  }
+});
+
+/**
  * GET /api/restaurants/:id
  * Get single restaurant with its active deals
  * NOTE: Must be defined AFTER specific string-path GET routes (/deals/all, /owner/profile)

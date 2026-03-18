@@ -359,6 +359,9 @@ export const restaurantsAPI = {
   ownerProfile: (token) => api.get('/restaurants/owner/profile', {
     headers: { Authorization: `Bearer ${token}` },
   }),
+  getOwnerStats: (token) => api.get('/restaurants/owner/stats', {
+    headers: { Authorization: `Bearer ${token}` },
+  }),
   ownerCreateDeal: (token, formData) => api.post('/restaurants/owner/deals', formData, {
     headers: { 'Content-Type': 'multipart/form-data', Authorization: `Bearer ${token}` },
   }),

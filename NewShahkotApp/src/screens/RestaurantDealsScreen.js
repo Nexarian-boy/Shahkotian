@@ -53,6 +53,9 @@ export default function RestaurantDealsScreen({ navigation, route }) {
   const [dealSubmitting, setDealSubmitting] = useState(false);
   const [showOwnerLoginModal, setShowOwnerLoginModal] = useState(false);
 
+  // Owner stats (safe optional UI)
+  const [ownerStats, setOwnerStats] = useState({ totalViews: 0, totalLikes: 0, activeDeals: 0 });
+
   // Video viewer for deals
   const [videoViewerVisible, setVideoViewerVisible] = useState(false);
   const [videoViewerUrl, setVideoViewerUrl] = useState(null);
@@ -86,6 +89,14 @@ export default function RestaurantDealsScreen({ navigation, route }) {
       setActiveTab('owner');
     }
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'owner' && ownerToken) {
+      restaurantsAPI.getOwnerStats(ownerToken)
+        .then((res) => setOwnerStats(res.data || { totalViews: 0, totalLikes: 0, activeDeals: 0 }))
+        .catch(() => {});
+    }
+  }, [activeTab, ownerToken]);
 
   const loadData = async () => {
     try {
@@ -563,6 +574,19 @@ export default function RestaurantDealsScreen({ navigation, route }) {
             <TouchableOpacity onPress={handleOwnerLogout} style={{ padding: 8, backgroundColor: '#FEE2E2', borderRadius: 8 }}>
               <Text style={{ fontSize: 12, color: '#EF4444', fontWeight: '700' }}>Logout</Text>
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.ownerStatsRow}>
+            {[
+              { label: 'Active Deals', value: ownerStats.activeDeals ?? (ownerProfile?.deals?.length || 0), color: '#10B981' },
+              { label: 'Views', value: ownerStats.totalViews || 0, color: '#3B82F6' },
+              { label: 'Likes', value: ownerStats.totalLikes || 0, color: '#EF4444' },
+            ].map((s) => (
+              <View key={s.label} style={[styles.ownerStatBox, { borderTopColor: s.color }]}>
+                <Text style={[styles.ownerStatVal, { color: s.color }]}>{s.value}</Text>
+                <Text style={styles.ownerStatLabel}>{s.label}</Text>
+              </View>
+            ))}
           </View>
 
           <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddDeal(true)}>
@@ -1045,6 +1069,18 @@ const styles = StyleSheet.create({
   },
   addBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 15 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text, marginBottom: 12 },
+  ownerStatsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  ownerStatBox: {
+    flex: 1,
+    backgroundColor: COLORS.surface,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+    borderTopWidth: 3,
+    elevation: 1,
+  },
+  ownerStatVal: { fontSize: 18, fontWeight: '900' },
+  ownerStatLabel: { fontSize: 10, color: COLORS.textLight, marginTop: 4, fontWeight: '700' },
   adminCard: {
     backgroundColor: COLORS.surface, borderRadius: 12, padding: 14, marginBottom: 10,
     borderWidth: 1, borderColor: COLORS.border,
