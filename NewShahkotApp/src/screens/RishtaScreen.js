@@ -9,6 +9,7 @@ import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { rishtaAPI, dmAPI } from '../services/api';
 import AdBanner from '../components/AdBanner';
+import ImageViewer from '../components/ImageViewer';
 
 export default function RishtaScreen({ navigation }) {
   const { user, isVerified } = useAuth();
@@ -39,6 +40,7 @@ export default function RishtaScreen({ navigation }) {
   const [cnicBack, setCnicBack] = useState(null);
   const [personalPhotos, setPersonalPhotos] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [viewerData, setViewerData] = useState(null);
 
   useEffect(() => {
     checkProfile();
@@ -480,7 +482,9 @@ export default function RishtaScreen({ navigation }) {
           {personalPhotos.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
               {personalPhotos.map((p, i) => (
-                <Image key={i} source={{ uri: p.uri }} style={{ width: 80, height: 80, borderRadius: 8, marginRight: 8 }} />
+                <TouchableOpacity key={i} onPress={() => setViewerData({ images: personalPhotos.map(photo => photo.uri), index: i })}>
+                  <Image source={{ uri: p.uri }} style={{ width: 80, height: 80, borderRadius: 8, marginRight: 8 }} />
+                </TouchableOpacity>
               ))}
             </ScrollView>
           )}
@@ -665,13 +669,18 @@ export default function RishtaScreen({ navigation }) {
                   <View style={{ marginBottom: 8 }}>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                       {item.images.map((uri, i) => (
-                        <View key={i} style={{ marginRight: 6, borderRadius: 8, overflow: 'hidden' }}>
+                        <TouchableOpacity 
+                          key={i} 
+                          style={{ marginRight: 6, borderRadius: 8, overflow: 'hidden' }}
+                          onPress={() => setViewerData({ images: item.images, index: i })}
+                          disabled={!interestAccepted}
+                        >
                           <Image
                             source={{ uri }}
                             style={{ width: 70, height: 70 }}
                             blurRadius={interestAccepted ? 0 : 20}
                           />
-                        </View>
+                        </TouchableOpacity>
                       ))}
                     </ScrollView>
                     {!interestAccepted && (
@@ -871,6 +880,15 @@ export default function RishtaScreen({ navigation }) {
               <Text style={styles.emptyText}>No shortlisted profiles</Text>
             </View>
           }
+        />
+      )}
+      {/* Image Viewer */}
+      {viewerData && (
+        <ImageViewer
+          images={viewerData.images}
+          initialIndex={viewerData.index}
+          visible={true}
+          onClose={() => setViewerData(null)}
         />
       )}
     </View>

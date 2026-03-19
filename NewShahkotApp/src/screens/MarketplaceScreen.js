@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { listingsAPI } from '../services/api';
 import AdBanner from '../components/AdBanner';
 import { useLanguage } from '../context/LanguageContext';
+import ImageViewer from '../components/ImageViewer';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +26,7 @@ export default function MarketplaceScreen() {
   const [showCreate, setShowCreate] = useState(false);
   const [selectedListing, setSelectedListing] = useState(null);
   const [showMyListings, setShowMyListings] = useState(false);
+  const [viewerData, setViewerData] = useState(null);
 
   // Create listing state
   const [title, setTitle] = useState('');
@@ -268,12 +270,13 @@ export default function MarketplaceScreen() {
                 style={styles.imageGallery}
               >
                 {item.images.map((uri, idx) => (
-                  <Image
-                    key={idx}
-                    source={{ uri }}
-                    style={styles.galleryImage}
-                    resizeMode="cover"
-                  />
+                  <TouchableOpacity key={idx} onPress={() => setViewerData({ images: item.images, index: idx })} activeOpacity={0.85}>
+                    <Image
+                      source={{ uri }}
+                      style={styles.galleryImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
                 ))}
               </ScrollView>
             ) : (
@@ -580,6 +583,16 @@ export default function MarketplaceScreen() {
 
       {/* Detail Modal */}
       {renderDetailModal()}
+
+      {/* Image Viewer */}
+      {viewerData && (
+        <ImageViewer
+          images={viewerData.images}
+          initialIndex={viewerData.index}
+          visible={true}
+          onClose={() => setViewerData(null)}
+        />
+      )}
     </View>
   );
 }

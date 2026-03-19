@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { COLORS } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { dmAPI } from '../services/api';
+import ImageViewer from '../components/ImageViewer';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -21,7 +22,7 @@ export default function DMChatScreen({ route, navigation }) {
     const [text, setText] = useState('');
     const [sending, setSending] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [previewImage, setPreviewImage] = useState(null);
+    const [viewerData, setViewerData] = useState(null);
     const flatListRef = useRef(null);
 
     useEffect(() => {
@@ -166,7 +167,7 @@ export default function DMChatScreen({ route, navigation }) {
                     {hasImages && (
                         <View style={styles.imageGrid}>
                             {item.images.map((img, idx) => (
-                                <TouchableOpacity key={idx} onPress={() => setPreviewImage(img)}>
+                                <TouchableOpacity key={idx} onPress={() => setViewerData({ images: item.images, index: idx })} activeOpacity={0.85}>
                                     <Image
                                         source={{ uri: img }}
                                         style={[
@@ -279,21 +280,15 @@ export default function DMChatScreen({ route, navigation }) {
                 </TouchableOpacity>
             </View>
 
-            {/* Image Preview Modal */}
-            <Modal visible={!!previewImage} transparent animationType="fade">
-                <View style={styles.previewOverlay}>
-                    <TouchableOpacity style={styles.previewClose} onPress={() => setPreviewImage(null)}>
-                        <Text style={styles.previewCloseText}>✕</Text>
-                    </TouchableOpacity>
-                    {previewImage && (
-                        <Image
-                            source={{ uri: previewImage }}
-                            style={styles.previewImage}
-                            resizeMode="contain"
-                        />
-                    )}
-                </View>
-            </Modal>
+            {/* Image Viewer */}
+            {viewerData && (
+                <ImageViewer
+                    images={viewerData.images}
+                    initialIndex={viewerData.index}
+                    visible={true}
+                    onClose={() => setViewerData(null)}
+                />
+            )}
         </KeyboardAvoidingView>
     );
 }

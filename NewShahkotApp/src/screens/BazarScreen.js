@@ -17,6 +17,7 @@ import { COLORS, API_URL } from '../config/constants';
 import { bazarAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import AdBanner from '../components/AdBanner';
+import ImageViewer from '../components/ImageViewer';
 
 export default function BazarScreen() {
   const { user } = useAuth();
@@ -1024,7 +1025,7 @@ export default function BazarScreen() {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 4, gap: 4 }}>
                 {item.images.map((img, i) => (
                   <View key={i} style={{ position: 'relative' }}>
-                    <TouchableOpacity onPress={() => setMediaViewer({ uri: img, type: 'image' })} activeOpacity={0.85}>
+                    <TouchableOpacity onPress={() => setMediaViewer({ uri: img, type: 'image', allImages: item.images, index: i })} activeOpacity={0.85}>
                       <Image
                         source={{ uri: img }}
                         style={{
@@ -1679,27 +1680,38 @@ export default function BazarScreen() {
   );
 
   // ========== FULL-SCREEN MEDIA VIEWER ==========
-  const renderMediaViewer = () => (
-    <Modal visible={!!mediaViewer} transparent animationType="fade" onRequestClose={() => setMediaViewer(null)}>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
-        <TouchableOpacity onPress={() => setMediaViewer(null)} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>✕</Text>
-        </TouchableOpacity>
-        {mediaViewer?.type === 'image' && (
-          <Image source={{ uri: mediaViewer.uri }} style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height * 0.75 }} resizeMode="contain" />
-        )}
-        {mediaViewer?.type === 'video' && (
-          <Video
-            source={{ uri: mediaViewer.uri }}
-            style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height * 0.65 }}
-            useNativeControls
-            resizeMode={ResizeMode.CONTAIN}
-            shouldPlay
-          />
-        )}
-      </View>
-    </Modal>
-  );
+  const renderMediaViewer = () => {
+    if (mediaViewer?.type === 'image') {
+      return (
+        <ImageViewer
+          images={mediaViewer.allImages || [mediaViewer.uri]}
+          initialIndex={mediaViewer.index || 0}
+          visible={true}
+          onClose={() => setMediaViewer(null)}
+        />
+      );
+    }
+    
+    // Fallback for videos
+    return (
+      <Modal visible={!!mediaViewer} transparent animationType="fade" onRequestClose={() => setMediaViewer(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => setMediaViewer(null)} style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 20, fontWeight: '700' }}>✕</Text>
+          </TouchableOpacity>
+          {mediaViewer?.type === 'video' && (
+            <Video
+              source={{ uri: mediaViewer.uri }}
+              style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height * 0.65 }}
+              useNativeControls
+              resizeMode={ResizeMode.CONTAIN}
+              shouldPlay
+            />
+          )}
+        </View>
+      </Modal>
+    );
+  };
 
   // ========== LOADING ==========
   if (loading) {

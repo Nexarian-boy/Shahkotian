@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import AdBanner from '../components/AdBanner';
+import ImageViewer from '../components/ImageViewer';
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout, isAdmin, updateUser } = useAuth();
@@ -19,6 +20,7 @@ export default function ProfileScreen({ navigation }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [viewerData, setViewerData] = useState(null);
 
   const handleDeleteAccount = async () => {
     if (!deleteConfirmed) return;
@@ -92,11 +94,15 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const showPhotoOptions = () => {
-    Alert.alert('Profile Photo', 'Choose an option', [
+    const options = [
       { text: 'Take Photo', onPress: takeProfilePhoto },
       { text: 'Choose from Gallery', onPress: pickProfilePhoto },
       { text: 'Cancel', style: 'cancel' },
-    ]);
+    ];
+    if (user?.photoUrl) {
+      options.unshift({ text: 'View Photo', onPress: () => setViewerData({ images: [user.photoUrl], index: 0 }) });
+    }
+    Alert.alert('Profile Photo', 'Choose an option', options);
   };
 
   const savePhoneNumbers = async () => {
@@ -369,6 +375,16 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* Image Viewer */}
+      {viewerData && (
+        <ImageViewer
+          images={viewerData.images}
+          initialIndex={viewerData.index}
+          visible={true}
+          onClose={() => setViewerData(null)}
+        />
+      )}
     </ScrollView>
   );
 }

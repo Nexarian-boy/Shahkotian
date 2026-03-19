@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { newsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import AdBanner from '../components/AdBanner';
+import ImageViewer from '../components/ImageViewer';
 
 export default function NewsScreen() {
   const { isAdmin } = useAuth();
@@ -20,6 +21,7 @@ export default function NewsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedArticle, setSelectedArticle] = useState(null);
+  const [viewerData, setViewerData] = useState(null);
 
   // Create article state
   const [showCreate, setShowCreate] = useState(false);
@@ -244,7 +246,14 @@ export default function NewsScreen() {
             </View>
             <ScrollView contentContainerStyle={{ padding: 16 }}>
               {selectedArticle.images?.length > 0 && (
-                <Image source={{ uri: selectedArticle.images[0] }} style={styles.detailImage} resizeMode="cover" />
+                <TouchableOpacity onPress={() => setViewerData({ images: selectedArticle.images, index: 0 })} activeOpacity={0.85}>
+                  <Image source={{ uri: selectedArticle.images[0] }} style={styles.detailImage} resizeMode="cover" />
+                  {selectedArticle.images.length > 1 && (
+                    <View style={{ position: 'absolute', bottom: 20, right: 10, backgroundColor: 'rgba(0,0,0,0.6)', padding: 6, borderRadius: 10 }}>
+                       <Text style={{ color: '#fff', fontSize: 12 }}>+ {selectedArticle.images.length - 1} more</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
               )}
               {selectedArticle.videos?.length > 0 && (
                 <Video
@@ -380,6 +389,16 @@ export default function NewsScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Image Viewer */}
+      {viewerData && (
+        <ImageViewer
+          images={viewerData.images}
+          initialIndex={viewerData.index}
+          visible={true}
+          onClose={() => setViewerData(null)}
+        />
+      )}
     </View>
   );
 }

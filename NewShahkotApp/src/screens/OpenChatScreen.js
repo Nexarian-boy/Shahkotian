@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { chatAPI } from '../services/api';
 import AdBanner from '../components/AdBanner';
+import ImageViewer from '../components/ImageViewer';
 
 // WhatsApp-style dark theme
 const COLORS = {
@@ -61,6 +62,7 @@ export default function OpenChatScreen({ navigation }) {
     const recordingTimerRef= useRef(null);
     const soundRef         = useRef(null);
     const playingIdRef     = useRef(null);
+    const [viewerData, setViewerData] = useState(null);
 
     // Load messages — smart merge so poll does NOT replace existing messages
     const loadMessages = useCallback(async (pageNum = 1, append = false) => {
@@ -432,7 +434,9 @@ export default function OpenChatScreen({ navigation }) {
                         {item.images?.length > 0 && (
                             <View style={styles.imageGrid}>
                                 {item.images.map((uri, i) => (
-                                    <Image key={i} source={{ uri }} style={styles.msgImage} />
+                                    <TouchableOpacity key={i} onPress={() => setViewerData({ images: item.images, index: i })} activeOpacity={0.85}>
+                                        <Image source={{ uri }} style={styles.msgImage} />
+                                    </TouchableOpacity>
                                 ))}
                             </View>
                         )}
@@ -689,6 +693,16 @@ export default function OpenChatScreen({ navigation }) {
                     </>
                 )}
             </View>
+
+            {/* Image Viewer */}
+            {viewerData && (
+                <ImageViewer
+                    images={viewerData.images}
+                    initialIndex={viewerData.index}
+                    visible={true}
+                    onClose={() => setViewerData(null)}
+                />
+            )}
         </KeyboardAvoidingView>
     );
 }
