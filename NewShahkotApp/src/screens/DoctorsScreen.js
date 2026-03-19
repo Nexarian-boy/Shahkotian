@@ -44,6 +44,24 @@ const STATUS_LABELS = {
   NO_SHOW: 'No Show',
 };
 
+const renderScheduleSummary = (item) => {
+  const schedule = Array.isArray(item.schedule) ? item.schedule : [];
+  if (schedule.length > 0) {
+    return schedule.map(s => (
+      <Text key={s.day} style={styles.timingsText}>
+        📅 {s.day}: {formatTo12Hour(s.startTime)} – {formatTo12Hour(s.endTime)}
+      </Text>
+    ));
+  }
+  if (item.startTime && item.endTime) {
+    return <Text style={styles.timingsText}>🕐 {formatTo12Hour(item.startTime)} – {formatTo12Hour(item.endTime)}</Text>;
+  }
+  if (item.weekdays) {
+    return <Text style={styles.timingsText}>📅 {item.weekdays}</Text>;
+  }
+  return null;
+};
+
 export default function DoctorsScreen({ navigation, route }) {
   const { isAdmin, user } = useAuth();
   const { t } = useLanguage();
@@ -538,8 +556,7 @@ export default function DoctorsScreen({ navigation, route }) {
           )}
         </View>
         <Text style={styles.addressText}>📍 {item.address}</Text>
-        {item.startTime && item.endTime && <Text style={styles.timingsText}>🕐 {formatTo12Hour(item.startTime)} - {formatTo12Hour(item.endTime)}</Text>}
-        {item.weekdays && <Text style={styles.timingsText}>📅 {item.weekdays}</Text>}
+        {renderScheduleSummary(item)}
         {item.fee != null && <Text style={styles.feeText}>💰 Rs. {item.fee}</Text>}
         {item.isAvailableNow
           ? <View style={styles.availableNow}><Text style={styles.availableNowText}>🟢 Available Now</Text></View>
@@ -666,8 +683,26 @@ export default function DoctorsScreen({ navigation, route }) {
             <View style={{ padding: 20 }}>
               {item.clinicName && <DetailRow label="Clinic" value={item.clinicName} />}
               <DetailRow label="Address" value={item.address} />
-              {item.startTime && item.endTime && <DetailRow label="Hours" value={`${formatTo12Hour(item.startTime)} - ${formatTo12Hour(item.endTime)}`} />}
-              {item.weekdays && <DetailRow label="Available Days" value={item.weekdays} />}
+              {Array.isArray(item.schedule) && item.schedule.length > 0 ? (
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontSize: 12, color: COLORS.textLight, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 }}>
+                    Schedule
+                  </Text>
+                  {item.schedule.map(s => (
+                    <View key={s.day} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: COLORS.border }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: COLORS.text }}>{s.day}</Text>
+                      <Text style={{ fontSize: 14, color: COLORS.textSecondary }}>
+                        {formatTo12Hour(s.startTime)} – {formatTo12Hour(s.endTime)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <>
+                  {item.startTime && item.endTime && <DetailRow label="Hours" value={`${formatTo12Hour(item.startTime)} – ${formatTo12Hour(item.endTime)}`} />}
+                  {item.weekdays && <DetailRow label="Available Days" value={item.weekdays} />}
+                </>
+              )}
               {item.fee != null && <DetailRow label="Fee" value={`Rs. ${item.fee}`} highlight />}
               <DetailRow label="Phone" value={item.phone} />
               {item.onlineBooking && (
@@ -721,17 +756,19 @@ export default function DoctorsScreen({ navigation, route }) {
       }>
         {/* Profile Summary */}
         <View style={styles.dashCard}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, marginRight: 12 }}>
               <Text style={styles.dashTitle}>Dr. {doctorProfile?.name}</Text>
               <Text style={styles.dashSub}>📍 {doctorProfile?.address}</Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <TouchableOpacity style={styles.editBtn} onPress={openEditProfile}>
-                <Text style={styles.editBtnText}>Edit</Text>
+            <View style={{ gap: 8 }}>
+              <TouchableOpacity style={styles.editBtnNew} onPress={openEditProfile}>
+                <Ionicons name="create-outline" size={14} color={COLORS.primary} />
+                <Text style={styles.editBtnNewText}>Edit Profile</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.logoutBtn} onPress={handleDoctorLogout}>
-                <Text style={styles.logoutBtnText}>Logout</Text>
+              <TouchableOpacity style={styles.logoutBtnNew} onPress={handleDoctorLogout}>
+                <Ionicons name="log-out-outline" size={14} color={COLORS.white} />
+                <Text style={styles.logoutBtnNewText}>Logout</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -802,8 +839,16 @@ export default function DoctorsScreen({ navigation, route }) {
             </Text>
           </Text>
           {doc?.paymentMethod && <Text style={styles.settingRow}>Payment: {doc.paymentMethod} — {doc.paymentAccount}</Text>}
-          {doc?.startTime && <Text style={styles.settingRow}>Hours: {formatTo12Hour(doc.startTime)} - {formatTo12Hour(doc.endTime)}</Text>}
-          {doc?.weekdays ? <Text style={styles.settingRow}>Days: {doc.weekdays}</Text> : null}
+          {Array.isArray(doc?.schedule) && doc.schedule.length > 0 && (
+            <View style={{ marginTop: 4 }}>
+              <Text style={[styles.settingRow, { fontWeight: '700', marginBottom: 4 }]}>Schedule:</Text>
+              {doc.schedule.map(s => (
+                <Text key={s.day} style={styles.settingRow}>
+                  • {s.day}: {formatTo12Hour(s.startTime)} – {formatTo12Hour(s.endTime)}
+                </Text>
+              ))}
+            </View>
+          )}
           <Text style={styles.settingRow}>Avg time per patient: {doc?.avgConsultTime || 15} min</Text>
         </View>
 
@@ -1755,4 +1800,21 @@ const styles = StyleSheet.create({
   availToggleOn: { backgroundColor: '#D1FAE5', borderWidth: 1, borderColor: '#6EE7B7' },
   availToggleOff: { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: COLORS.border },
   availToggleText: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+
+  editBtnNew: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: COLORS.primary + '15',
+    borderWidth: 1, borderColor: COLORS.primary,
+    borderRadius: 10,
+  },
+  editBtnNewText: { color: COLORS.primary, fontSize: 12, fontWeight: '700' },
+
+  logoutBtnNew: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: '#EF4444',
+    borderRadius: 10,
+  },
+  logoutBtnNewText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
 });
