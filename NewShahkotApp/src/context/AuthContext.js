@@ -20,6 +20,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  // isNewUser is now only a transient hint; the source of truth is AsyncStorage 'pendingOnboarding'
   const [isNewUser, setIsNewUser] = useState(false);
 
   useEffect(() => {
@@ -106,7 +107,9 @@ export function AuthProvider({ children }) {
     const response = await authAPI.register(userData);
     const { token: newToken, user: newUser } = response.data;
 
-    // STEP 1: Clear onboarding flag FIRST — must complete before auth state changes
+    // STEP 1: Mark pending onboarding in storage BEFORE auth state flips
+    // This is more reliable than in-memory state for cross-render communication
+    await AsyncStorage.setItem('pendingOnboarding', 'true');
     await AsyncStorage.removeItem('hasSeenOnboarding');
 
     // STEP 2: Save token and user
@@ -115,11 +118,7 @@ export function AuthProvider({ children }) {
       AsyncStorage.setItem('user', JSON.stringify(newUser)),
     ]);
 
-    // Mark as new user before auth state flips, so onboarding shows reliably.
-    setIsNewUser(true);
-
     // STEP 3: Update state LAST — this triggers isAuthenticated = true
-    // By this point hasSeenOnboarding is already cleared
     setToken(newToken);
     setUser(newUser);
 

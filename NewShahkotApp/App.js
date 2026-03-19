@@ -115,11 +115,18 @@ function MainTabs() {
 
 // Auth Flow Navigation
 function AppNavigator() {
-  const { isAuthenticated, loading, isNewUser, setIsNewUser } = useAuth();
+  const { isAuthenticated, loading, setIsNewUser } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [showGreeting, setShowGreeting] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [greetingPhase, setGreetingPhase] = useState(0);
+
+  const GREETINGS = [
+    { arabic: 'الحمد للہ', transliteration: 'Alhumdulillah', meaning: 'All praise is for Allah' },
+    { arabic: 'اللہ اکبر', transliteration: 'Allahu Akbar', meaning: 'Allah is the Greatest' },
+    { arabic: 'سبحان اللہ', transliteration: 'SubhanAllah', meaning: 'Glory be to Allah' },
+  ];
 
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2500);
@@ -129,27 +136,31 @@ function AppNavigator() {
   // Check onboarding status when authentication changes
   useEffect(() => {
     let greetingTimer;
+    let phaseTimer;
 
     if (isAuthenticated) {
-      // New signup path: bypass storage read to avoid race with navigator render.
-      if (isNewUser) {
-        setIsNewUser(false);
-        setNeedsOnboarding(true);
-        setShowGreeting(false);
-        setOnboardingChecked(true);
-        return;
-      }
-
-      AsyncStorage.getItem('hasSeenOnboarding').then((val) => {
-        if (val !== 'true') {
-          // First time — show full onboarding
+      // Read the reliable AsyncStorage key set during register()
+      AsyncStorage.multiGet(['pendingOnboarding', 'hasSeenOnboarding']).then(([[, pending], [, seen]]) => {
+        if (pending === 'true') {
+          // Brand new signup: clear the flag, show full onboarding
+          AsyncStorage.removeItem('pendingOnboarding');
+          setNeedsOnboarding(true);
+          setShowGreeting(false);
+        } else if (seen !== 'true') {
+          // Edge case: hasSeenOnboarding not set yet (rare legacy case)
           setNeedsOnboarding(true);
           setShowGreeting(false);
         } else {
-          // Returning user — show only greeting for 2.5s
+          // Returning user (or re-login): show 3-second cycling greeting
           setNeedsOnboarding(false);
+          setGreetingPhase(0);
           setShowGreeting(true);
-          greetingTimer = setTimeout(() => setShowGreeting(false), 2500);
+          // Rotate phrases: 0 → 1 → 2 → hide
+          phaseTimer = setTimeout(() => setGreetingPhase(1), 1000);
+          greetingTimer = setTimeout(() => {
+            setGreetingPhase(2);
+            setTimeout(() => setShowGreeting(false), 1000);
+          }, 2000);
         }
         setOnboardingChecked(true);
       });
@@ -161,26 +172,28 @@ function AppNavigator() {
 
     return () => {
       if (greetingTimer) clearTimeout(greetingTimer);
+      if (phaseTimer) clearTimeout(phaseTimer);
     };
-  }, [isAuthenticated, isNewUser, setIsNewUser]);
+  }, [isAuthenticated]);
 
   if (showSplash || loading || !onboardingChecked) {
     return <SplashScreen />;
   }
 
-  // Show Alhumdulillah greeting overlay for returning users
+  // Show rotating Islamic greeting for returning users
   if (showGreeting) {
+    const g = GREETINGS[greetingPhase];
     return (
-      <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
         <Text style={{ fontSize: 64, marginBottom: 16 }}>🤲</Text>
         <Text style={{ fontSize: 42, fontWeight: '800', color: '#0C8A43', textAlign: 'center' }}>
-          الحمد للہ
+          {g.arabic}
         </Text>
-        <Text style={{ fontSize: 22, fontWeight: '700', color: '#1a1a1a', marginTop: 8 }}>
-          Alhumdulillah
+        <Text style={{ fontSize: 22, fontWeight: '700', color: '#1a1a1a', marginTop: 8, textAlign: 'center' }}>
+          {g.transliteration}
         </Text>
-        <Text style={{ fontSize: 14, color: '#666', marginTop: 8 }}>
-          All praise is for Allah
+        <Text style={{ fontSize: 14, color: '#666', marginTop: 8, textAlign: 'center' }}>
+          {g.meaning}
         </Text>
       </View>
     );
