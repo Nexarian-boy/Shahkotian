@@ -418,6 +418,7 @@ model Doctor {
   totalTokensToday Int             @default(0)
   isAvailableNow   Boolean         @default(false)
   weekdays         String?
+  schedule         Json?
   appointments     Appointment[]
 
   @@index([specialty])

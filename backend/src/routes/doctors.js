@@ -56,7 +56,7 @@ router.get('/', async (req, res) => {
           fee: true, education: true, experience: true, isVerified: true,
           onlineBooking: true, paymentMethod: true, startTime: true,
           endTime: true, avgConsultTime: true, currentToken: true,
-          weekdays: true, isAvailableNow: true, createdAt: true,
+          weekdays: true, isAvailableNow: true, schedule: true, createdAt: true,
         },
       }),
       prisma.doctor.count({ where }),
@@ -152,7 +152,7 @@ router.get('/me/profile', authenticateDoctor, async (req, res) => {
         email: true, onlineBooking: true, paymentMethod: true,
         paymentAccount: true, startTime: true, endTime: true,
         avgConsultTime: true, currentToken: true, totalTokensToday: true,
-        weekdays: true, isAvailableNow: true,
+        weekdays: true, isAvailableNow: true, schedule: true,
       },
     });
     if (!doctor) return res.status(404).json({ error: 'Doctor not found.' });
@@ -171,7 +171,7 @@ router.put('/me/profile', authenticateDoctor, async (req, res) => {
       'clinicName', 'address', 'phone', 'whatsapp', 'timings', 'fee',
       'education', 'experience', 'onlineBooking', 'paymentMethod',
       'paymentAccount', 'startTime', 'endTime', 'avgConsultTime',
-      'weekdays', 'isAvailableNow',
+      'weekdays', 'isAvailableNow', 'schedule'
     ];
     const data = {};
     allowed.forEach((k) => {
@@ -206,7 +206,7 @@ router.get('/me/dashboard', authenticateDoctor, async (req, res) => {
           id: true, name: true, currentToken: true, totalTokensToday: true,
           onlineBooking: true, paymentMethod: true, paymentAccount: true,
           startTime: true, endTime: true, avgConsultTime: true, fee: true,
-          weekdays: true, isAvailableNow: true,
+          weekdays: true, isAvailableNow: true, schedule: true,
         },
       }),
       prisma.appointment.findMany({
@@ -265,7 +265,7 @@ router.get('/:id', async (req, res) => {
         fee: true, education: true, experience: true, isVerified: true,
         onlineBooking: true, paymentMethod: true, startTime: true,
         endTime: true, avgConsultTime: true, currentToken: true,
-        createdAt: true,
+        schedule: true, createdAt: true,
       },
     });
     if (!doctor) return res.status(404).json({ error: 'Doctor not found.' });
@@ -287,7 +287,7 @@ router.post('/', authenticate, adminOnly, async (req, res) => {
       name, specialty, clinicName, address, phone, whatsapp,
       timings, fee, education, experience, isVerified,
       latitude, longitude, email, password, onlineBooking,
-      paymentMethod, paymentAccount, startTime, endTime, avgConsultTime, weekdays,
+      paymentMethod, paymentAccount, startTime, endTime, avgConsultTime, weekdays, schedule,
     } = req.body;
 
     if (!name || !specialty || !address || !phone) {
@@ -330,6 +330,7 @@ router.post('/', authenticate, adminOnly, async (req, res) => {
         endTime: endTime || null,
         avgConsultTime: avgConsultTime ? parseInt(avgConsultTime, 10) : 15,
         weekdays: weekdays || null,
+        schedule: schedule || null,
       },
     });
     res.status(201).json({ message: 'Doctor added successfully.', doctor });
@@ -352,7 +353,7 @@ router.put('/:id', authenticate, adminOnly, async (req, res) => {
       timings, fee, education, experience, isVerified,
       latitude, longitude, email, password, onlineBooking,
       paymentMethod, paymentAccount, startTime, endTime, avgConsultTime,
-      weekdays, isAvailableNow,
+      weekdays, isAvailableNow, schedule,
     } = req.body;
 
     const data = {};
@@ -378,6 +379,7 @@ router.put('/:id', authenticate, adminOnly, async (req, res) => {
     if (avgConsultTime !== undefined) data.avgConsultTime = parseInt(avgConsultTime, 10) || 15;
     if (weekdays !== undefined) data.weekdays = weekdays;
     if (isAvailableNow !== undefined) data.isAvailableNow = !!isAvailableNow;
+    if (schedule !== undefined) data.schedule = schedule;
 
     if (password) {
       data.password = await bcrypt.hash(password, 12);

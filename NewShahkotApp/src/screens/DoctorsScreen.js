@@ -76,6 +76,7 @@ export default function DoctorsScreen({ navigation, route }) {
   // Live token polling: { [doctorId]: { currentToken, totalTokensToday } }
   const [liveTokens, setLiveTokens] = useState({});
   const liveTokenIntervalRef = useRef(null);
+  const autoAvailCheckRef = useRef(null);
 
   // Doctor auth & dashboard
   const [doctorToken, setDoctorToken] = useState(null);
@@ -91,7 +92,7 @@ export default function DoctorsScreen({ navigation, route }) {
     phone: '', whatsapp: '', timings: '', fee: '', education: '', experience: '',
     isVerified: false, email: '', password: '', onlineBooking: false,
     paymentMethod: '', paymentAccount: '', startTime: '', endTime: '', avgConsultTime: '15',
-    weekdays: '', isAvailableNow: false,
+    weekdays: '', isAvailableNow: false, schedule: [],
   });
 
   // Doctor edit form
@@ -122,6 +123,38 @@ export default function DoctorsScreen({ navigation, route }) {
     }
     return () => stopLiveTokenPolling();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'dashboard' && doctorToken) {
+      autoAvailCheckRef.current = setInterval(async () => {
+        const doc = doctorDashboard?.doctor;
+        if (!doc?.isAvailableNow) return;
+
+        const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const now = new Date();
+        const todayName = DAY_NAMES[now.getDay()];
+        const schedule = Array.isArray(doc.schedule) ? doc.schedule : [];
+        const todayEntry = schedule.find(s => s.day === todayName);
+
+        if (!todayEntry || !todayEntry.endTime) return;
+
+        const [endH, endM] = todayEntry.endTime.split(':').map(Number);
+        const endMinutes = endH * 60 + endM;
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+        if (currentMinutes >= endMinutes) {
+          try {
+            await doctorsAPI.doctorUpdateProfile(doctorToken, { isAvailableNow: false });
+            loadDoctorDashboard();
+          } catch (_) {}
+        }
+      }, 60000); // check every 60 seconds
+    }
+
+    return () => {
+      if (autoAvailCheckRef.current) clearInterval(autoAvailCheckRef.current);
+    };
+  }, [activeTab, doctorToken, doctorDashboard]);
 
   const startLiveTokenPolling = () => {
     stopLiveTokenPolling();
@@ -203,7 +236,7 @@ export default function DoctorsScreen({ navigation, route }) {
     phone: '', whatsapp: '', timings: '', fee: '', education: '', experience: '',
     isVerified: false, email: '', password: '', onlineBooking: false,
     paymentMethod: '', paymentAccount: '', startTime: '', endTime: '', avgConsultTime: '15',
-    weekdays: '', isAvailableNow: false,
+    weekdays: '', isAvailableNow: false, schedule: [],
   });
 
   // ── Book Appointment ───────────────────────────────────────────────
@@ -356,7 +389,53 @@ export default function DoctorsScreen({ navigation, route }) {
 
   const handleToggleAvailability = async () => {
     if (!doctorToken || !doctorDashboard?.doctor) return;
-    const current = doctorDashboard.doctor.isAvailableNow;
+    const doc = doctorDashboard.doctor;
+    const current = doc.isAvailableNow;
+
+    // If turning ON — validate day and time
+    if (!current) {
+      const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const now = new Date();
+      const todayName = DAY_NAMES[now.getDay()];
+      const schedule = Array.isArray(doc.schedule) ? doc.schedule : [];
+      const todayEntry = schedule.find(s => s.day === todayName);
+
+      if (!todayEntry) {
+        Alert.alert(
+          'Not Scheduled Today',
+          `Today is ${todayName}. You have not set availability for this day. Please update your schedule in Edit Profile.`
+        );
+        return;
+      }
+
+      if (!todayEntry.startTime || !todayEntry.endTime) {
+        Alert.alert('No Time Set', `Please set start and end time for ${todayName} in Edit Profile.`);
+        return;
+      }
+
+      const [startH, startM] = todayEntry.startTime.split(':').map(Number);
+      const [endH, endM] = todayEntry.endTime.split(':').map(Number);
+      const startMinutes = startH * 60 + startM;
+      const endMinutes = endH * 60 + endM;
+      const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+      if (currentMinutes < startMinutes) {
+        Alert.alert(
+          'Too Early',
+          `Your scheduled hours for ${todayName} start at ${formatTo12Hour(todayEntry.startTime)}. You cannot go available before that.`
+        );
+        return;
+      }
+
+      if (currentMinutes >= endMinutes) {
+        Alert.alert(
+          'Session Ended',
+          `Your scheduled hours for ${todayName} ended at ${formatTo12Hour(todayEntry.endTime)}.`
+        );
+        return;
+      }
+    }
+
     try {
       await doctorsAPI.doctorUpdateProfile(doctorToken, { isAvailableNow: !current });
       loadDoctorDashboard();
@@ -380,11 +459,8 @@ export default function DoctorsScreen({ navigation, route }) {
       onlineBooking: doctorProfile.onlineBooking || false,
       paymentMethod: doctorProfile.paymentMethod || '',
       paymentAccount: doctorProfile.paymentAccount || '',
-      startTime: doctorProfile.startTime || '',
-      endTime: doctorProfile.endTime || '',
       avgConsultTime: doctorProfile.avgConsultTime ? String(doctorProfile.avgConsultTime) : '15',
-      weekdays: doctorProfile.weekdays || '',
-      isAvailableNow: doctorProfile.isAvailableNow || false,
+      schedule: Array.isArray(doctorProfile.schedule) ? doctorProfile.schedule : [],
     });
     setShowEditProfileModal(true);
   };
@@ -1106,17 +1182,10 @@ export default function DoctorsScreen({ navigation, route }) {
                 />
               </View>
             ))}
-            <WeekdaySelector label="Available Days" value={editForm.weekdays || ''} onChange={(v) => setEditForm({ ...editForm, weekdays: v })} />
-            <TimePicker12hr label="Start Time" value={editForm.startTime || ''} onChange={(v) => setEditForm({ ...editForm, startTime: v })} />
-            <TimePicker12hr label="End Time" value={editForm.endTime || ''} onChange={(v) => setEditForm({ ...editForm, endTime: v })} />
-            <TouchableOpacity
-              style={[styles.toggleBtn, editForm.isAvailableNow && { backgroundColor: '#D1FAE5', borderColor: '#10B981' }]}
-              onPress={() => setEditForm({ ...editForm, isAvailableNow: !editForm.isAvailableNow })}
-            >
-              <Text style={{ fontWeight: '600', color: editForm.isAvailableNow ? '#065F46' : COLORS.textLight }}>
-                {editForm.isAvailableNow ? '🟢 Currently Seeing Patients (Available Now)' : '⭕ Not Available Now'}
-              </Text>
-            </TouchableOpacity>
+            <WeekdayScheduleSelector
+              value={editForm.schedule}
+              onChange={(v) => setEditForm({ ...editForm, schedule: v })}
+            />
             <TouchableOpacity
               style={[styles.toggleBtn, editForm.onlineBooking && styles.toggleBtnActive]}
               onPress={() => setEditForm({ ...editForm, onlineBooking: !editForm.onlineBooking })}
@@ -1191,9 +1260,10 @@ export default function DoctorsScreen({ navigation, route }) {
 
             <View style={styles.divider} />
             <Text style={styles.sectionTitle}>� Availability</Text>
-            <WeekdaySelector label="Available Days" value={form.weekdays} onChange={(v) => setForm({ ...form, weekdays: v })} />
-            <TimePicker12hr label="Start Time" value={form.startTime} onChange={(v) => setForm({ ...form, startTime: v })} />
-            <TimePicker12hr label="End Time" value={form.endTime} onChange={(v) => setForm({ ...form, endTime: v })} />
+            <WeekdayScheduleSelector
+              value={form.schedule || []}
+              onChange={(v) => setForm({ ...form, schedule: v })}
+            />
 
             <View style={styles.divider} />
             <Text style={styles.sectionTitle}>📋 Online Booking Settings</Text>
@@ -1263,26 +1333,117 @@ function DetailRow({ label, value, highlight }) {
   );
 }
 
-function WeekdaySelector({ label, value, onChange }) {
+function WeekdayScheduleSelector({ value, onChange }) {
+  // value: array like [{day:"Mon",startTime:"09:00",endTime:"17:00"}, ...]
+  // onChange: (newArray) => void
+
   const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const selected = value ? value.split(',').map(d => d.trim()).filter(Boolean) : [];
-  const toggle = (day) => {
-    const next = selected.includes(day) ? selected.filter(d => d !== day) : [...selected, day];
-    onChange(next.join(','));
+  const [expandedDay, setExpandedDay] = useState(null);
+  const [sameForAll, setSameForAll] = useState(false);
+
+  const schedule = Array.isArray(value) ? value : [];
+
+  const isDaySelected = (day) => schedule.some(s => s.day === day);
+
+  const toggleDay = (day) => {
+    if (isDaySelected(day)) {
+      onChange(schedule.filter(s => s.day !== day));
+      if (expandedDay === day) setExpandedDay(null);
+    } else {
+      const newEntry = { day, startTime: '', endTime: '' };
+      // If sameForAll, copy times from first entry
+      if (sameForAll && schedule.length > 0) {
+        newEntry.startTime = schedule[0].startTime;
+        newEntry.endTime = schedule[0].endTime;
+      }
+      onChange([...schedule, newEntry]);
+      setExpandedDay(day);
+    }
   };
+
+  const updateDayTime = (day, field, val) => {
+    const updated = schedule.map(s => s.day === day ? { ...s, [field]: val } : s);
+    if (sameForAll) {
+      // Propagate to all selected days
+      const refEntry = updated.find(s => s.day === day);
+      onChange(updated.map(s => ({ ...s, [field]: refEntry[field] })));
+    } else {
+      onChange(updated);
+    }
+  };
+
+  const getDayEntry = (day) => schedule.find(s => s.day === day) || {};
+
   return (
-    <View style={{ marginBottom: 4 }}>
-      <Text style={styles.fieldLabel}>{label || 'Available Days'}</Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-        {DAYS.map(d => {
-          const active = selected.includes(d);
+    <View style={{ marginBottom: 12 }}>
+      <Text style={styles.fieldLabel}>Available Days & Hours</Text>
+
+      {/* Same time toggle */}
+      <TouchableOpacity
+        style={[styles.toggleBtn, sameForAll && styles.toggleBtnActive, { marginBottom: 10 }]}
+        onPress={() => setSameForAll(!sameForAll)}
+      >
+        <Text style={{ fontWeight: '600', color: sameForAll ? COLORS.primary : COLORS.textLight, fontSize: 12 }}>
+          {sameForAll ? '✅ Same time for all days' : 'Set same time for all days'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Day chips */}
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+        {DAYS.map(day => {
+          const selected = isDaySelected(day);
+          const entry = getDayEntry(day);
           return (
-            <TouchableOpacity key={d} style={[styles.tpBtn, active && styles.tpBtnActive]} onPress={() => toggle(d)}>
-              <Text style={[styles.tpBtnText, active && { color: COLORS.white }]}>{d}</Text>
+            <TouchableOpacity
+              key={day}
+              style={[styles.tpBtn, selected && styles.tpBtnActive, { minWidth: 44 }]}
+              onPress={() => toggleDay(day)}
+            >
+              <Text style={[styles.tpBtnText, selected && { color: COLORS.white }]}>{day}</Text>
+              {selected && entry.startTime ? (
+                <Text style={{ fontSize: 9, color: COLORS.white, marginTop: 1 }}>
+                  {formatTo12Hour(entry.startTime).replace(' ', '')}
+                </Text>
+              ) : null}
             </TouchableOpacity>
           );
         })}
       </View>
+
+      {/* Per-day time picker — shows for expanded day */}
+      {DAYS.filter(isDaySelected).map(day => {
+        const entry = getDayEntry(day);
+        const isOpen = expandedDay === day;
+        return (
+          <View key={day} style={{ backgroundColor: COLORS.background, borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, marginBottom: 8 }}>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12 }}
+              onPress={() => setExpandedDay(isOpen ? null : day)}
+            >
+              <Text style={{ fontWeight: '700', color: COLORS.text }}>{day}</Text>
+              <Text style={{ fontSize: 12, color: COLORS.primary }}>
+                {entry.startTime && entry.endTime
+                  ? `${formatTo12Hour(entry.startTime)} – ${formatTo12Hour(entry.endTime)}`
+                  : 'Tap to set times'}
+              </Text>
+            </TouchableOpacity>
+            {isOpen && (
+              <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
+                <TimePicker12hr
+                  label="Start Time"
+                  value={entry.startTime || ''}
+                  onChange={(v) => updateDayTime(day, 'startTime', v)}
+                />
+                <TimePicker12hr
+                  label="End Time"
+                  value={entry.endTime || ''}
+                  onChange={(v) => updateDayTime(day, 'endTime', v)}
+                />
+              </View>
+            )}
+          </View>
+        );
+      })}
     </View>
   );
 }
