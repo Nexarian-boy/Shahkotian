@@ -24,7 +24,8 @@
         },
         "production": {
             "android": {
-                "buildType": "app-bundle"
+                "buildType": "app-bundle",
+                "credentialsSource": "local"
             },
             "env": {
                 "EXPO_PUBLIC_API_URL": "https://lionfish-app-tkr7y.ondigitalocean.app/api",

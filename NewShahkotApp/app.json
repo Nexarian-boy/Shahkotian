@@ -1,96 +1,94 @@
 {
-    "expo":  {
-                 "name":  "Apna Shahkot",
-                 "slug":  "NewShahkotApp",
-                 "version":  "1.0.3",
-                 "orientation":  "portrait",
-                 "icon":  "./assets/icon.png",
-                 "userInterfaceStyle":  "light",
-                 "newArchEnabled":  true,
-                 "splash":  {
-                                "image":  "./assets/splash-icon.png",
-                                "resizeMode":  "contain",
-                                "backgroundColor":  "#0C8A43"
-                            },
-                 "ios":  {
-                             "supportsTablet":  true,
-                             "bundleIdentifier":  "com.salman39.shahkotapp",
-                             "infoPlist":  {
-                                               "ITSAppUsesNonExemptEncryption":  false,
-                                               "NSLocationWhenInUseUsageDescription":  "Shahkot App needs your location to verify you are within the Shahkot area.",
-                                               "NSLocationAlwaysUsageDescription":  "Shahkot App needs your location to verify you are within the Shahkot area.",
-                                               "NSCameraUsageDescription":  "Shahkot App needs camera access to upload profile photos and post images.",
-                                               "NSMicrophoneUsageDescription":  "Shahkot App needs microphone access to record voice messages.",
-                                               "NSPhotoLibraryUsageDescription":  "Shahkot App needs photo library access to select images and videos.",
-                                               "NSUserNotificationsUsageDescription":  "Apna Shahkot sends you notifications about important community updates, news, and activities in your area."
-                                           }
-                         },
-                 "android":  {
-                                 "googleServicesFile":  "./google-services.json",
-                                 "package":  "com.salman39.shahkotapp",
-                                 "versionCode":  3,
-                                 "adaptiveIcon":  {
-                                                      "foregroundImage":  "./assets/adaptive-icon.png",
-                                                      "backgroundColor":  "#0C8A43"
-                                                  },
-                                 "softwareKeyboardLayoutMode":  "pan",
-                                 "edgeToEdgeEnabled":  true,
-                                 "permissions":  [
-                                                     "android.permission.ACCESS_FINE_LOCATION",
-                                                     "android.permission.ACCESS_COARSE_LOCATION",
-                                                     "android.permission.CAMERA",
-                                                     "android.permission.READ_EXTERNAL_STORAGE",
-                                                     "android.permission.WRITE_EXTERNAL_STORAGE",
-                                                     "android.permission.READ_MEDIA_IMAGES",
-                                                     "android.permission.READ_MEDIA_VIDEO",
-                                                     "android.permission.RECORD_AUDIO",
-                                                     "android.permission.INTERNET",
-                                                     "android.permission.VIBRATE",
-                                                     "android.permission.RECEIVE_BOOT_COMPLETED",
-                                                     "android.permission.POST_NOTIFICATIONS"
-                                                 ]
-                             },
-                 "web":  {
-                             "favicon":  "./assets/favicon.png"
-                         },
-                 "plugins":  [
-                                 [
-                                     "expo-notifications",
-                                     {
-                                         "icon":  "./assets/notification-icon.png",
-                                         "color":  "#0C8A43",
-                                         "defaultChannel":  "apnashahkot_default",
-                                         "sounds":  [
-
-                                                    ]
-                                     }
-                                 ],
-                                 [
-                                     "react-native-google-mobile-ads",
-                                     {
-                                         "androidAppId":  "ca-app-pub-9583068113931056~4534630315",
-                                         "iosAppId":  "ca-app-pub-3940256099942544~1458002511"
-                                     }
-                                 ],
-                                 [
-                                     "expo-location",
-                                     {
-                                         "locationAlwaysAndWhenInUsePermission":  "Apna Shahkot is only available within 50 km of Shahkot city. Your location is required to verify you are within the service area. Location is never tracked, sold, or shared with third parties."
-                                     }
-                                 ],
-                                 [
-                                     "expo-image-picker",
-                                     {
-                                         "photosPermission":  "Shahkot App needs access to your photos to upload images and videos.",
-                                         "cameraPermission":  "Shahkot App needs camera access to take photos."
-                                     }
-                                 ]
-                             ],
-                 "owner":  "salman38",
-                 "extra":  {
-                               "eas":  {
-                                           "projectId":  "be4df999-170d-4c32-8369-2c0aaea183b6"
-                                       }
-                           }
-             }
+  "expo": {
+    "name": "Apna Shahkot",
+    "slug": "NewShahkotApp",
+    "version": "1.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0C8A43"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.salman39.shahkotapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Shahkot App needs your location to verify you are within the Shahkot area.",
+        "NSLocationAlwaysUsageDescription": "Shahkot App needs your location to verify you are within the Shahkot area.",
+        "NSCameraUsageDescription": "Shahkot App needs camera access to upload profile photos and post images.",
+        "NSMicrophoneUsageDescription": "Shahkot App needs microphone access to record voice messages.",
+        "NSPhotoLibraryUsageDescription": "Shahkot App needs photo library access to select images and videos.",
+        "NSUserNotificationsUsageDescription": "Apna Shahkot sends you notifications about important community updates, news, and activities in your area."
+      }
+    },
+    "android": {
+      "googleServicesFile": "./google-services.json",
+      "package": "com.salman39.shahkotapp",
+      "versionCode": 4,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0C8A43"
+      },
+      "softwareKeyboardLayoutMode": "pan",
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#0C8A43",
+          "defaultChannel": "apnashahkot_default",
+          "sounds": []
+        }
+      ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-9583068113931056~4534630315",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Apna Shahkot is only available within 50 km of Shahkot city. Your location is required to verify you are within the service area. Location is never tracked, sold, or shared with third parties."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Shahkot App needs access to your photos to upload images and videos.",
+          "cameraPermission": "Shahkot App needs camera access to take photos."
+        }
+      ]
+    ],
+    "owner": "salman38",
+    "extra": {
+      "eas": {
+        "projectId": "70a2e99b-90ca-47ef-9c37-0b90f9b534ad"
+      }
+    }
+  }
 }

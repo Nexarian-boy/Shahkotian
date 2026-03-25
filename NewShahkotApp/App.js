@@ -139,6 +139,7 @@ function AppNavigator() {
     let phaseTimer;
 
     if (isAuthenticated) {
+      setOnboardingChecked(false);
       // Read the reliable AsyncStorage key set during register()
       AsyncStorage.multiGet(['pendingOnboarding', 'hasSeenOnboarding']).then(([[, pending], [, seen]]) => {
         if (pending === 'true') {
