@@ -462,4 +462,60 @@ export const bazarAPI = {
     `${API_URL}/bazar/export-traders?presidentToken=${encodeURIComponent(presidentToken)}${bazarId && bazarId !== 'all' ? '&bazarId=' + bazarId : ''}`,
 };
 
+// ============ AC OFFICE API ============
+export const acAPI = {
+  // AC Officer auth
+  login: (data) => api.post('/ac/auth/login', data),
+  // Admin: manage officers
+  createOfficer: (data) => api.post('/ac/admin/officer/create', data),
+  getOfficers: () => api.get('/ac/admin/officers'),
+  deleteOfficer: (id) => api.delete(`/ac/admin/officer/${id}`),
+  // Admin: CNIC verification
+  getPendingCnic: () => api.get('/ac/admin/pending-cnic'),
+  getAllComplainants: () => api.get('/ac/admin/all-complainants'),
+  approveCnic: (id) => api.put(`/ac/admin/cnic/${id}/approve`),
+  rejectCnic: (id, reason) => api.put(`/ac/admin/cnic/${id}/reject`, { reason }),
+  adminExport: () => api.get('/ac/admin/export', { responseType: 'blob' }),
+  adminCreateAnnouncement: (data) => api.post('/ac/admin/announcements', data),
+  // User: complainant
+  submitCnic: (formData) => api.post('/ac/complainant/verify', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+  }),
+  getComplainantStatus: () => api.get('/ac/complainant/status'),
+  // User: complaints
+  submitComplaint: (formData) => api.post('/ac/complaints', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 300000,
+  }),
+  getMyComplaints: () => api.get('/ac/complaints/mine'),
+  rateComplaint: (id, rating) => api.post(`/ac/complaints/${id}/rate`, { rating }),
+  // Public: announcements
+  getAnnouncements: () => api.get('/ac/announcements'),
+  viewAnnouncement: (id) => api.post(`/ac/announcements/${id}/view`),
+  likeAnnouncement: (id) => api.post(`/ac/announcements/${id}/like`),
+  // AC Officer dashboard (uses x-ac-token)
+  getDashboard: (token) => api.get('/ac/dashboard', {
+    headers: { 'x-ac-token': token },
+  }),
+  getComplaintDetail: (token, id) => api.get(`/ac/complaints/${id}/detail`, {
+    headers: { 'x-ac-token': token },
+  }),
+  updateComplaintStatus: (token, id, status) => api.put(`/ac/complaints/${id}/status`, { status }, {
+    headers: { 'x-ac-token': token },
+  }),
+  acCreateAnnouncement: (token, formData) => api.post('/ac/announcements/create', formData, {
+    headers: { 'x-ac-token': token, 'Content-Type': 'multipart/form-data' },
+    timeout: 300000,
+  }),
+  acDeleteAnnouncement: (token, id) => api.delete(`/ac/announcements/${id}`, {
+    headers: { 'x-ac-token': token },
+  }),
+  acExport: (token) => api.get('/ac/export', {
+    headers: { 'x-ac-token': token },
+    responseType: 'blob',
+  }),
+  getExportUrl: (token) => `${API_URL}/ac/export?token=${encodeURIComponent(token)}`,
+};
+
 export default api;

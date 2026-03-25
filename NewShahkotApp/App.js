@@ -23,6 +23,15 @@ import CommunityScreen from './src/screens/CommunityScreen';
 import TournamentsScreen from './src/screens/TournamentsScreen';
 import TournamentDetailScreen from './src/screens/TournamentDetailScreen';
 import GovtOfficesScreen from './src/screens/GovtOfficesScreen';
+import ACOfficeScreen from './src/screens/ACOfficeScreen';
+import ACAnnouncementsScreen from './src/screens/ACAnnouncementsScreen';
+import ACCNICUploadScreen from './src/screens/ACCNICUploadScreen';
+import ACComplaintScreen from './src/screens/ACComplaintScreen';
+import ACComplaintHistoryScreen from './src/screens/ACComplaintHistoryScreen';
+import ACLoginScreen from './src/screens/ACLoginScreen';
+import ACDashboardScreen from './src/screens/ACDashboardScreen';
+import ACComplaintDetailScreen from './src/screens/ACComplaintDetailScreen';
+import ACCreateAnnouncementScreen from './src/screens/ACCreateAnnouncementScreen';
 import BazarScreen from './src/screens/BazarScreen';
 import NewsScreen from './src/screens/NewsScreen';
 import RishtaScreen from './src/screens/RishtaScreen';
@@ -209,6 +218,9 @@ function AppNavigator() {
           <Stack.Screen name="RestaurantDeals" component={RestaurantDealsScreen} />
           <Stack.Screen name="ClothBrands" component={ClothBrandDealsScreen} />
           <Stack.Screen name="Doctors" component={DoctorsScreen} />
+          <Stack.Screen name="ACDashboard" component={ACDashboardScreen} options={{ gestureEnabled: false, headerShown: false }} />
+          <Stack.Screen name="ACComplaintDetail" component={ACComplaintDetailScreen} />
+          <Stack.Screen name="ACCreateAnnouncement" component={ACCreateAnnouncementScreen} />
         </>
       ) : (
         <>
@@ -226,6 +238,18 @@ function AppNavigator() {
           <Stack.Screen name="BloodDonation" component={BloodDonationScreen} />
           <Stack.Screen name="AdminDashboard" component={AdminDashboardScreen} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          
+          {/* --- AC Office Screens --- */}
+          <Stack.Screen name="ACOffice" component={ACOfficeScreen} />
+          <Stack.Screen name="ACAnnouncements" component={ACAnnouncementsScreen} />
+          <Stack.Screen name="ACCNICUpload" component={ACCNICUploadScreen} />
+          <Stack.Screen name="ACComplaint" component={ACComplaintScreen} />
+          <Stack.Screen name="ACComplaintHistory" component={ACComplaintHistoryScreen} />
+          <Stack.Screen name="ACLogin" component={ACLoginScreen} />
+          <Stack.Screen name="ACDashboard" component={ACDashboardScreen} options={{ gestureEnabled: false, headerShown: false }} />
+          <Stack.Screen name="ACComplaintDetail" component={ACComplaintDetailScreen} />
+          <Stack.Screen name="ACCreateAnnouncement" component={ACCreateAnnouncementScreen} />
+
           <Stack.Screen name="AIChatbot" component={AIChatbotScreen} />
           <Stack.Screen name="DMList" component={DMListScreen} />
           <Stack.Screen name="DMChat" component={DMChatScreen} />

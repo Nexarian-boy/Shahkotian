@@ -33,6 +33,7 @@ const restaurantRoutes = require('./routes/restaurants');
 const clothBrandRoutes = require('./routes/clothBrands');
 const appointmentRoutes = require('./routes/appointments');
 const bazarRoutes = require('./routes/bazar');
+const acRoutes = require('./routes/ac');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -190,6 +191,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/cloth-brands', clothBrandRoutes);
 app.use('/api/bazar', bazarRoutes);
+app.use('/api/ac', acRoutes);
 
 // 404 handler
 app.use((req, res) => {

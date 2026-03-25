@@ -15,12 +15,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../config/constants';
-import { adminAPI, newsAPI, listingsAPI, reportsAPI, bazarAPI } from '../services/api';
+import { adminAPI, newsAPI, listingsAPI, reportsAPI, bazarAPI, acAPI } from '../services/api';
 import { notificationsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import ImageViewer from '../components/ImageViewer';
 
 const { width } = Dimensions.get('window');
-const TABS = ['Overview', 'Users', 'Rishta', 'Traders', 'Reports', 'News', 'Notify', 'Storage'];
+const TABS = ['Overview', 'Users', 'Rishta', 'Traders', 'AC Office', 'Reports', 'News', 'Notify', 'Storage'];
 
 export default function AdminDashboardScreen({ navigation }) {
   const { loading: authLoading } = useAuth();
@@ -52,6 +53,12 @@ export default function AdminDashboardScreen({ navigation }) {
   const [presidentForm, setPresidentForm] = useState({ name: '', email: '', password: '' });
   const [creatingPresident, setCreatingPresident] = useState(false);
   const [traderSearch, setTraderSearch] = useState('');
+
+  // AC Office management
+  const [acComplainants, setAcComplainants] = useState([]);
+  const [acOfficers, setAcOfficers] = useState([]);
+  const [acOfficerForm, setAcOfficerForm] = useState({ name: '', designation: '', email: '', password: '' });
+  const [creatingAcOfficer, setCreatingAcOfficer] = useState(false);
 
   // Wait for auth token to load before fetching
   useEffect(() => {
@@ -95,6 +102,10 @@ export default function AdminDashboardScreen({ navigation }) {
         setAllTraders(allRes.data.traders || []);
         setPendingTraders(pendRes.data.traders || []);
         setPresidents(presRes.data.presidents || []);
+      } else if (activeTab === 'AC Office') {
+        const [compRes, offRes] = await Promise.all([acAPI.getPendingCnic(), acAPI.getOfficers()]);
+        setAcComplainants(compRes.data.complainants || []);
+        setAcOfficers(offRes.data.officers || []);
       } else if (activeTab === 'Storage') {
         try {
           const [dbRes, storRes, cloudRes] = await Promise.all([
@@ -159,6 +170,34 @@ export default function AdminDashboardScreen({ navigation }) {
         },
       },
     ]);
+  };
+
+  const handleCreateAcOfficer = async () => {
+    if (!acOfficerForm.name || !acOfficerForm.email || !acOfficerForm.password) return Alert.alert('Required', 'Fill all fields');
+    setCreatingAcOfficer(true);
+    try {
+      await acAPI.createOfficer(acOfficerForm);
+      Alert.alert('Success', 'AC Officer created');
+      setAcOfficerForm({ name: '', designation: '', email: '', password: '' });
+      loadData();
+    } catch (e) { Alert.alert('Error', e.response?.data?.error || 'Failed to create AC Officer'); }
+    finally { setCreatingAcOfficer(false); }
+  };
+
+  const handleDeleteAcOfficer = (id) => {
+    Alert.alert('Delete', 'Remove AC Officer profile?', [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => {
+      try { await acAPI.deleteOfficer(id); loadData(); } catch { Alert.alert('Error', 'Failed to delete'); }
+    } }]);
+  };
+
+  const handleApproveCnic = async (id) => {
+    try { await acAPI.approveCnic(id); Alert.alert('Done', 'CNIC Approved'); loadData(); }
+    catch { Alert.alert('Error', 'Failed to approve CNIC'); }
+  };
+
+  const handleRejectCnic = async (id) => {
+    try { await acAPI.rejectCnic(id, 'Invalid documentation'); Alert.alert('Done', 'CNIC Rejected'); loadData(); }
+    catch { Alert.alert('Error', 'Failed to reject CNIC'); }
   };
 
   const handleDeleteListing = (id) => {
@@ -617,7 +656,7 @@ export default function AdminDashboardScreen({ navigation }) {
               {new Date(item.createdAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
             </Text>
 
-            {/* Context: Last 5 messages (for chat/dm reports) */}}
+            {/* Context: Last 5 messages (for chat/dm reports) */}
             {item.contextMessages && item.contextMessages.length > 0 && (
               <View style={{ marginTop: 10, backgroundColor: '#f0f0f0', borderRadius: 8, padding: 10 }}>
                 <Text style={{ fontSize: 12, fontWeight: '700', color: COLORS.primary, marginBottom: 6 }}>
@@ -873,6 +912,74 @@ export default function AdminDashboardScreen({ navigation }) {
   );
   };
 
+  const renderACOffice = () => (
+    <ScrollView style={styles.tabContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}>
+      <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>Waiting CNIC Verifications ({acComplainants.length})</Text>
+      {acComplainants.map(comp => (
+        <View key={comp.id} style={styles.rishtaCard}>
+          <View style={styles.rishtaHeader}>
+            <Text style={styles.rishtaName}>{comp.user?.name}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: '#FFF3E0' }]}><Text style={{ color: '#E65100', fontSize: 12 }}>PENDING</Text></View>
+          </View>
+          <Text style={styles.rishtaDetail}>Phone: {comp.phone}</Text>
+          {comp.cnicNumber && <Text style={styles.rishtaDetail}>CNIC: {comp.cnicNumber}</Text>}
+          
+          <View style={styles.cnicImagesRow}>
+            {comp.cnicFront && (
+              <TouchableOpacity style={styles.cnicImageContainer} onPress={() => setMediaViewer(comp.cnicFront)}>
+                <Text style={styles.cnicImageLabel}>Front</Text>
+                <Image source={{ uri: comp.cnicFront }} style={styles.cnicImage} resizeMode="contain" />
+              </TouchableOpacity>
+            )}
+            {comp.cnicBack && (
+              <TouchableOpacity style={styles.cnicImageContainer} onPress={() => setMediaViewer(comp.cnicBack)}>
+                <Text style={styles.cnicImageLabel}>Back</Text>
+                <Image source={{ uri: comp.cnicBack }} style={styles.cnicImage} resizeMode="contain" />
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.rishtaActions}>
+            <TouchableOpacity style={[styles.rishtaBtn, { backgroundColor: '#4CAF50' }]} onPress={() => handleApproveCnic(comp.id)}>
+              <Text style={styles.rishtaBtnText}>✅ Approve</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.rishtaBtn, { backgroundColor: COLORS.error }]} onPress={() => handleRejectCnic(comp.id)}>
+              <Text style={styles.rishtaBtnText}>❌ Reject</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+
+      <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 16 }]}>AC Officers Directory</Text>
+      
+      {/* Officer Creation Form */}
+      <View style={{ backgroundColor: COLORS.surface, borderRadius: 12, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: COLORS.border }}>
+        <Text style={{ fontWeight: '700', color: COLORS.text, fontSize: 14, marginBottom: 12 }}>+ Create New AC Officer</Text>
+        <TextInput style={styles.notifInput} placeholder="Officer Name" value={acOfficerForm.name} onChangeText={v => setAcOfficerForm({ ...acOfficerForm, name: v })} />
+        <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Designation (e.g., Assistant Commissioner)" value={acOfficerForm.designation} onChangeText={v => setAcOfficerForm({ ...acOfficerForm, designation: v })} />
+        <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Email Address" value={acOfficerForm.email} onChangeText={v => setAcOfficerForm({ ...acOfficerForm, email: v })} autoCapitalize="none" />
+        <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Password" value={acOfficerForm.password} onChangeText={v => setAcOfficerForm({ ...acOfficerForm, password: v })} secureTextEntry />
+        <TouchableOpacity style={[styles.sendNotifBtn, { marginTop: 12 }, creatingAcOfficer && { opacity: 0.6 }]} onPress={handleCreateAcOfficer} disabled={creatingAcOfficer}>
+          <Text style={styles.sendNotifBtnText}>{creatingAcOfficer ? 'Creating...' : 'Create Account'}</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* List Officers */}
+      {acOfficers.map(off => (
+        <View key={off.id} style={[styles.userCard, { paddingVertical: 14 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontWeight: '700', fontSize: 15 }}>{off.name}</Text>
+            <Text style={{ color: COLORS.textSecondary, fontSize: 13, marginVertical: 2 }}>{off.designation}</Text>
+            <Text style={{ color: COLORS.textLight, fontSize: 12 }}>{off.email}</Text>
+          </View>
+          <TouchableOpacity onPress={() => handleDeleteAcOfficer(off.id)} style={{ padding: 10 }}>
+            <Ionicons name="trash" size={20} color={COLORS.error} />
+          </TouchableOpacity>
+        </View>
+      ))}
+      <View style={{ height: 40 }} />
+    </ScrollView>
+  );
+
   const renderTab = () => {
     if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={COLORS.primary} /></View>;
     switch (activeTab) {
@@ -881,6 +988,7 @@ export default function AdminDashboardScreen({ navigation }) {
       case 'Rishta': return renderRishta();
       case 'Reports': return renderReports();
       case 'Traders': return renderTraders();
+      case 'AC Office': return renderACOffice();
       case 'News': return renderNews();
       case 'Notify': return renderNotifications();
       case 'Storage': return renderStorage();
@@ -912,6 +1020,15 @@ export default function AdminDashboardScreen({ navigation }) {
       </ScrollView>
 
       {renderTab()}
+
+      {mediaViewer && (
+        <ImageViewer
+          visible={true}
+          images={[mediaViewer]}
+          initialIndex={0}
+          onClose={() => setMediaViewer(null)}
+        />
+      )}
     </View>
   );
 }

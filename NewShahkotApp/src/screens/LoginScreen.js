@@ -3,11 +3,12 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { COLORS, APP_NAME, GEOFENCE_RADIUS_KM } from '../config/constants';
 import { isWithinShahkot } from '../utils/geolocation';
 import { useAuth } from '../context/AuthContext';
-import { authAPI, restaurantsAPI, doctorsAPI, clothBrandsAPI } from '../services/api';
+import { authAPI, restaurantsAPI, doctorsAPI, clothBrandsAPI, acAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 
 // Language toggle shown at the top of each login view
@@ -217,7 +218,16 @@ export default function LoginScreen({ navigation }) {
             navigation.navigate('ClothBrands', { ownerToken: brandToken, ownerProfile: brandProfileRes.data });
             return;
           } catch (_3) {
-            // Not a cloth brand owner either — show original error
+            // Not a cloth brand owner — try AC officer login
+            try {
+              const acRes = await acAPI.login({ email: email.trim(), password: password.trim() });
+              await AsyncStorage.setItem('acToken', acRes.data.token);
+              await AsyncStorage.setItem('acProfile', JSON.stringify(acRes.data.officer));
+              navigation.replace('ACDashboard');
+              return;
+            } catch (_4) {
+              // Not an AC officer either — show original error
+            }
           }
         }
       }
