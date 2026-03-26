@@ -94,7 +94,7 @@ export default function ServicesScreen({ navigation }) {
         <Text style={styles.sectionTitle}>I want to hire service</Text>
         <Text style={styles.help}>Select category and sub-category to see available providers.</Text>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+        <View style={{ marginBottom: 10, gap: 8 }}>
           {categories.map((cat) => (
             <TouchableOpacity
               key={cat.id}
@@ -107,7 +107,7 @@ export default function ServicesScreen({ navigation }) {
               <Text style={[styles.chipText, selectedCategory?.id === cat.id && styles.chipTextActive]}>{cat.emoji} {cat.name}</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         {selectedCategory && (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   approved: { backgroundColor: '#E8F5E9', color: '#2E7D32' },
   rejected: { backgroundColor: '#FFEBEE', color: '#C62828' },
   rejectReason: { fontSize: 12, color: '#C62828', marginTop: 6 },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, marginRight: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.background },
+  chip: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.background },
   chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   chipText: { fontSize: 12, color: COLORS.textSecondary },
   chipTextActive: { color: COLORS.white, fontWeight: '700' },

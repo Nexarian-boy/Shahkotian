@@ -101,6 +101,7 @@ export default function HomeScreen({ navigation }) {
   const QUICK_ACCESS = [
     { key: 'Market', label: t('buySell'), icon: 'cart', color: '#FF6584' },
     { key: 'Jobs', label: t('jobs'), icon: 'briefcase', color: '#2563EB' },
+    { key: 'Services', label: 'Services', icon: 'construct', color: '#0EA5E9' },
     { key: 'News & Articles', label: t('news'), icon: 'newspaper', color: '#8B5CF6' },
     { key: 'Tournaments', label: t('sports'), icon: 'trophy', color: '#10B981' },
     { key: 'Bazar', label: t('bazar'), icon: 'storefront', color: '#3B82F6' },
@@ -110,12 +111,6 @@ export default function HomeScreen({ navigation }) {
     { key: 'BloodDonation', label: t('blood'), icon: 'water', color: '#B91C1C' },
     { key: 'Doctors', label: t('doctors'), icon: 'medkit', color: '#E11D48' },
     { key: 'Weather', label: t('weather'), icon: 'partly-sunny', color: '#0EA5E9' },
-  ];
-
-  const SERVICES_ROW = [
-    { key: 'Explore', label: t('exploreAll'), icon: 'compass', color: COLORS.primary },
-    { key: 'Community', label: t('community'), icon: 'people', color: '#14B8A6' },
-    { key: 'Helpline', label: t('helplines'), icon: 'call', color: '#EF4444' },
   ];
 
   if (loading && !refreshing) {
@@ -190,16 +185,6 @@ export default function HomeScreen({ navigation }) {
             ))}
           </View>
         </View>
-
-        {/* Services Row */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.servicesRow}>
-          {SERVICES_ROW.map((s) => (
-            <TouchableOpacity key={s.key} style={[styles.serviceChip, { borderColor: s.color + '40' }]} onPress={() => navigation.navigate(s.key)}>
-              <Ionicons name={s.icon} size={16} color={s.color} />
-              <Text style={[styles.serviceChipText, { color: s.color }]}>{s.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
 
         {/* Ad after Quick Access */}
         <AdBanner />

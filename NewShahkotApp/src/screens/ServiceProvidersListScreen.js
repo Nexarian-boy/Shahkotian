@@ -103,7 +103,7 @@ export default function ServiceProvidersListScreen({ navigation, route }) {
       </View>
 
       <View style={styles.filters}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={{ gap: 8 }}>
           {categories.map((cat) => (
             <TouchableOpacity
               key={cat.id}
@@ -117,7 +117,7 @@ export default function ServiceProvidersListScreen({ navigation, route }) {
               <Text style={[styles.chipText, selectedCategory?.id === cat.id && styles.chipTextActive]}>{cat.emoji} {cat.name}</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         {selectedCategory && (
           <View style={styles.subWrap}>
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   back: { color: COLORS.white, fontSize: 15 },
   title: { color: COLORS.white, fontSize: 20, fontWeight: '800', marginTop: 6 },
   filters: { backgroundColor: COLORS.surface, padding: 12, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  chip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, marginRight: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.background },
+  chip: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.background },
   chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   chipText: { fontSize: 12, color: COLORS.textSecondary },
   chipTextActive: { color: COLORS.white, fontWeight: '700' },
