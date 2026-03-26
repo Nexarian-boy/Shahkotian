@@ -2,7 +2,7 @@
   "expo": {
     "name": "Ahwal e Shahkot",
     "slug": "NewShahkotApp",
-    "version": "1.1.2",
+    "version": "1.1.4",
     "orientation": "portrait",
     "icon": "./assets/icon.jpeg",
     "userInterfaceStyle": "light",
@@ -28,7 +28,7 @@
     "android": {
       "googleServicesFile": "./google-services.json",
       "package": "com.salman39.shahkotapp",
-      "versionCode": 6,
+      "versionCode": 8,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.jpeg",
         "backgroundColor": "#0C8A43"
