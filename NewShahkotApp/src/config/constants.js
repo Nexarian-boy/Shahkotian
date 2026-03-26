@@ -1,5 +1,5 @@
 // Shahkot App API Configuration
-const DEV_API_URL = 'http://192.168.0.102:5000/api'; // Local network (updated to current machine IP)
+const DEV_API_URL = 'http://192.168.100.40:5000/api'; // Local network (updated to current machine IP)
 const PROD_API_URL = 'https://lionfish-app-tkr7y.ondigitalocean.app/api';
 
 // EXPO_PUBLIC_API_URL is injected by EAS build profile (eas.json env section)
@@ -16,7 +16,7 @@ export const SHAHKOT_CENTER = {
 export const GEOFENCE_RADIUS_KM = 50;
 
 // App Constants
-export const APP_NAME = 'APNA SHAHKOT';
+export const APP_NAME = 'AHWAL E SHAHKOT';
 export const APP_VERSION = '1.0.0';
 
 // Listing Categories
