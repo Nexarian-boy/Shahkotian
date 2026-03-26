@@ -359,10 +359,13 @@ export default function RestaurantDealsScreen({ navigation, route }) {
     }
   };
 
-  const openLocationLink = async (locationLink) => {
-    if (!locationLink) return;
+  const openLocationLink = async (locationLink, address) => {
+    const directLink = locationLink?.trim();
+    const fallbackQuery = address?.trim() ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address.trim())}` : null;
+    const targetUrl = directLink || fallbackQuery;
+    if (!targetUrl) return;
     try {
-      await Linking.openURL(locationLink);
+      await Linking.openURL(targetUrl);
     } catch {
       Alert.alert('Error', 'Could not open location link.');
     }
@@ -487,8 +490,8 @@ export default function RestaurantDealsScreen({ navigation, route }) {
             </TouchableOpacity>
 
             <View style={styles.dealActionsRight}>
-              {item.restaurant?.locationLink ? (
-                <TouchableOpacity style={styles.iconCircleBtn} onPress={() => openLocationLink(item.restaurant.locationLink)} activeOpacity={0.9}>
+              {(item.restaurant?.locationLink || item.restaurant?.address) ? (
+                <TouchableOpacity style={styles.iconCircleBtn} onPress={() => openLocationLink(item.restaurant.locationLink, item.restaurant.address)} activeOpacity={0.9}>
                   <Ionicons name="location" size={14} color={COLORS.primary} />
                 </TouchableOpacity>
               ) : null}
@@ -524,7 +527,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
               <Text style={styles.restDeals}>{item._count?.deals || 0} {t('activeDeals')}</Text>
         </View>
       </View>
-      {(item.phone || item.whatsapp || item.locationLink) && (
+      {(item.phone || item.whatsapp || item.locationLink || item.address) && (
         <View style={styles.contactRow}>
           {item.phone && (
             <TouchableOpacity style={styles.contactBtn} onPress={() => callPhone(item.phone)}>
@@ -538,8 +541,8 @@ export default function RestaurantDealsScreen({ navigation, route }) {
               <Text style={[styles.contactText, { color: '#25D366' }]}>WhatsApp</Text>
             </TouchableOpacity>
           )}
-          {item.locationLink && (
-            <TouchableOpacity style={styles.contactBtn} onPress={() => openLocationLink(item.locationLink)}>
+          {(item.locationLink || item.address) && (
+            <TouchableOpacity style={styles.contactBtn} onPress={() => openLocationLink(item.locationLink, item.address)}>
               <Ionicons name="location" size={16} color={COLORS.primary} />
               <Text style={styles.contactText}>Map</Text>
             </TouchableOpacity>
@@ -806,7 +809,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
                   <Text style={styles.detailDesc}>{selectedRestaurant.description}</Text>
                 )}
 
-                {(selectedRestaurant.phone || selectedRestaurant.whatsapp || selectedRestaurant.locationLink) && (
+                {(selectedRestaurant.phone || selectedRestaurant.whatsapp || selectedRestaurant.locationLink || selectedRestaurant.address) && (
                   <View style={styles.contactRow}>
                     {selectedRestaurant.phone && (
                       <TouchableOpacity style={styles.contactBtn} onPress={() => callPhone(selectedRestaurant.phone)}>
@@ -820,8 +823,8 @@ export default function RestaurantDealsScreen({ navigation, route }) {
                         <Text style={[styles.contactText, { color: '#25D366' }]}>WhatsApp</Text>
                       </TouchableOpacity>
                     )}
-                    {selectedRestaurant.locationLink && (
-                      <TouchableOpacity style={styles.contactBtn} onPress={() => openLocationLink(selectedRestaurant.locationLink)}>
+                    {(selectedRestaurant.locationLink || selectedRestaurant.address) && (
+                      <TouchableOpacity style={styles.contactBtn} onPress={() => openLocationLink(selectedRestaurant.locationLink, selectedRestaurant.address)}>
                         <Ionicons name="location" size={16} color={COLORS.primary} />
                         <Text style={styles.contactText}>Map</Text>
                       </TouchableOpacity>
