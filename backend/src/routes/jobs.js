@@ -192,9 +192,33 @@ router.put('/:id', authenticate, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized.' });
     }
 
+    const { title, company, description, category, type, salary, location, phone, whatsapp, requirements, isActive } = req.body;
+
+    const data = {};
+    if (title !== undefined) data.title = title;
+    if (company !== undefined) data.company = company;
+    if (description !== undefined) data.description = description;
+    if (category !== undefined) data.category = category;
+    if (type !== undefined) data.type = type;
+    if (salary !== undefined) data.salary = salary || null;
+    if (location !== undefined) data.location = location;
+    if (phone !== undefined) data.phone = phone;
+    if (whatsapp !== undefined) data.whatsapp = whatsapp || null;
+    if (requirements !== undefined) data.requirements = requirements || null;
+    if (isActive !== undefined) data.isActive = !!isActive;
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No valid fields provided for update.' });
+    }
+
+    // Keep required core fields non-empty if they are being updated.
+    if ((title !== undefined && !title) || (company !== undefined && !company) || (description !== undefined && !description) || (phone !== undefined && !phone)) {
+      return res.status(400).json({ error: 'Title, company, description, and phone cannot be empty.' });
+    }
+
     const updated = await prisma.job.update({
       where: { id: req.params.id },
-      data: req.body,
+      data,
     });
 
     res.json(updated);

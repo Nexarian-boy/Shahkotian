@@ -37,6 +37,7 @@ export default function JobsScreen({ navigation }) {
   const [loadingApplicants, setLoadingApplicants] = useState(false);
   const [permission, setPermission] = useState({ canPostJobs: !!user?.canPostJobs, jobPostRequestPending: !!user?.jobPostRequestPending });
   const [requestingAccess, setRequestingAccess] = useState(false);
+  const [editingJobId, setEditingJobId] = useState(null);
 
   const [form, setForm] = useState({
     title: '', company: '', description: '', category: 'OTHER',
@@ -122,16 +123,41 @@ export default function JobsScreen({ navigation }) {
     }
     setSaving(true);
     try {
-      await jobsAPI.create(form);
-      Alert.alert(t('success'), t('jobPosted'));
+      if (editingJobId) {
+        await jobsAPI.update(editingJobId, form);
+        Alert.alert(t('success'), 'Job updated successfully.');
+      } else {
+        await jobsAPI.create(form);
+        Alert.alert(t('success'), t('jobPosted'));
+      }
       setShowPostModal(false);
+      setEditingJobId(null);
       resetForm();
       loadJobs();
+      if (showMyJobs) loadMyJobs();
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.error || 'Failed to post job.');
+      Alert.alert('Error', error.response?.data?.error || (editingJobId ? 'Failed to update job.' : 'Failed to post job.'));
     } finally {
       setSaving(false);
     }
+  };
+
+  const openEditJob = (job) => {
+    setEditingJobId(job.id);
+    setForm({
+      title: job.title || '',
+      company: job.company || '',
+      description: job.description || '',
+      category: job.category || 'OTHER',
+      type: job.type || 'FULL_TIME',
+      salary: job.salary || '',
+      location: job.location || 'Shahkot',
+      phone: job.phone || '',
+      whatsapp: job.whatsapp || '',
+      requirements: job.requirements || '',
+    });
+    setShowDetailModal(false);
+    setShowPostModal(true);
   };
 
   const deleteJob = (id) => {
@@ -344,10 +370,16 @@ export default function JobsScreen({ navigation }) {
             )}
 
             {isOwner && (
-              <TouchableOpacity style={styles.deleteJobBtn} onPress={() => deleteJob(selectedJob.id)}>
-                <Ionicons name="trash-outline" size={18} color="#F44336" />
-                <Text style={styles.deleteJobText}>{t('deleteJob')}</Text>
-              </TouchableOpacity>
+              <View style={styles.ownerActionsRow}>
+                <TouchableOpacity style={styles.editJobBtn} onPress={() => openEditJob(selectedJob)}>
+                  <Ionicons name="create-outline" size={18} color="#1565C0" />
+                  <Text style={styles.editJobText}>Edit Job</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.deleteJobBtn} onPress={() => deleteJob(selectedJob.id)}>
+                  <Ionicons name="trash-outline" size={18} color="#F44336" />
+                  <Text style={styles.deleteJobText}>{t('deleteJob')}</Text>
+                </TouchableOpacity>
+              </View>
             )}
             <View style={{ height: 30 }} />
           </ScrollView>
@@ -397,13 +429,13 @@ export default function JobsScreen({ navigation }) {
   };
 
   const renderPostModal = () => (
-    <Modal visible={showPostModal} animationType="slide" onRequestClose={() => setShowPostModal(false)}>
+    <Modal visible={showPostModal} animationType="slide" onRequestClose={() => { setShowPostModal(false); setEditingJobId(null); resetForm(); }}>
       <KeyboardAvoidingView style={styles.modalContainer} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.modalHeader}>
-          <TouchableOpacity onPress={() => setShowPostModal(false)}>
+          <TouchableOpacity onPress={() => { setShowPostModal(false); setEditingJobId(null); resetForm(); }}>
             <Text style={styles.closeBtn}>✕</Text>
           </TouchableOpacity>
-          <Text style={styles.modalTitle}>{t('postAJob')}</Text>
+          <Text style={styles.modalTitle}>{editingJobId ? 'Edit Job' : t('postAJob')}</Text>
           <View style={{ width: 30 }} />
         </View>
         <ScrollView style={{ flex: 1, padding: 20 }} keyboardShouldPersistTaps="handled">
@@ -451,7 +483,7 @@ export default function JobsScreen({ navigation }) {
           <TextInput style={[styles.input, { height: 80 }]} placeholder={t('requirementsPlaceholder')} value={form.requirements} onChangeText={v => setForm({ ...form, requirements: v })} multiline placeholderTextColor={COLORS.textLight} />
 
           <TouchableOpacity style={[styles.postBtn, saving && { opacity: 0.6 }]} onPress={postJob} disabled={saving}>
-            {saving ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.postBtnText}>{t('postJobBtn')}</Text>}}
+            {saving ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.postBtnText}>{editingJobId ? 'Save Changes' : t('postJobBtn')}</Text>}
           </TouchableOpacity>
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -657,10 +689,23 @@ const styles = StyleSheet.create({
   descText: { fontSize: 14, color: COLORS.textSecondary, lineHeight: 22, marginBottom: 16 },
   postedBy: { fontSize: 12, color: COLORS.textLight, marginTop: 8 },
   deleteJobBtn: {
+    flex: 1,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    backgroundColor: '#FFEBEE', padding: 14, borderRadius: 12, marginTop: 20,
+    backgroundColor: '#FFEBEE', padding: 14, borderRadius: 12,
   },
   deleteJobText: { color: '#F44336', fontWeight: '700' },
+  ownerActionsRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  editJobBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#E3F2FD',
+    padding: 14,
+    borderRadius: 12,
+  },
+  editJobText: { color: '#1565C0', fontWeight: '700' },
   // Applicant cards
   applicantCard: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface,
