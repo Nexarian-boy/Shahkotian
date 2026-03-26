@@ -458,6 +458,7 @@ model Restaurant {
   id          String   @id @default(uuid())
   name        String
   address     String
+  locationLink String?
   phone       String?
   whatsapp    String?
   description String?
@@ -499,6 +500,7 @@ model ClothBrand {
   id          String      @id @default(uuid())
   name        String
   address     String
+  locationLink String?
   phone       String?
   whatsapp    String?
   description String?

@@ -9,6 +9,11 @@ const { uploadMultipleVideosToCloudinary } = require('../utils/cloudinaryUpload'
 
 const router = express.Router();
 
+const isValidOptionalHttpUrl = (value) => {
+  if (value === undefined || value === null || value === '') return true;
+  return /^https?:\/\//i.test(String(value).trim());
+};
+
 // ============ PUBLIC ROUTES ============
 
 /**
@@ -30,7 +35,7 @@ router.get('/', async (req, res) => {
       where,
       orderBy: { name: 'asc' },
       select: {
-        id: true, name: true, address: true, phone: true, whatsapp: true,
+        id: true, name: true, address: true, locationLink: true, phone: true, whatsapp: true,
         description: true, image: true, isActive: true,
         _count: { select: { deals: { where: { isActive: true } } } },
       },
@@ -58,7 +63,7 @@ router.get('/deals/all', async (req, res) => {
       orderBy: { createdAt: 'desc' },
       include: {
         restaurant: {
-          select: { id: true, name: true, image: true, address: true, phone: true },
+          select: { id: true, name: true, image: true, address: true, locationLink: true, phone: true },
         },
       },
     });
@@ -80,7 +85,7 @@ router.get('/owner/profile', authenticateRestaurant, async (req, res) => {
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: req.restaurantId },
       select: {
-        id: true, name: true, address: true, phone: true, whatsapp: true,
+        id: true, name: true, address: true, locationLink: true, phone: true, whatsapp: true,
         description: true, image: true, email: true,
         deals: { orderBy: { createdAt: 'desc' } },
       },
@@ -127,7 +132,7 @@ router.get('/:id', async (req, res) => {
     const restaurant = await prisma.restaurant.findUnique({
       where: { id: req.params.id },
       select: {
-        id: true, name: true, address: true, phone: true, whatsapp: true,
+        id: true, name: true, address: true, locationLink: true, phone: true, whatsapp: true,
         description: true, image: true,
         deals: {
           where: { isActive: true },
@@ -156,7 +161,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/admin/create', authenticate, adminOnly, upload.single('image'), async (req, res) => {
   try {
-    const { name, address, phone, whatsapp, description, email, password } = req.body;
+    const { name, address, locationLink, phone, whatsapp, description, email, password } = req.body;
 
     if (!name || !address || !email || !password) {
       return res.status(400).json({ error: 'Name, address, email, and password are required.' });
@@ -164,6 +169,10 @@ router.post('/admin/create', authenticate, adminOnly, upload.single('image'), as
 
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+    }
+
+    if (!isValidOptionalHttpUrl(locationLink)) {
+      return res.status(400).json({ error: 'Location link must start with http:// or https://.' });
     }
 
     // Check email uniqueness
@@ -183,6 +192,7 @@ router.post('/admin/create', authenticate, adminOnly, upload.single('image'), as
       data: {
         name,
         address,
+        locationLink: locationLink?.trim() || null,
         phone: phone || null,
         whatsapp: whatsapp || null,
         description: description || null,
@@ -208,10 +218,16 @@ router.post('/admin/create', authenticate, adminOnly, upload.single('image'), as
  */
 router.put('/admin/:id', authenticate, adminOnly, async (req, res) => {
   try {
-    const { name, address, phone, whatsapp, description, isActive } = req.body;
+    const { name, address, locationLink, phone, whatsapp, description, isActive } = req.body;
     const data = {};
     if (name !== undefined) data.name = name;
     if (address !== undefined) data.address = address;
+    if (locationLink !== undefined) {
+      if (!isValidOptionalHttpUrl(locationLink)) {
+        return res.status(400).json({ error: 'Location link must start with http:// or https://.' });
+      }
+      data.locationLink = locationLink?.trim() || null;
+    }
     if (phone !== undefined) data.phone = phone;
     if (whatsapp !== undefined) data.whatsapp = whatsapp;
     if (description !== undefined) data.description = description;

@@ -68,6 +68,7 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
   // Add brand form
   const [formName, setFormName] = useState('');
   const [formAddress, setFormAddress] = useState('');
+  const [formLocationLink, setFormLocationLink] = useState('');
   const [formPhone, setFormPhone] = useState('');
   const [formWhatsapp, setFormWhatsapp] = useState('');
   const [formDesc, setFormDesc] = useState('');
@@ -168,11 +169,18 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
     if (formPassword.length < 6) {
       return Alert.alert(t('error'), 'Password must be at least 6 characters.');
     }
+
+    const trimmedLocationLink = formLocationLink.trim();
+    if (trimmedLocationLink && !/^https?:\/\//i.test(trimmedLocationLink)) {
+      return Alert.alert('Invalid link', 'Location link must start with http:// or https://');
+    }
+
     setSubmitting(true);
     try {
       const formData = new FormData();
       formData.append('name', formName.trim());
       formData.append('address', formAddress.trim());
+      formData.append('locationLink', trimmedLocationLink);
       formData.append('phone', formPhone.trim());
       formData.append('whatsapp', formWhatsapp.trim());
       formData.append('description', formDesc.trim());
@@ -222,7 +230,7 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
   };
 
   const resetForm = () => {
-    setFormName(''); setFormAddress(''); setFormPhone(''); setFormWhatsapp('');
+    setFormName(''); setFormAddress(''); setFormLocationLink(''); setFormPhone(''); setFormWhatsapp('');
     setFormDesc(''); setFormEmail(''); setFormPassword(''); setFormImage(null);
   };
 
@@ -331,6 +339,15 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
     if (whatsapp) {
       const num = whatsapp.replace(/[^0-9]/g, '');
       Linking.openURL(`https://wa.me/${num}`);
+    }
+  };
+
+  const openLocationLink = async (locationLink) => {
+    if (!locationLink) return;
+    try {
+      await Linking.openURL(locationLink);
+    } catch {
+      Alert.alert('Error', 'Could not open location link.');
     }
   };
 
@@ -452,14 +469,19 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
               </View>
             </TouchableOpacity>
 
-            {item.brand?.phone ? (
-              <TouchableOpacity style={styles.callChip} onPress={() => callPhone(item.brand.phone)} activeOpacity={0.9}>
-                <Ionicons name="call" size={14} color="#FFF" />
-                <Text style={styles.callChipText}>Call</Text>
-              </TouchableOpacity>
-            ) : (
-              <View style={{ width: 0, height: 0 }} />
-            )}
+            <View style={styles.dealActionsRight}>
+              {item.brand?.locationLink ? (
+                <TouchableOpacity style={styles.iconCircleBtn} onPress={() => openLocationLink(item.brand.locationLink)} activeOpacity={0.9}>
+                  <Ionicons name="location" size={14} color={COLORS.primary} />
+                </TouchableOpacity>
+              ) : null}
+              {item.brand?.phone ? (
+                <TouchableOpacity style={styles.callChip} onPress={() => callPhone(item.brand.phone)} activeOpacity={0.9}>
+                  <Ionicons name="call" size={14} color="#FFF" />
+                  <Text style={styles.callChipText}>Call</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
         </View>
       </TouchableOpacity>
@@ -485,16 +507,24 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
             <Text style={styles.brandDeals}>{item._count?.deals || 0} {t('activeDeals')}</Text>
           </View>
         </View>
-        {item.phone && (
+        {(item.phone || item.whatsapp || item.locationLink) && (
           <View style={styles.contactRow}>
-            <TouchableOpacity style={styles.contactBtn} onPress={() => callPhone(item.phone)}>
-              <Ionicons name="call" size={16} color={COLORS.primary} />
-              <Text style={styles.contactText}>Call</Text>
-            </TouchableOpacity>
+            {item.phone && (
+              <TouchableOpacity style={styles.contactBtn} onPress={() => callPhone(item.phone)}>
+                <Ionicons name="call" size={16} color={COLORS.primary} />
+                <Text style={styles.contactText}>Call</Text>
+              </TouchableOpacity>
+            )}
             {item.whatsapp && (
               <TouchableOpacity style={[styles.contactBtn, { borderColor: '#25D366' }]} onPress={() => openWhatsApp(item.whatsapp)}>
                 <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
                 <Text style={[styles.contactText, { color: '#25D366' }]}>WhatsApp</Text>
+              </TouchableOpacity>
+            )}
+            {item.locationLink && (
+              <TouchableOpacity style={styles.contactBtn} onPress={() => openLocationLink(item.locationLink)}>
+                <Ionicons name="location" size={16} color={COLORS.primary} />
+                <Text style={styles.contactText}>Map</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -753,7 +783,7 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
                   <Text style={styles.detailDesc}>{selectedBrand.description}</Text>
                 )}
 
-                {(selectedBrand.phone || selectedBrand.whatsapp) && (
+                {(selectedBrand.phone || selectedBrand.whatsapp || selectedBrand.locationLink) && (
                   <View style={styles.contactRow}>
                     {selectedBrand.phone && (
                       <TouchableOpacity style={styles.contactBtn} onPress={() => callPhone(selectedBrand.phone)}>
@@ -765,6 +795,12 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
                       <TouchableOpacity style={[styles.contactBtn, { borderColor: '#25D366' }]} onPress={() => openWhatsApp(selectedBrand.whatsapp)}>
                         <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
                         <Text style={[styles.contactText, { color: '#25D366' }]}>WhatsApp</Text>
+                      </TouchableOpacity>
+                    )}
+                    {selectedBrand.locationLink && (
+                      <TouchableOpacity style={styles.contactBtn} onPress={() => openLocationLink(selectedBrand.locationLink)}>
+                        <Ionicons name="location" size={16} color={COLORS.primary} />
+                        <Text style={styles.contactText}>Map</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -908,6 +944,7 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <TextInput style={styles.input} placeholder={t('brandName')} value={formName} onChangeText={setFormName} placeholderTextColor={COLORS.textLight} />
                 <TextInput style={styles.input} placeholder={t('restaurantAddress')} value={formAddress} onChangeText={setFormAddress} placeholderTextColor={COLORS.textLight} />
+                <TextInput style={styles.input} placeholder="Google Maps Link (optional)" value={formLocationLink} onChangeText={setFormLocationLink} keyboardType="url" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
                 <TextInput style={styles.input} placeholder="Phone" value={formPhone} onChangeText={setFormPhone} keyboardType="phone-pad" placeholderTextColor={COLORS.textLight} />
                 <TextInput style={styles.input} placeholder="WhatsApp" value={formWhatsapp} onChangeText={setFormWhatsapp} keyboardType="phone-pad" placeholderTextColor={COLORS.textLight} />
                 <TextInput style={[styles.input, { height: 80 }]} placeholder="Description" value={formDesc} onChangeText={setFormDesc} multiline placeholderTextColor={COLORS.textLight} />
@@ -1163,6 +1200,17 @@ const styles = StyleSheet.create({
   brandAvatarLetter: { fontSize: 15, fontWeight: '900', color: COLORS.primary },
   brandNameNew: { fontSize: 14, fontWeight: '900', color: '#111827' },
   brandAddrNew: { fontSize: 11, color: '#6B7280', marginTop: 2 },
+  dealActionsRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconCircleBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.surface,
+  },
   callChip: {
     flexDirection: 'row',
     alignItems: 'center',
