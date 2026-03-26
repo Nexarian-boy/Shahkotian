@@ -7,8 +7,10 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { acAPI } from '../services/api';
 import { COLORS } from '../config/constants';
+import { useAuth } from '../context/AuthContext';
 
-export default function ACDashboardScreen({ navigation }) {
+export default function ACDashboardScreen({ navigation, route }) {
+  const { isAuthenticated } = useAuth();
   const [token, setToken] = useState(null);
   const [officer, setOfficer] = useState(null);
   const [complaints, setComplaints] = useState([]);
@@ -17,6 +19,7 @@ export default function ACDashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('ALL');
+  const logoutTo = route?.params?.logoutTo;
 
   useEffect(() => {
     loadAuth();
@@ -67,7 +70,15 @@ export default function ACDashboardScreen({ navigation }) {
   const handleLogout = async () => {
     await AsyncStorage.removeItem('acToken');
     await AsyncStorage.removeItem('acProfile');
-    navigation.replace('Login');
+    if (logoutTo === 'Login') {
+      navigation.replace('Login');
+      return;
+    }
+    if (logoutTo === 'MainTabs') {
+      navigation.replace('MainTabs');
+      return;
+    }
+    navigation.replace(isAuthenticated ? 'MainTabs' : 'Login');
   };
 
   const handleExport = async () => {

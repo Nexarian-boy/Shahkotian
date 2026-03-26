@@ -223,7 +223,7 @@ export default function LoginScreen({ navigation }) {
               const acRes = await acAPI.login({ email: email.trim(), password: password.trim() });
               await AsyncStorage.setItem('acToken', acRes.data.token);
               await AsyncStorage.setItem('acProfile', JSON.stringify(acRes.data.officer));
-              navigation.replace('ACDashboard');
+              navigation.replace('ACDashboard', { logoutTo: 'Login' });
               return;
             } catch (_4) {
               // Not an AC officer either — show original error

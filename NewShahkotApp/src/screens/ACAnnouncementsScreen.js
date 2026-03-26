@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, FlatList,
-  ActivityIndicator, RefreshControl, Image, Linking, Alert
+  ActivityIndicator, RefreshControl, Image, Linking, Alert, Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Audio } from 'expo-av';
+import { Audio, Video, ResizeMode } from 'expo-av';
 import { COLORS } from '../config/constants';
 import { acAPI } from '../services/api';
 import AdBanner from '../components/AdBanner';
@@ -24,6 +24,8 @@ export default function ACAnnouncementsScreen({ navigation }) {
   const [viewerIndex, setViewerIndex] = useState(0);
   const [acToken, setAcToken] = useState(null);
   const [playingVoiceId, setPlayingVoiceId] = useState(null);
+  const [videoModalVisible, setVideoModalVisible] = useState(false);
+  const [activeVideoUrl, setActiveVideoUrl] = useState(null);
   const soundRef = useRef(null);
   const viewedIdsRef = useRef(new Set());
 
@@ -152,12 +154,29 @@ export default function ACAnnouncementsScreen({ navigation }) {
     setViewerVisible(true);
   };
 
-  const openVideo = async (url) => {
+  const openVideo = (url) => {
+    if (!url) {
+      Alert.alert('Error', 'Video link is missing.');
+      return;
+    }
+    const hasScheme = /^https?:\/\//i.test(url);
+    const webUrl = hasScheme ? url : `https://${url}`;
+    setActiveVideoUrl(webUrl);
+    setVideoModalVisible(true);
+  };
+
+  const openVideoInBrowser = async () => {
+    if (!activeVideoUrl) return;
     try {
-      await Linking.openURL(url);
+      await Linking.openURL(activeVideoUrl);
     } catch (_) {
       Alert.alert('Error', 'Cannot open this video link.');
     }
+  };
+
+  const closeVideoModal = () => {
+    setVideoModalVisible(false);
+    setActiveVideoUrl(null);
   };
 
   const handleDeleteAnnouncement = (id, title) => {
@@ -309,6 +328,42 @@ export default function ACAnnouncementsScreen({ navigation }) {
         onClose={() => setViewerVisible(false)}
       />
 
+      <Modal
+        visible={videoModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeVideoModal}
+      >
+        <View style={styles.videoModalOverlay}>
+          <View style={styles.videoModalCard}>
+            <View style={styles.videoModalHeader}>
+              <Text style={styles.videoModalTitle}>Video Attachment</Text>
+              <TouchableOpacity onPress={closeVideoModal} style={styles.videoCloseBtn}>
+                <Ionicons name="close" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+
+            {!!activeVideoUrl && (
+              <Video
+                source={{ uri: activeVideoUrl }}
+                style={styles.videoPlayer}
+                useNativeControls
+                shouldPlay
+                resizeMode={ResizeMode.CONTAIN}
+                onError={() => Alert.alert('Playback Error', 'Could not play video in app. Use browser option below.')}
+              />
+            )}
+
+            <View style={styles.videoActionsRow}>
+              <TouchableOpacity style={styles.videoActionBtn} onPress={openVideoInBrowser}>
+                <Ionicons name="open-outline" size={16} color="#1D4ED8" />
+                <Text style={styles.videoActionText}>Open in Browser</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* AdBanner at bottom */}
       <View style={{ backgroundColor: COLORS.surface, borderTopWidth: 1, borderColor: COLORS.border, paddingBottom: Math.max(insets.bottom, 10) }}>
         <AdBanner />
@@ -393,4 +448,54 @@ const styles = StyleSheet.create({
   engagementText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '700' },
   emptyBox: { alignItems: 'center', marginTop: 100 },
   emptyText: { color: COLORS.textSecondary, marginTop: 16, fontSize: 15 },
+  videoModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  videoModalCard: {
+    backgroundColor: '#0B1220',
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  videoModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  videoModalTitle: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  videoCloseBtn: { padding: 4 },
+  videoPlayer: {
+    width: '100%',
+    height: 240,
+    backgroundColor: '#000',
+  },
+  videoActionsRow: {
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  videoActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#DBEAFE',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  videoActionText: {
+    color: '#1D4ED8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });

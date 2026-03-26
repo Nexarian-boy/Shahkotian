@@ -119,7 +119,7 @@ export default function ACOfficeScreen({ navigation }) {
         {/* AC Officer Login */}
         <TouchableOpacity
           style={[styles.optionCard, { borderColor: '#1E40AF20' }]}
-          onPress={() => navigation.navigate('ACLogin')}
+          onPress={() => navigation.navigate('ACLogin', { logoutTo: 'MainTabs' })}
           activeOpacity={0.7}
         >
           <View style={[styles.optionIcon, { backgroundColor: '#1E40AF12' }]}> 

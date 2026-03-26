@@ -214,6 +214,7 @@ function AppNavigator() {
       {!isAuthenticated ? (
         <>
           <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="ACLogin" component={ACLoginScreen} />
           <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
           <Stack.Screen name="RestaurantDeals" component={RestaurantDealsScreen} />
           <Stack.Screen name="ClothBrands" component={ClothBrandDealsScreen} />

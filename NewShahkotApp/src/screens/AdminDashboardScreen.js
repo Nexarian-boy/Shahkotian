@@ -46,6 +46,7 @@ export default function AdminDashboardScreen({ navigation }) {
   const [notifBody, setNotifBody] = useState('');
   const [notifSending, setNotifSending] = useState(false);
   const [notifStats, setNotifStats] = useState(null);
+  const [mediaViewer, setMediaViewer] = useState(null);
   // Trader management
   const [allTraders, setAllTraders] = useState([]);
   const [pendingTraders, setPendingTraders] = useState([]);

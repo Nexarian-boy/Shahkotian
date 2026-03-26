@@ -28,8 +28,8 @@ export default function ACLoginScreen({ navigation }) {
       await AsyncStorage.setItem('acToken', res.data.token);
       await AsyncStorage.setItem('acProfile', JSON.stringify(res.data.officer));
 
-      // Navigate to AC Dashboard
-      navigation.replace('ACDashboard');
+      // Navigate to AC Dashboard and return to app flow on logout.
+      navigation.replace('ACDashboard', { logoutTo: 'MainTabs' });
     } catch (error) {
       const msg = error.response?.data?.error || 'Login failed. Please try again.';
       Alert.alert('Login Failed', msg);

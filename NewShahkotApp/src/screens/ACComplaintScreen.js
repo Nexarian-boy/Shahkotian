@@ -24,21 +24,46 @@ export default function ACComplaintScreen({ navigation }) {
   const [voiceUri, setVoiceUri] = useState(null);
   const [voiceDuration, setVoiceDuration] = useState(0);
 
-  const pickMedia = async (type) => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: type === 'video' ? ['video'] : ['images'],
-      allowsMultipleSelection: type === 'image',
-      quality: 0.7,
-    });
-
-    if (!result.canceled) {
-      if (type === 'image') {
-        const newImages = result.assets.slice(0, 5 - images.length);
-        setImages([...images, ...newImages]);
-      } else {
-        const newVideos = result.assets.slice(0, 2 - videos.length);
-        setVideos([...videos, ...newVideos]);
+  const resolvePickerMediaType = (type) => {
+    // Support both legacy MediaTypeOptions and newer MediaType shapes across Expo SDKs.
+    if (ImagePicker.MediaType) {
+      if (type === 'video') {
+        return ImagePicker.MediaType.videos || ImagePicker.MediaType.video;
       }
+      return ImagePicker.MediaType.images || ImagePicker.MediaType.image;
+    }
+
+    if (type === 'video') {
+      return ImagePicker.MediaTypeOptions.Videos;
+    }
+    return ImagePicker.MediaTypeOptions.Images;
+  };
+
+  const pickMedia = async (type) => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'Please allow media library access to attach photos/videos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: resolvePickerMediaType(type),
+        allowsMultipleSelection: type === 'image',
+        selectionLimit: type === 'image' ? Math.max(1, 5 - images.length) : 1,
+        quality: 0.7,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      if (type === 'image') {
+        setImages((prev) => [...prev, ...result.assets].slice(0, 5));
+      } else {
+        setVideos((prev) => [...prev, ...result.assets].slice(0, 2));
+      }
+    } catch (error) {
+      console.error('Media picker error:', error);
+      Alert.alert('Error', 'Could not open media picker. Please try again.');
     }
   };
 
