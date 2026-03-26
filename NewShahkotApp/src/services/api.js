@@ -256,6 +256,12 @@ export const adminAPI = {
   // Push notifications
   sendNotification: (data) => api.post('/admin/send-notification', data),
   getNotificationStats: () => api.get('/admin/notification-stats'),
+  // Job poster permissions
+  requestJobPosterAccess: () => api.post('/admin/job-posters/request'),
+  getJobPosterRequests: () => api.get('/admin/job-posters/requests'),
+  getApprovedJobPosters: () => api.get('/admin/job-posters/approved'),
+  approveJobPoster: (userId) => api.put(`/admin/job-posters/${userId}/approve`),
+  revokeJobPoster: (userId) => api.put(`/admin/job-posters/${userId}/revoke`),
 };
 
 // ============ REPORTS API ============
@@ -327,6 +333,7 @@ export const appointmentsAPI = {
 // ============ JOBS API ============
 export const jobsAPI = {
   getAll: (params) => api.get('/jobs', { params }),
+  canPost: () => api.get('/jobs/can-post'),
   getCategories: () => api.get('/jobs/categories'),
   getOne: (id) => api.get(`/jobs/${id}`),
   getMine: () => api.get('/jobs/my'),
@@ -335,6 +342,7 @@ export const jobsAPI = {
   delete: (id) => api.delete(`/jobs/${id}`),
   apply: (id, data) => api.post(`/jobs/${id}/apply`, data),
   getApplications: (id) => api.get(`/jobs/${id}/applications`),
+  requestPostAccess: () => api.post('/admin/job-posters/request'),
 };
 
 // ============ ALIASES FOR BACKWARDS COMPATIBILITY ============

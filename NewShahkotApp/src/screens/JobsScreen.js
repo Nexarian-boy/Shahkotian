@@ -16,7 +16,7 @@ const getCategoryInfo = (key) => JOB_CATEGORIES.find(c => c.key === key) || { la
 const getTypeLabel = (key) => JOB_TYPES.find(t => t.key === key)?.label || key;
 
 export default function JobsScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { t } = useLanguage();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +35,8 @@ export default function JobsScreen({ navigation }) {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [applicants, setApplicants] = useState([]);
   const [loadingApplicants, setLoadingApplicants] = useState(false);
+  const [permission, setPermission] = useState({ canPostJobs: !!user?.canPostJobs, jobPostRequestPending: !!user?.jobPostRequestPending });
+  const [requestingAccess, setRequestingAccess] = useState(false);
 
   const [form, setForm] = useState({
     title: '', company: '', description: '', category: 'OTHER',
@@ -42,7 +44,28 @@ export default function JobsScreen({ navigation }) {
     whatsapp: '', requirements: '',
   });
 
-  useEffect(() => { loadJobs(); }, []);
+  useEffect(() => {
+    loadJobs();
+    loadPostPermission();
+  }, []);
+
+  const loadPostPermission = async () => {
+    try {
+      const res = await jobsAPI.canPost();
+      const nextPermission = {
+        canPostJobs: !!res.data?.canPostJobs,
+        jobPostRequestPending: !!res.data?.jobPostRequestPending,
+      };
+      setPermission(nextPermission);
+
+      if (user && (user.canPostJobs !== nextPermission.canPostJobs || user.jobPostRequestPending !== nextPermission.jobPostRequestPending)) {
+        updateUser({ ...user, ...nextPermission });
+      }
+    } catch (error) {
+      console.error('Load post permission error:', error);
+      setPermission({ canPostJobs: !!user?.canPostJobs, jobPostRequestPending: !!user?.jobPostRequestPending });
+    }
+  };
 
   const loadJobs = async () => {
     try {
@@ -88,6 +111,11 @@ export default function JobsScreen({ navigation }) {
   };
 
   const postJob = async () => {
+    if (!permission.canPostJobs) {
+      Alert.alert('Permission required', 'You are not allowed to post jobs yet. Request access from admin.');
+      return;
+    }
+
     if (!form.title || !form.company || !form.description || !form.phone) {
       Alert.alert(t('required'), 'Please fill title, company, description, and phone.');
       return;
@@ -141,6 +169,33 @@ export default function JobsScreen({ navigation }) {
       Alert.alert('Info', error.response?.data?.error || 'Could not apply.');
     } finally {
       setApplying(false);
+    }
+  };
+
+  const requestJobPostingAccess = async () => {
+    if (permission.canPostJobs) {
+      Alert.alert('Already enabled', 'You already have permission to post jobs.');
+      return;
+    }
+    if (permission.jobPostRequestPending) {
+      Alert.alert('Pending', 'Your request is already pending admin approval.');
+      return;
+    }
+
+    setRequestingAccess(true);
+    try {
+      const res = await jobsAPI.requestPostAccess();
+      const nextPermission = {
+        canPostJobs: !!res.data?.canPostJobs,
+        jobPostRequestPending: !!res.data?.jobPostRequestPending,
+      };
+      setPermission(nextPermission);
+      if (user) updateUser({ ...user, ...nextPermission });
+      Alert.alert('Request submitted', 'Your job posting access request was sent to admin.');
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to submit request.');
+    } finally {
+      setRequestingAccess(false);
     }
   };
 
@@ -417,11 +472,34 @@ export default function JobsScreen({ navigation }) {
           <TouchableOpacity onPress={() => { setShowMyJobs(!showMyJobs); if (!showMyJobs) loadMyJobs(); }}>
             <Text style={styles.headerBtn}>{showMyJobs ? t('browse') : t('myJobs')}</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowPostModal(true)}>
-            <Text style={styles.headerBtn}>{t('postJob2')}</Text>
-          </TouchableOpacity>
+          {permission.canPostJobs && (
+            <TouchableOpacity onPress={() => setShowPostModal(true)}>
+              <Text style={styles.headerBtn}>{t('postJob2')}</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
+
+      {!permission.canPostJobs && (
+        <View style={styles.permissionBox}>
+          <Text style={styles.permissionText}>
+            {permission.jobPostRequestPending
+              ? 'Job posting access request is pending admin approval.'
+              : 'You can browse and apply for jobs. Request admin permission to post jobs.'}
+          </Text>
+          {!permission.jobPostRequestPending && (
+            <TouchableOpacity
+              style={[styles.requestAccessBtn, requestingAccess && { opacity: 0.6 }]}
+              onPress={requestJobPostingAccess}
+              disabled={requestingAccess}
+            >
+              {requestingAccess
+                ? <ActivityIndicator size="small" color={COLORS.white} />
+                : <Text style={styles.requestAccessBtnText}>Request to Post Jobs</Text>}
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Search */}
       <View style={styles.searchBar}>
@@ -503,6 +581,24 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface, borderRadius: 12, paddingHorizontal: 14, elevation: 2,
   },
   searchInput: { flex: 1, paddingVertical: 12, fontSize: 15, color: COLORS.text },
+  permissionBox: {
+    marginHorizontal: 12,
+    marginTop: 2,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#E3F2FD',
+    borderWidth: 1,
+    borderColor: '#BBDEFB',
+  },
+  permissionText: { color: '#0D47A1', fontSize: 13, lineHeight: 18, marginBottom: 10 },
+  requestAccessBtn: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  requestAccessBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 13 },
   filterRow: { paddingHorizontal: 12, marginBottom: 8, paddingRight: 20 },
   filterChip: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface,

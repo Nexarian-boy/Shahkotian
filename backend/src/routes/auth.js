@@ -80,7 +80,7 @@ router.get('/test-smtp', async (req, res) => {
     return res.status(403).json({ error: 'Not allowed.' });
   }
   const testEmail = req.query.email || process.env.ADMIN_EMAIL || 'test@example.com';
-  const result = await sendEmail(testEmail, '✅ Email Test — Apna Shahkot', '<p>Email is working from Apna Shahkot!</p>');
+  const result = await sendEmail(testEmail, '✅ Email Test — Ahwal e Shahkot', '<p>Email is working from Ahwal e Shahkot!</p>');
   res.json({
     success: result.ok,
     provider: result.provider || 'Unknown',
@@ -124,7 +124,7 @@ router.post('/send-otp', async (req, res) => {
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;">
         <div style="background:#0C8A43;padding:28px;border-radius:10px 10px 0 0;text-align:center;">
-          <h1 style="color:#fff;margin:0;font-size:24px;">🏘️ APNA SHAHKOT</h1>
+          <h1 style="color:#fff;margin:0;font-size:24px;">🏘️ AHWAL E SHAHKOT</h1>
           <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;">Email Verification</p>
         </div>
         <div style="background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px;">
@@ -138,7 +138,7 @@ router.post('/send-otp', async (req, res) => {
         </div>
       </div>`;
 
-    const result = await sendEmail(email, '🔐 Your Apna Shahkot OTP Code', html);
+    const result = await sendEmail(email, '🔐 Your Ahwal e Shahkot OTP Code', html);
     if (!result.ok) {
       console.error('OTP email failed:', result.error);
       return res.status(500).json({ error: `Failed to send OTP email. (${result.error || 'SMTP error'})` });
@@ -245,7 +245,7 @@ router.post('/register', geofenceCheck, async (req, res) => {
     );
 
     res.status(201).json({
-      message: 'Registration successful! Welcome to Apna Shahkot.',
+      message: 'Registration successful! Welcome to Ahwal e Shahkot.',
       token,
       user: {
         id: user.id,
@@ -255,6 +255,8 @@ router.post('/register', geofenceCheck, async (req, res) => {
         whatsapp: user.whatsapp,
         role: user.role,
         photoUrl: user.photoUrl,
+        canPostJobs: user.canPostJobs,
+        jobPostRequestPending: user.jobPostRequestPending,
       },
     });
   } catch (error) {
@@ -326,6 +328,8 @@ router.post('/login', geofenceCheck, async (req, res) => {
         whatsapp: user.whatsapp,
         role: userRole,
         photoUrl: user.photoUrl,
+        canPostJobs: user.canPostJobs,
+        jobPostRequestPending: user.jobPostRequestPending,
       },
     });
   } catch (error) {
@@ -365,7 +369,7 @@ router.post('/forgot-password', async (req, res) => {
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;">
         <div style="background:#0C8A43;padding:28px;border-radius:10px 10px 0 0;text-align:center;">
-          <h1 style="color:#fff;margin:0;font-size:24px;">🏘️ APNA SHAHKOT</h1>
+          <h1 style="color:#fff;margin:0;font-size:24px;">🏘️ AHWAL E SHAHKOT</h1>
           <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;">Password Reset</p>
         </div>
         <div style="background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px;">
@@ -378,7 +382,7 @@ router.post('/forgot-password', async (req, res) => {
         </div>
       </div>`;
 
-    const result = await sendEmail(email, '🔐 Reset Your Apna Shahkot Password', html);
+    const result = await sendEmail(email, '🔐 Reset Your Ahwal e Shahkot Password', html);
     if (!result.ok) {
       return res.status(500).json({ error: 'Failed to send OTP email.' });
     }
@@ -471,6 +475,8 @@ router.get('/profile', authenticate, async (req, res) => {
         whatsapp: true,
         photoUrl: true,
         role: true,
+        canPostJobs: true,
+        jobPostRequestPending: true,
         latitude: true,
         longitude: true,
         createdAt: true,
@@ -525,6 +531,8 @@ router.put('/profile', authenticate, async (req, res) => {
         whatsapp: true,
         photoUrl: true,
         role: true,
+        canPostJobs: true,
+        jobPostRequestPending: true,
       },
     });
 
@@ -581,6 +589,8 @@ router.post('/profile/photo', authenticate, uploadPhoto, async (req, res) => {
         whatsapp: true,
         photoUrl: true,
         role: true,
+        canPostJobs: true,
+        jobPostRequestPending: true,
       },
     });
 

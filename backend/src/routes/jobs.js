@@ -97,6 +97,27 @@ router.get('/my', authenticate, async (req, res) => {
 });
 
 /**
+ * GET /api/jobs/can-post
+ * Returns whether current user can create job posts
+ */
+router.get('/can-post', authenticate, async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { canPostJobs: true, jobPostRequestPending: true, role: true },
+    });
+
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const canPostJobs = user.role === 'ADMIN' || user.canPostJobs;
+    res.json({ canPostJobs, jobPostRequestPending: user.jobPostRequestPending });
+  } catch (error) {
+    console.error('Can-post check error:', error);
+    res.status(500).json({ error: 'Failed to check permission.' });
+  }
+});
+
+/**
  * GET /api/jobs/:id
  * Get a single job with applications (if owner)
  */
@@ -123,6 +144,10 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', authenticate, async (req, res) => {
   try {
+    if (req.user.role !== 'ADMIN' && !req.user.canPostJobs) {
+      return res.status(403).json({ error: 'You are not allowed to post jobs yet. Request access from admin.' });
+    }
+
     const { title, company, description, category, type, salary, location, phone, whatsapp, requirements } = req.body;
 
     if (!title || !company || !description || !category || !phone) {

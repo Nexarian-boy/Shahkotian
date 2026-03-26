@@ -27,6 +27,15 @@ export function AuthProvider({ children }) {
     loadStoredAuth();
   }, []);
 
+  const normalizeUser = (rawUser) => {
+    if (!rawUser) return rawUser;
+    return {
+      ...rawUser,
+      canPostJobs: !!rawUser.canPostJobs,
+      jobPostRequestPending: !!rawUser.jobPostRequestPending,
+    };
+  };
+
   // Register for push notifications and save token to backend
   const registerPushToken = async () => {
     try {
@@ -35,7 +44,7 @@ export function AuthProvider({ children }) {
       // Create the high-priority notification channel for Android
       if (Platform.OS === 'android') {
         await Notifications.setNotificationChannelAsync('apnashahkot_default', {
-          name: 'Apna Shahkot',
+          name: 'Ahwal e Shahkot',
           importance: Notifications.AndroidImportance.MAX,
           vibrationPattern: [0, 250, 250, 250],
           lightColor: '#0C8A43',
@@ -76,7 +85,7 @@ export function AuthProvider({ children }) {
 
       if (storedToken && storedUser) {
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        setUser(normalizeUser(JSON.parse(storedUser)));
       }
     } catch (error) {
       console.error('Auth load error:', error);
@@ -87,7 +96,8 @@ export function AuthProvider({ children }) {
 
   const login = async (loginData) => {
     const response = await authAPI.login(loginData);
-    const { token: newToken, user: newUser } = response.data;
+    const { token: newToken, user: rawUser } = response.data;
+    const newUser = normalizeUser(rawUser);
 
     await Promise.all([
       AsyncStorage.setItem('token', newToken),
@@ -105,7 +115,8 @@ export function AuthProvider({ children }) {
 
   const register = async (userData) => {
     const response = await authAPI.register(userData);
-    const { token: newToken, user: newUser } = response.data;
+    const { token: newToken, user: rawUser } = response.data;
+    const newUser = normalizeUser(rawUser);
 
     // STEP 1: Mark pending onboarding in storage BEFORE auth state flips
     // This is more reliable than in-memory state for cross-render communication
@@ -140,8 +151,9 @@ export function AuthProvider({ children }) {
   };
 
   const updateUser = (updatedUser) => {
-    setUser(updatedUser);
-    AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+    const normalized = normalizeUser(updatedUser);
+    setUser(normalized);
+    AsyncStorage.setItem('user', JSON.stringify(normalized));
   };
 
   const isAdmin = user?.role === 'ADMIN';

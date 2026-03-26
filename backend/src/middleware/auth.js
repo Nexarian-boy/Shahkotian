@@ -26,6 +26,8 @@ async function authenticate(req, res, next) {
         photoUrl: true,
         role: true,
         isActive: true,
+        canPostJobs: true,
+        jobPostRequestPending: true,
         latitude: true,
         longitude: true,
       },

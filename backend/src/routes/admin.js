@@ -9,8 +9,44 @@ const { sendPushToUser } = require('../utils/pushNotification');
 
 const router = express.Router();
 
-// All admin routes require authentication + admin role
+// All routes require authentication. Some routes below require admin role explicitly.
 router.use(authenticate);
+
+/**
+ * POST /api/admin/job-posters/request
+ * User requests permission to post jobs
+ */
+router.post('/job-posters/request', async (req, res) => {
+  try {
+    if (req.user.canPostJobs) {
+      return res.status(200).json({
+        message: 'You already have permission to post jobs.',
+        canPostJobs: true,
+        jobPostRequestPending: false,
+      });
+    }
+
+    if (req.user.jobPostRequestPending) {
+      return res.status(409).json({ error: 'Your request is already pending admin approval.' });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.id },
+      data: { jobPostRequestPending: true },
+      select: { id: true, canPostJobs: true, jobPostRequestPending: true },
+    });
+
+    res.json({
+      message: 'Your request has been submitted to admin.',
+      canPostJobs: updated.canPostJobs,
+      jobPostRequestPending: updated.jobPostRequestPending,
+    });
+  } catch (error) {
+    console.error('Job poster request error:', error);
+    res.status(500).json({ error: 'Failed to submit request.' });
+  }
+});
+
 router.use(adminOnly);
 
 // ============ DASHBOARD ============
@@ -137,6 +173,124 @@ router.put('/users/:id/toggle-active', async (req, res) => {
   } catch (error) {
     console.error('Toggle user error:', error);
     res.status(500).json({ error: 'Failed to update user.' });
+  }
+});
+
+// ============ JOB POSTER PERMISSIONS ============
+
+/**
+ * GET /api/admin/job-posters/requests
+ * Get all pending job poster requests
+ */
+router.get('/job-posters/requests', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { jobPostRequestPending: true },
+      orderBy: { updatedAt: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        canPostJobs: true,
+        jobPostRequestPending: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({ requests: users, count: users.length });
+  } catch (error) {
+    console.error('Job poster requests error:', error);
+    res.status(500).json({ error: 'Failed to load requests.' });
+  }
+});
+
+/**
+ * GET /api/admin/job-posters/approved
+ * Get users who are currently allowed to post jobs
+ */
+router.get('/job-posters/approved', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { canPostJobs: true },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        canPostJobs: true,
+        jobPostRequestPending: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({ users, count: users.length });
+  } catch (error) {
+    console.error('Approved job posters error:', error);
+    res.status(500).json({ error: 'Failed to load approved users.' });
+  }
+});
+
+/**
+ * PUT /api/admin/job-posters/:userId/approve
+ * Approve user to post jobs
+ */
+router.put('/job-posters/:userId/approve', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        canPostJobs: true,
+        jobPostRequestPending: false,
+      },
+      select: {
+        id: true,
+        name: true,
+        canPostJobs: true,
+        jobPostRequestPending: true,
+      },
+    });
+
+    res.json({ message: 'User approved for job posting.', user: updated });
+  } catch (error) {
+    console.error('Approve job poster error:', error);
+    res.status(500).json({ error: 'Failed to approve user.' });
+  }
+});
+
+/**
+ * PUT /api/admin/job-posters/:userId/revoke
+ * Revoke user job posting permission and clear pending request
+ */
+router.put('/job-posters/:userId/revoke', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        canPostJobs: false,
+        jobPostRequestPending: false,
+      },
+      select: {
+        id: true,
+        name: true,
+        canPostJobs: true,
+        jobPostRequestPending: true,
+      },
+    });
+
+    res.json({ message: 'User job posting permission revoked.', user: updated });
+  } catch (error) {
+    console.error('Revoke job poster error:', error);
+    res.status(500).json({ error: 'Failed to revoke permission.' });
   }
 });
 

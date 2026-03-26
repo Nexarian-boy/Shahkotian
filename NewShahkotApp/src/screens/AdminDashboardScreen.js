@@ -21,13 +21,15 @@ import { useAuth } from '../context/AuthContext';
 import ImageViewer from '../components/ImageViewer';
 
 const { width } = Dimensions.get('window');
-const TABS = ['Overview', 'Users', 'Rishta', 'Traders', 'AC Office', 'Reports', 'News', 'Notify', 'Storage'];
+const TABS = ['Overview', 'Users', 'Job Posters', 'Rishta', 'Traders', 'AC Office', 'Reports', 'News', 'Notify', 'Storage'];
 
 export default function AdminDashboardScreen({ navigation }) {
   const { loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('Overview');
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
+  const [jobPosterRequests, setJobPosterRequests] = useState([]);
+  const [approvedJobPosters, setApprovedJobPosters] = useState([]);
   const [rishtaProfiles, setRishtaProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,6 +88,13 @@ export default function AdminDashboardScreen({ navigation }) {
         const res = await adminAPI.getUsers({ search: searchQuery || undefined });
         console.log('Users data:', res.data);
         setUsers(res.data.users || []);
+      } else if (activeTab === 'Job Posters') {
+        const [reqRes, approvedRes] = await Promise.all([
+          adminAPI.getJobPosterRequests(),
+          adminAPI.getApprovedJobPosters(),
+        ]);
+        setJobPosterRequests(reqRes.data.requests || []);
+        setApprovedJobPosters(approvedRes.data.users || []);
       } else if (activeTab === 'Rishta') {
         const res = await adminAPI.getPendingRishta();
         setRishtaProfiles(res.data.profiles || []);
@@ -167,6 +176,36 @@ export default function AdminDashboardScreen({ navigation }) {
             loadData();
           } catch (err) {
             Alert.alert('Error', 'Action failed');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleApproveJobPoster = async (id) => {
+    try {
+      const res = await adminAPI.approveJobPoster(id);
+      Alert.alert('Done', res.data?.message || 'User approved for job posting.');
+      loadData();
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.error || 'Failed to approve user.');
+    }
+  };
+
+  const handleRejectOrRevokeJobPoster = async (id, mode = 'revoke') => {
+    const label = mode === 'reject' ? 'Reject request' : 'Revoke permission';
+    Alert.alert(label, `Are you sure you want to ${label.toLowerCase()}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: label,
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const res = await adminAPI.revokeJobPoster(id);
+            Alert.alert('Done', res.data?.message || 'Updated successfully.');
+            loadData();
+          } catch (err) {
+            Alert.alert('Error', err.response?.data?.error || 'Failed to update user.');
           }
         },
       },
@@ -413,6 +452,71 @@ export default function AdminDashboardScreen({ navigation }) {
       )}
       ListEmptyComponent={<EmptyState icon="✅" text="No pending approvals" />}
     />
+  );
+
+  const renderJobPosters = () => (
+    <ScrollView
+      style={styles.tabContent}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
+    >
+      <Text style={styles.sectionTitle}>Job Poster Requests ({jobPosterRequests.length})</Text>
+      {jobPosterRequests.length === 0 ? (
+        <EmptyState icon="📭" text="No pending job poster requests" />
+      ) : (
+        jobPosterRequests.map((item) => (
+          <View key={item.id} style={styles.userCard}>
+            <View style={styles.userAvatar}>
+              <Text style={styles.userAvatarText}>{item.name?.[0] || 'U'}</Text>
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{item.name}</Text>
+              <Text style={styles.userPhone}>{item.phone || '-'} {item.email ? `• ${item.email}` : ''}</Text>
+              <Text style={styles.userStats}>Requested job posting permission</Text>
+            </View>
+            <View style={{ gap: 6 }}>
+              <TouchableOpacity
+                style={[styles.toggleBtn, { backgroundColor: '#4CAF50' }]}
+                onPress={() => handleApproveJobPoster(item.id)}
+              >
+                <Text style={styles.toggleBtnText}>Approve</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleBtn, { backgroundColor: '#F44336' }]}
+                onPress={() => handleRejectOrRevokeJobPoster(item.id, 'reject')}
+              >
+                <Text style={styles.toggleBtnText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))
+      )}
+
+      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Approved Job Posters ({approvedJobPosters.length})</Text>
+      {approvedJobPosters.length === 0 ? (
+        <EmptyState icon="🗂️" text="No approved job posters" />
+      ) : (
+        approvedJobPosters.map((item) => (
+          <View key={item.id} style={styles.userCard}>
+            <View style={styles.userAvatar}>
+              <Text style={styles.userAvatarText}>{item.name?.[0] || 'U'}</Text>
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{item.name}</Text>
+              <Text style={styles.userPhone}>{item.phone || '-'} {item.email ? `• ${item.email}` : ''}</Text>
+              <Text style={[styles.userStats, { color: '#2E7D32' }]}>Approved for posting jobs</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.toggleBtn, { backgroundColor: '#F44336' }]}
+              onPress={() => handleRejectOrRevokeJobPoster(item.id, 'revoke')}
+            >
+              <Text style={styles.toggleBtnText}>Revoke</Text>
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
+
+      <View style={{ height: 20 }} />
+    </ScrollView>
   );
 
   const renderContent = () => (
@@ -773,7 +877,7 @@ export default function AdminDashboardScreen({ navigation }) {
         <Text style={[styles.notifInputLabel, { marginTop: 12 }]}>Message</Text>
         <TextInput
           style={[styles.notifInput, { height: 100, textAlignVertical: 'top' }]}
-          placeholder="e.g. Apna Shahkot mein aaj raat Mela hai, zaroor aayein!"
+          placeholder="e.g. Ahwal e Shahkot mein aaj raat Mela hai, zaroor aayein!"
           placeholderTextColor={COLORS.textLight}
           value={notifBody}
           onChangeText={setNotifBody}
@@ -986,6 +1090,7 @@ export default function AdminDashboardScreen({ navigation }) {
     switch (activeTab) {
       case 'Overview': return renderOverview();
       case 'Users': return renderUsers();
+      case 'Job Posters': return renderJobPosters();
       case 'Rishta': return renderRishta();
       case 'Reports': return renderReports();
       case 'Traders': return renderTraders();
