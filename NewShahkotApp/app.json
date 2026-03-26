@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Apna Shahkot",
+    "name": "Ahwal e Shahkot",
     "slug": "NewShahkotApp",
     "version": "1.1.2",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon.jpeg",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash-icon.jpeg",
       "resizeMode": "contain",
       "backgroundColor": "#0C8A43"
     },
@@ -22,7 +22,7 @@
         "NSCameraUsageDescription": "Shahkot App needs camera access to upload profile photos and post images.",
         "NSMicrophoneUsageDescription": "Shahkot App needs microphone access to record voice messages.",
         "NSPhotoLibraryUsageDescription": "Shahkot App needs photo library access to select images and videos.",
-        "NSUserNotificationsUsageDescription": "Apna Shahkot sends you notifications about important community updates, news, and activities in your area."
+        "NSUserNotificationsUsageDescription": "Ahwal e Shahkot sends you notifications about important community updates, news, and activities in your area."
       }
     },
     "android": {
@@ -30,7 +30,7 @@
       "package": "com.salman39.shahkotapp",
       "versionCode": 6,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/adaptive-icon.jpeg",
         "backgroundColor": "#0C8A43"
       },
       "softwareKeyboardLayoutMode": "pan",
@@ -51,13 +51,13 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/icon.jpeg"
     },
     "plugins": [
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
+          "icon": "./assets/notification-icon.jpeg",
           "color": "#0C8A43",
           "defaultChannel": "apnashahkot_default",
           "sounds": []
@@ -73,7 +73,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Apna Shahkot is only available within 50 km of Shahkot city. Your location is required to verify you are within the service area. Location is never tracked, sold, or shared with third parties."
+          "locationAlwaysAndWhenInUsePermission": "Ahwal e Shahkot is only available within 50 km of Shahkot city. Your location is required to verify you are within the service area. Location is never tracked, sold, or shared with third parties."
         }
       ],
       [

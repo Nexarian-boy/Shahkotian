@@ -121,7 +121,7 @@ export default function HomeScreen({ navigation }) {
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
-        <Image source={require('../../assets/logo.png')} style={{ width: 80, height: 80, borderRadius: 40, marginBottom: 16 }} resizeMode="contain" />
+        <Image source={require('../../assets/logo.jpeg')} style={{ width: 80, height: 80, borderRadius: 40, marginBottom: 16 }} resizeMode="contain" />
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={{ color: COLORS.textLight, marginTop: 12, fontSize: 14 }}>Loading your city...</Text>
       </View>
@@ -138,9 +138,9 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.header}>
           <View style={styles.headerTop}>
             <View style={styles.headerLeft}>
-              <Image source={require('../../assets/logo.png')} style={styles.headerLogo} resizeMode="contain" />
+              <Image source={require('../../assets/logo.jpeg')} style={styles.headerLogo} resizeMode="contain" />
               <View>
-                <Text style={styles.brandName}>APNA SHAHKOT</Text>
+                <Text style={styles.brandName}>AHWAL E SHAHKOT</Text>
                 <Text style={styles.greeting}>{getGreeting()}, {user?.name?.split(' ')[0] || 'User'} 👋</Text>
               </View>
             </View>
@@ -334,7 +334,7 @@ export default function HomeScreen({ navigation }) {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Image source={require('../../assets/logo.png')} style={{ width: 40, height: 40, borderRadius: 20, marginBottom: 8, opacity: 0.8 }} resizeMode="contain" />
+          <Image source={require('../../assets/logo.jpeg')} style={{ width: 40, height: 40, borderRadius: 20, marginBottom: 8, opacity: 0.8 }} resizeMode="contain" />
           <Text style={styles.footerText}>{APP_NAME} v1.0</Text>
           <Text style={styles.footerSub}>Made with ❤️ for Shahkot 🇵🇰</Text>
         </View>

@@ -37,8 +37,8 @@ export default function SplashScreen() {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.logoContainer, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
-        <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
-        <Text style={styles.title}>APNA SHAHKOT</Text>
+        <Image source={require('../../assets/logo.jpeg')} style={styles.logoImage} resizeMode="contain" />
+        <Text style={styles.title}>AHWAL E SHAHKOT</Text>
         <Text style={styles.taglineSmall}>Your City, Your Community</Text>
       </Animated.View>
       <View style={styles.bottom}>

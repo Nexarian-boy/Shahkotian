@@ -479,7 +479,7 @@ export default function LoginScreen({ navigation }) {
 
         {/* Header */}
         <View style={styles.header}>
-          <Image source={require('../../assets/logo.png')} style={styles.logoImage} resizeMode="contain" />
+          <Image source={require('../../assets/logo.jpeg')} style={styles.logoImage} resizeMode="contain" />
           <Text style={styles.title}>{APP_NAME}</Text>
           <Text style={styles.subtitle}>
             {isRegister ? t('createAccount') : t('welcomeBack')}
