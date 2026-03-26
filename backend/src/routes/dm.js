@@ -48,7 +48,25 @@ router.post('/start/:userId', authenticate, async (req, res) => {
             },
         });
 
-        if (existing) return res.json(existing);
+        if (existing) {
+            if (source === 'SERVICE') {
+                try {
+                    const sender = await prisma.user.findUnique({
+                        where: { id: req.user.id },
+                        select: { name: true },
+                    });
+                    await sendPushToUser(
+                        otherUserId,
+                        `💬 ${sender?.name || 'Someone'} messaged you`,
+                        'Service request received. Go to DM chat.',
+                        { type: 'DM_MESSAGE', chatId: existing.id }
+                    );
+                } catch (pushErr) {
+                    console.error('Service chat start push error (existing):', pushErr.message);
+                }
+            }
+            return res.json(existing);
+        }
 
         const chat = await prisma.dMChat.create({
             data: {
@@ -61,6 +79,23 @@ router.post('/start/:userId', authenticate, async (req, res) => {
                 user2: { select: { id: true, name: true, photoUrl: true } },
             },
         });
+
+        if (source === 'SERVICE') {
+            try {
+                const sender = await prisma.user.findUnique({
+                    where: { id: req.user.id },
+                    select: { name: true },
+                });
+                await sendPushToUser(
+                    otherUserId,
+                    `💬 ${sender?.name || 'Someone'} messaged you`,
+                    'Service request received. Go to DM chat.',
+                    { type: 'DM_MESSAGE', chatId: chat.id }
+                );
+            } catch (pushErr) {
+                console.error('Service chat start push error (new):', pushErr.message);
+            }
+        }
 
         res.status(201).json(chat);
     } catch (error) {

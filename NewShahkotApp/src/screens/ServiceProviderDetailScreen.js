@@ -60,11 +60,11 @@ export default function ServiceProviderDetailScreen({ navigation, route }) {
       return;
     }
     try {
-      const res = await dmAPI.startChat(provider.user.id, 'GENERAL');
+      const res = await dmAPI.startChat(provider.user.id, 'SERVICE');
       navigation.navigate('DMChat', {
         chatId: res.data.id,
         otherUser: provider.user,
-        source: 'GENERAL',
+        source: 'SERVICE',
       });
     } catch {
       Alert.alert('Error', 'Failed to open chat.');
