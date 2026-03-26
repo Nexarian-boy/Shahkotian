@@ -15,13 +15,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../config/constants';
-import { adminAPI, newsAPI, listingsAPI, reportsAPI, bazarAPI, acAPI } from '../services/api';
+import { adminAPI, newsAPI, listingsAPI, reportsAPI, bazarAPI, acAPI, servicesAPI } from '../services/api';
 import { notificationsAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import ImageViewer from '../components/ImageViewer';
 
 const { width } = Dimensions.get('window');
-const TABS = ['Overview', 'Users', 'Job Posters', 'Rishta', 'Traders', 'AC Office', 'Reports', 'News', 'Notify', 'Storage'];
+const TABS = ['Overview', 'Users', 'Job Posters', 'Services', 'Rishta', 'Traders', 'AC Office', 'Reports', 'News', 'Notify', 'Storage'];
 
 export default function AdminDashboardScreen({ navigation }) {
   const { loading: authLoading } = useAuth();
@@ -56,6 +56,13 @@ export default function AdminDashboardScreen({ navigation }) {
   const [presidentForm, setPresidentForm] = useState({ name: '', email: '', password: '' });
   const [creatingPresident, setCreatingPresident] = useState(false);
   const [traderSearch, setTraderSearch] = useState('');
+
+  // Services management
+  const [servicePendingProviders, setServicePendingProviders] = useState([]);
+  const [serviceCategories, setServiceCategories] = useState([]);
+  const [serviceCategoryForm, setServiceCategoryForm] = useState({ name: '', emoji: '🔧' });
+  const [serviceSubForms, setServiceSubForms] = useState({});
+  const [serviceBusy, setServiceBusy] = useState(false);
 
   // AC Office management
   const [acComplainants, setAcComplainants] = useState([]);
@@ -112,6 +119,13 @@ export default function AdminDashboardScreen({ navigation }) {
         setAllTraders(allRes.data.traders || []);
         setPendingTraders(pendRes.data.traders || []);
         setPresidents(presRes.data.presidents || []);
+      } else if (activeTab === 'Services') {
+        const [pendingRes, categoriesRes] = await Promise.all([
+          servicesAPI.adminGetPending(),
+          servicesAPI.getCategories(),
+        ]);
+        setServicePendingProviders(pendingRes.data.providers || []);
+        setServiceCategories(categoriesRes.data.categories || []);
       } else if (activeTab === 'AC Office') {
         const [compRes, offRes] = await Promise.all([acAPI.getPendingCnic(), acAPI.getOfficers()]);
         setAcComplainants(compRes.data.complainants || []);
@@ -265,6 +279,121 @@ export default function AdminDashboardScreen({ navigation }) {
             await newsAPI.delete(id);
             setAllNews(prev => prev.filter(n => n.id !== id));
           } catch (e) { Alert.alert('Error', 'Failed to delete.'); }
+        },
+      },
+    ]);
+  };
+
+  const handleApproveServiceProvider = async (id) => {
+    try {
+      setServiceBusy(true);
+      await servicesAPI.adminApproveProvider(id);
+      Alert.alert('Done', 'Service provider approved.');
+      loadData();
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to approve provider.');
+    } finally {
+      setServiceBusy(false);
+    }
+  };
+
+  const handleRejectServiceProvider = (id) => {
+    Alert.alert('Reject Provider', 'Are you sure you want to reject this provider request?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reject',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setServiceBusy(true);
+            await servicesAPI.adminRejectProvider(id, 'Rejected by admin');
+            Alert.alert('Done', 'Service provider rejected.');
+            loadData();
+          } catch (e) {
+            Alert.alert('Error', e.response?.data?.error || 'Failed to reject provider.');
+          } finally {
+            setServiceBusy(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleAddServiceCategory = async () => {
+    if (!serviceCategoryForm.name.trim()) {
+      Alert.alert('Required', 'Category name is required.');
+      return;
+    }
+    try {
+      setServiceBusy(true);
+      await servicesAPI.adminAddCategory({
+        name: serviceCategoryForm.name.trim(),
+        emoji: serviceCategoryForm.emoji?.trim() || '🔧',
+      });
+      setServiceCategoryForm({ name: '', emoji: '🔧' });
+      loadData();
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to add category.');
+    } finally {
+      setServiceBusy(false);
+    }
+  };
+
+  const handleAddServiceSubCategory = async (categoryId) => {
+    const value = serviceSubForms[categoryId]?.trim();
+    if (!value) {
+      Alert.alert('Required', 'Sub-category name is required.');
+      return;
+    }
+    try {
+      setServiceBusy(true);
+      await servicesAPI.adminAddSubCategory(categoryId, { name: value });
+      setServiceSubForms((prev) => ({ ...prev, [categoryId]: '' }));
+      loadData();
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to add sub-category.');
+    } finally {
+      setServiceBusy(false);
+    }
+  };
+
+  const handleDeleteServiceCategory = (id) => {
+    Alert.alert('Delete Category', 'Delete this category and all its sub-categories?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setServiceBusy(true);
+            await servicesAPI.adminDeleteCategory(id);
+            loadData();
+          } catch (e) {
+            Alert.alert('Error', e.response?.data?.error || 'Failed to delete category.');
+          } finally {
+            setServiceBusy(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteServiceSubCategory = (id) => {
+    Alert.alert('Delete Sub-category', 'Delete this sub-category?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setServiceBusy(true);
+            await servicesAPI.adminDeleteSubCategory(id);
+            loadData();
+          } catch (e) {
+            Alert.alert('Error', e.response?.data?.error || 'Failed to delete sub-category.');
+          } finally {
+            setServiceBusy(false);
+          }
         },
       },
     ]);
@@ -911,6 +1040,122 @@ export default function AdminDashboardScreen({ navigation }) {
     </ScrollView>
   );
 
+  const renderServices = () => (
+    <ScrollView style={styles.tabContent} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}>
+      <Text style={styles.sectionTitle}>Pending Provider Approvals ({servicePendingProviders.length})</Text>
+      {serviceBusy && <ActivityIndicator color={COLORS.primary} style={{ marginBottom: 10 }} />}
+
+      {servicePendingProviders.length === 0 ? (
+        <EmptyState icon="✅" text="No pending service providers" />
+      ) : (
+        servicePendingProviders.map((item) => (
+          <View key={item.id} style={styles.rishtaCard}>
+            <View style={styles.rishtaHeader}>
+              <Text style={styles.rishtaName}>{item.user?.name || 'Provider'}</Text>
+              <View style={[styles.statusBadge, { backgroundColor: '#FFF3E0' }]}>
+                <Text style={{ color: '#E65100', fontSize: 12 }}>PENDING</Text>
+              </View>
+            </View>
+            <Text style={styles.rishtaDetail}>Phone: {item.phone || item.user?.phone || '-'}</Text>
+            <Text style={styles.rishtaDetail}>Category: {item.category?.name || '-'}</Text>
+            <Text style={styles.rishtaDetail}>Sub-category: {item.subCategory?.name || '-'}</Text>
+            <Text style={styles.rishtaDetail}>Experience: {item.experience ?? 0} years</Text>
+            {item.description ? <Text style={styles.rishtaDetail}>Description: {item.description}</Text> : null}
+
+            <Text style={styles.cnicLabel}>CNIC Verification</Text>
+            <View style={styles.cnicImagesRow}>
+              {item.cnicFront ? (
+                <TouchableOpacity style={styles.cnicImageContainer} onPress={() => setMediaViewer(item.cnicFront)}>
+                  <Text style={styles.cnicImageLabel}>Front</Text>
+                  <Image source={{ uri: item.cnicFront }} style={styles.cnicImage} resizeMode="cover" />
+                </TouchableOpacity>
+              ) : null}
+              {item.cnicBack ? (
+                <TouchableOpacity style={styles.cnicImageContainer} onPress={() => setMediaViewer(item.cnicBack)}>
+                  <Text style={styles.cnicImageLabel}>Back</Text>
+                  <Image source={{ uri: item.cnicBack }} style={styles.cnicImage} resizeMode="cover" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            <View style={styles.rishtaActions}>
+              <TouchableOpacity
+                style={[styles.rishtaBtn, { backgroundColor: '#4CAF50' }]}
+                onPress={() => handleApproveServiceProvider(item.id)}
+              >
+                <Text style={styles.rishtaBtnText}>Approve</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.rishtaBtn, { backgroundColor: COLORS.error }]}
+                onPress={() => handleRejectServiceProvider(item.id)}
+              >
+                <Text style={styles.rishtaBtnText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))
+      )}
+
+      <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Manage Categories</Text>
+      <View style={{ backgroundColor: COLORS.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: COLORS.border }}>
+        <Text style={{ fontWeight: '700', color: COLORS.text, marginBottom: 8 }}>Add New Category</Text>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TextInput
+            style={[styles.notifInput, { flex: 0.25 }]}
+            placeholder="Emoji"
+            value={serviceCategoryForm.emoji}
+            onChangeText={(v) => setServiceCategoryForm((prev) => ({ ...prev, emoji: v }))}
+          />
+          <TextInput
+            style={[styles.notifInput, { flex: 0.75 }]}
+            placeholder="Category name"
+            value={serviceCategoryForm.name}
+            onChangeText={(v) => setServiceCategoryForm((prev) => ({ ...prev, name: v }))}
+          />
+        </View>
+        <TouchableOpacity style={[styles.sendNotifBtn, { marginTop: 10 }]} onPress={handleAddServiceCategory}>
+          <Text style={styles.sendNotifBtnText}>Add Category</Text>
+        </TouchableOpacity>
+      </View>
+
+      {serviceCategories.map((cat) => (
+        <View key={cat.id} style={[styles.userCard, { marginTop: 12, flexDirection: 'column', alignItems: 'stretch' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontWeight: '800', color: COLORS.text }}>{cat.emoji} {cat.name}</Text>
+            <TouchableOpacity onPress={() => handleDeleteServiceCategory(cat.id)}>
+              <Ionicons name="trash" size={18} color={COLORS.error} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={{ marginTop: 8, gap: 6 }}>
+            {(cat.subCategories || []).map((sub) => (
+              <View key={sub.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F8FAFC', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8 }}>
+                <Text style={{ color: COLORS.textSecondary, flex: 1 }}>{sub.name}</Text>
+                <TouchableOpacity onPress={() => handleDeleteServiceSubCategory(sub.id)}>
+                  <Ionicons name="close-circle" size={18} color={COLORS.error} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+            <TextInput
+              style={[styles.notifInput, { flex: 1 }]}
+              placeholder="Add sub-category"
+              value={serviceSubForms[cat.id] || ''}
+              onChangeText={(v) => setServiceSubForms((prev) => ({ ...prev, [cat.id]: v }))}
+            />
+            <TouchableOpacity style={[styles.actionBtn, { backgroundColor: COLORS.primary }]} onPress={() => handleAddServiceSubCategory(cat.id)}>
+              <Text style={styles.actionBtnText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+
+      <View style={{ height: 24 }} />
+    </ScrollView>
+  );
+
   const renderTraders = () => {
     const q = traderSearch.toLowerCase();
     const filteredTraders = q ? allTraders.filter(t =>
@@ -1091,6 +1336,7 @@ export default function AdminDashboardScreen({ navigation }) {
       case 'Overview': return renderOverview();
       case 'Users': return renderUsers();
       case 'Job Posters': return renderJobPosters();
+      case 'Services': return renderServices();
       case 'Rishta': return renderRishta();
       case 'Reports': return renderReports();
       case 'Traders': return renderTraders();

@@ -345,6 +345,31 @@ export const jobsAPI = {
   requestPostAccess: () => api.post('/admin/job-posters/request'),
 };
 
+// ============ SERVICES API ============
+export const servicesAPI = {
+  // Public
+  getCategories: () => api.get('/services/categories'),
+  getSubCategories: (categoryId) => api.get(`/services/categories/${categoryId}/sub`),
+  getProviders: (subCategoryId, categoryId) => api.get('/services/providers', { params: { subCategoryId, categoryId } }),
+  getProviderDetail: (providerId) => api.get(`/services/providers/${providerId}`),
+  // Provider
+  getMyProviderStatus: () => api.get('/services/my-provider'),
+  registerProvider: (formData) => api.post('/services/register-provider', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
+  }),
+  // Reviews
+  submitReview: (providerId, stars, comment) => api.post(`/services/providers/${providerId}/review`, { stars, comment }),
+  // Admin
+  adminGetPending: () => api.get('/services/admin/pending'),
+  adminApproveProvider: (id) => api.put(`/services/admin/providers/${id}/approve`),
+  adminRejectProvider: (id, reason) => api.put(`/services/admin/providers/${id}/reject`, { reason }),
+  adminAddCategory: (data) => api.post('/services/admin/categories', data),
+  adminAddSubCategory: (categoryId, data) => api.post(`/services/admin/categories/${categoryId}/sub`, data),
+  adminDeleteCategory: (id) => api.delete(`/services/admin/categories/${id}`),
+  adminDeleteSubCategory: (id) => api.delete(`/services/admin/subcategories/${id}`),
+};
+
 // ============ ALIASES FOR BACKWARDS COMPATIBILITY ============
 export const listingAPI = listingsAPI;
 export const tournamentAPI = tournamentsAPI;

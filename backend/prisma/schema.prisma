@@ -37,6 +37,8 @@ model User {
   dmMessages       DMMessage[]       @relation("DMSender")
   jobs             Job[]
   jobApplications  JobApplication[]
+  serviceProvider  ServiceProvider?
+  serviceReviews   ServiceReview[]   @relation("ServiceSeeker")
   listings         Listing[]
   newsArticles     News[]
   notifications    Notification[]
@@ -680,6 +682,70 @@ model ACAnnouncement {
   @@index([isPublished, createdAt(sort: Desc)])
 }
 
+model ServiceCategory {
+  id            String               @id @default(uuid())
+  name          String
+  emoji         String               @default("🔧")
+  isActive      Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  subCategories ServiceSubCategory[]
+  providers     ServiceProvider[]
+
+  @@index([isActive])
+}
+
+model ServiceSubCategory {
+  id         String            @id @default(uuid())
+  categoryId String
+  name       String
+  isActive   Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  category   ServiceCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  providers  ServiceProvider[]
+
+  @@index([categoryId])
+  @@index([isActive])
+}
+
+model ServiceProvider {
+  id              String                @id @default(uuid())
+  userId          String                @unique
+  categoryId      String
+  subCategoryId   String
+  cnicFront       String
+  cnicBack        String
+  experience      Int
+  phone           String
+  description     String?
+  status          ServiceProviderStatus @default(PENDING)
+  rejectionReason String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        ServiceCategory       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  subCategory     ServiceSubCategory    @relation(fields: [subCategoryId], references: [id], onDelete: Restrict)
+  reviews         ServiceReview[]
+
+  @@index([status])
+  @@index([subCategoryId])
+  @@index([categoryId])
+}
+
+model ServiceReview {
+  id         String          @id @default(uuid())
+  providerId String
+  seekerId   String
+  stars      Int
+  comment    String?
+  createdAt  DateTime        @default(now())
+  provider   ServiceProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  seeker     User            @relation("ServiceSeeker", fields: [seekerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, seekerId])
+  @@index([providerId])
+  @@index([seekerId])
+}
+
 enum Role {
   USER
   VERIFIED_USER
@@ -802,6 +868,12 @@ enum ACComplaintStatus {
 }
 
 enum ACVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ServiceProviderStatus {
   PENDING
   APPROVED
   REJECTED

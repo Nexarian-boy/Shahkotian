@@ -51,6 +51,11 @@ import PrivacyPolicyScreen from './src/screens/PrivacyPolicyScreen';
 import RestaurantDealsScreen from './src/screens/RestaurantDealsScreen';
 import ClothBrandDealsScreen from './src/screens/ClothBrandDealsScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import ServicesScreen from './src/screens/ServicesScreen';
+import ServiceProviderRegisterScreen from './src/screens/ServiceProviderRegisterScreen';
+import ServiceProvidersListScreen from './src/screens/ServiceProvidersListScreen';
+import ServiceProviderDetailScreen from './src/screens/ServiceProviderDetailScreen';
+import ServiceReviewScreen from './src/screens/ServiceReviewScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -258,6 +263,11 @@ function AppNavigator() {
           <Stack.Screen name="Helpline" component={HelplineScreen} />
           <Stack.Screen name="Doctors" component={DoctorsScreen} />
           <Stack.Screen name="Jobs" component={JobsScreen} />
+          <Stack.Screen name="Services" component={ServicesScreen} />
+          <Stack.Screen name="ServiceProviderRegister" component={ServiceProviderRegisterScreen} />
+          <Stack.Screen name="ServiceProvidersList" component={ServiceProvidersListScreen} />
+          <Stack.Screen name="ServiceProviderDetail" component={ServiceProviderDetailScreen} />
+          <Stack.Screen name="ServiceReview" component={ServiceReviewScreen} />
           <Stack.Screen name="RestaurantDeals" component={RestaurantDealsScreen} />
           <Stack.Screen name="ClothBrands" component={ClothBrandDealsScreen} />
           <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
@@ -285,6 +295,8 @@ export default function App() {
         navigationRef.current.navigate('Doctors');
       } else if (data?.type === 'JOB_APPLICATION') {
         navigationRef.current.navigate('Jobs');
+      } else if (data?.type === 'SERVICE_APPROVED' || data?.type === 'SERVICE_REJECTED') {
+        navigationRef.current.navigate('Services');
       } else if (data?.type === 'DM_MESSAGE') {
         navigationRef.current.navigate('DMList');
       } else if (data?.type === 'RISHTA_INTEREST' || data?.type === 'RISHTA_ACCEPTED' || data?.type === 'RISHTA_APPROVED' || data?.type === 'RISHTA_REJECTED') {

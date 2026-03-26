@@ -34,6 +34,7 @@ const clothBrandRoutes = require('./routes/clothBrands');
 const appointmentRoutes = require('./routes/appointments');
 const bazarRoutes = require('./routes/bazar');
 const acRoutes = require('./routes/ac');
+const serviceRoutes = require('./routes/services');
 
 const app = express();
 const httpServer = http.createServer(app);
@@ -104,7 +105,7 @@ const { authenticate, adminOnly } = require('./middleware/auth');
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Apna Shahkot API is running', timestamp: new Date() });
+  res.json({ status: 'ok', message: 'Ahwal e Shahkot API is running', timestamp: new Date() });
 });
 
 // Database status endpoint (admin only)
@@ -192,6 +193,7 @@ app.use('/api/restaurants', restaurantRoutes);
 app.use('/api/cloth-brands', clothBrandRoutes);
 app.use('/api/bazar', bazarRoutes);
 app.use('/api/ac', acRoutes);
+app.use('/api/services', serviceRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -218,7 +220,7 @@ async function startServer() {
     }
 
     const server = httpServer.listen(PORT, () => {
-      console.log(`🚀 Apna Shahkot API running on port ${PORT}`);
+      console.log(`🚀 Ahwal e Shahkot API running on port ${PORT}`);
       console.log(`📍 Geofence: ${process.env.SHAHKOT_LAT}, ${process.env.SHAHKOT_LNG} (${process.env.GEOFENCE_RADIUS_KM}km radius)`);
 
       // Keep-alive self-ping — prevents Render free tier from sleeping after 15 min idle

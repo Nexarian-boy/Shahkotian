@@ -24,6 +24,7 @@ function getCategories(t) {
       icon: 'briefcase',
       color: '#2563EB',
       items: [
+        { key: 'Services', label: 'Services', icon: 'construct', desc: 'Hire or offer local services', color: '#0EA5E9' },
         { key: 'Jobs', label: t('jobs'), icon: 'briefcase', desc: t('findPostJobs'), color: '#2563EB' },
         { key: 'Market', label: t('buySell'), icon: 'cart', desc: t('marketplace'), color: '#FF6584' },
         { key: 'Bazar', label: t('bazarFinder'), icon: 'storefront', desc: t('findShops'), color: '#3B82F6' },
