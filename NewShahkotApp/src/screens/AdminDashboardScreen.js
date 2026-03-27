@@ -1262,12 +1262,12 @@ export default function AdminDashboardScreen({ navigation }) {
                   <Text style={{ fontSize: 11, color: COLORS.textLight }}>📞 {trader.phone}</Text>
                 </View>
               </View>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                <TouchableOpacity style={{ flex: 1, backgroundColor: COLORS.success + '15', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }} onPress={async () => { try { await bazarAPI.approveTrader(trader.id); Alert.alert('Done', 'Trader approved'); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } }}>
-                  <Text style={{ color: COLORS.success, fontWeight: '700', fontSize: 13 }}>✓ Approve</Text>
+              <View style={styles.traderActionRow}>
+                <TouchableOpacity style={styles.traderApproveBtn} onPress={async () => { try { await bazarAPI.approveTrader(trader.id); Alert.alert('Done', 'Trader approved'); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } }}>
+                  <Text style={styles.traderActionText}>Approve</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={{ flex: 1, backgroundColor: COLORS.error + '15', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }} onPress={async () => { try { await bazarAPI.rejectTrader(trader.id); Alert.alert('Done', 'Trader rejected'); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } }}>
-                  <Text style={{ color: COLORS.error, fontWeight: '700', fontSize: 13 }}>✗ Reject</Text>
+                <TouchableOpacity style={styles.traderRejectBtn} onPress={async () => { try { await bazarAPI.rejectTrader(trader.id); Alert.alert('Done', 'Trader rejected'); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } }}>
+                  <Text style={styles.traderActionText}>Reject</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={{ backgroundColor: COLORS.error + '10', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 }} onPress={() => Alert.alert('Delete', 'Remove this trader?', [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await bazarAPI.deleteTrader(trader.id); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } } }])}>
                   <Ionicons name="trash" size={16} color={COLORS.error} />
@@ -1784,4 +1784,24 @@ const styles = StyleSheet.create({
   },
   settingActionBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   settingHint: { fontSize: 12, color: COLORS.textSecondary, lineHeight: 18 },
+  traderActionRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  traderApproveBtn: {
+    flex: 1,
+    backgroundColor: '#2E7D32',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  traderRejectBtn: {
+    flex: 1,
+    backgroundColor: '#C62828',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  traderActionText: { color: '#fff', fontWeight: '800', fontSize: 13 },
 });
