@@ -6,12 +6,12 @@ const router = express.Router();
 const ADMIN_PHONE = process.env.ADMIN_CONTACT_PHONE || '03160623838';
 const ADMIN_EMAIL_CONTACT = process.env.ADMIN_CONTACT_EMAIL || 'salmanmalhig@gmail.com';
 
-const SYSTEM_PROMPT = `You are the APNA SHAHKOT AI Assistant — a helpful, friendly chatbot that helps users navigate and use the Apna Shahkot App. You ONLY answer questions about the app and Shahkot city. If someone asks about anything else, politely redirect them back to the app.
+const SYSTEM_PROMPT = `You are the AHWAL E SHAHKOT AI Assistant — a helpful, friendly chatbot that helps users navigate and use the Ahwal e Shahkot App. You ONLY answer questions about the app and Shahkot city. If someone asks about anything else, politely redirect them back to the app.
 
 About the App:
 - A community app for the people of Shahkot, Pakistan (50km radius)
 - Built for connecting the local community with all city services in one place
-- Brand name: "APNA SHAHKOT"
+- Brand name: "AHWAL E SHAHKOT"
 - Contact Admin: Phone/WhatsApp ${ADMIN_PHONE}, Email ${ADMIN_EMAIL_CONTACT}
 
 FEATURES:
@@ -170,7 +170,7 @@ function getFallbackReply(message) {
     if (msg.includes('password') || msg.includes('forgot') || msg.includes('reset') || msg.includes('bhool'))
         return '🔑 Password bhool gaye? Login screen pe "Forgot Password?" tap karein. Apna email daalein, OTP aayega email pe, OTP verify karein aur naya password set karein! 📧';
     // Default fallback
-    return `🤖 Main APNA SHAHKOT App ka AI Helper hoon! Mujhse app ke baare mein poochiye — Buy & Sell, Jobs, Rishta, Chat, Tournaments, Blood Donation, ya koi bhi feature. Admin se contact: ${ADMIN_PHONE} 💬`;
+    return `🤖 Main AHWAL E SHAHKOT App ka AI Helper hoon! Mujhse app ke baare mein poochiye — Buy & Sell, Jobs, Rishta, Chat, Tournaments, Blood Donation, ya koi bhi feature. Admin se contact: ${ADMIN_PHONE} 💬`;
 }
 
 /**

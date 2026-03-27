@@ -7,6 +7,7 @@
  */
 import { Platform, AppState } from 'react-native';
 import Constants from 'expo-constants';
+import { getAdsEnabled, subscribeAdsEnabled } from './adSettings';
 
 const isExpoGo = Constants.appOwnership === 'expo';
 
@@ -51,6 +52,18 @@ let AppOpenAd       = null;
 let AdEvent         = null;
 let interstitialRef = null;
 let appOpenRef      = null;
+let adsToggleSubscribed = false;
+
+function ensureAdsToggleSubscription() {
+  if (adsToggleSubscribed) return;
+  adsToggleSubscribed = true;
+
+  subscribeAdsEnabled((enabled) => {
+    if (enabled) {
+      initAds();
+    }
+  });
+}
 
 function loadSdk() {
   if (isExpoGo) return false;
@@ -84,6 +97,7 @@ function preloadInterstitial() {
  * Call this on screen transitions.  Shows an interstitial once every 2 minutes.
  */
 export function onScreenView() {
+  if (!getAdsEnabled()) return;
   screenViewCount += 1;
   const now = Date.now();
   if (now - lastInterstitialTime < MIN_INTERSTITIAL_GAP_MS) return; // respect 2-min gap
@@ -116,6 +130,7 @@ function preloadAppOpen() {
 }
 
 function handleAppStateChange(nextState) {
+  if (!getAdsEnabled()) return;
   if (nextState !== 'active') return;
   const now = Date.now();
   if (now - lastAppOpenTime < MIN_APP_OPEN_GAP_MS) return;
@@ -136,7 +151,14 @@ function handleAppStateChange(nextState) {
 let initialised = false;
 
 export function initAds() {
+  ensureAdsToggleSubscription();
+
   if (initialised) return;
+  if (!getAdsEnabled()) {
+    console.log('AdManager: ads disabled by remote setting');
+    return;
+  }
+
   initialised = true;
   if (!loadSdk()) {
     console.log('AdManager: running in Expo Go — ads disabled');

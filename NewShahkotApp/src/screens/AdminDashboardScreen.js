@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import ImageViewer from '../components/ImageViewer';
 
 const { width } = Dimensions.get('window');
-const TABS = ['Overview', 'Users', 'Job Posters', 'Services', 'Rishta', 'Traders', 'AC Office', 'Reports', 'News', 'Notify', 'Storage'];
+const TABS = ['Overview', 'Users', 'Job Posters', 'Services', 'Rishta', 'Traders', 'AC Office', 'Reports', 'News', 'Notify', 'Storage', 'App Settings'];
 
 export default function AdminDashboardScreen({ navigation }) {
   const { loading: authLoading } = useAuth();
@@ -63,6 +63,8 @@ export default function AdminDashboardScreen({ navigation }) {
   const [serviceCategoryForm, setServiceCategoryForm] = useState({ name: '', emoji: '🔧' });
   const [serviceSubForms, setServiceSubForms] = useState({});
   const [serviceBusy, setServiceBusy] = useState(false);
+  const [adsEnabled, setAdsEnabled] = useState(true);
+  const [adsToggleLoading, setAdsToggleLoading] = useState(false);
 
   // AC Office management
   const [acComplainants, setAcComplainants] = useState([]);
@@ -153,6 +155,9 @@ export default function AdminDashboardScreen({ navigation }) {
             console.log('Could not load storage info:', e);
           }
         }
+      } else if (activeTab === 'App Settings') {
+        const res = await adminAPI.getAdSettings();
+        setAdsEnabled(res?.data?.adsEnabled !== false);
       }
     } catch (err) {
       console.log('Admin data load error:', err);
@@ -821,6 +826,77 @@ export default function AdminDashboardScreen({ navigation }) {
     </ScrollView>
   );
 
+  const handleToggleAds = async () => {
+    const nextValue = !adsEnabled;
+    Alert.alert(
+      nextValue ? 'Enable Ads' : 'Disable Ads',
+      nextValue
+        ? 'Ads will start showing again for users without a new app release.'
+        : 'Ads will stop for users without a new app release.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            try {
+              setAdsToggleLoading(true);
+              const res = await adminAPI.updateAdSettings(nextValue);
+              setAdsEnabled(res?.data?.adsEnabled !== false);
+              Alert.alert('Done', res?.data?.message || 'Ads setting updated.');
+            } catch (e) {
+              Alert.alert('Error', e.response?.data?.error || 'Failed to update ads setting.');
+            } finally {
+              setAdsToggleLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const renderAppSettings = () => (
+    <ScrollView
+      style={styles.tabContent}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadData(); }} />}
+    >
+      <Text style={styles.sectionTitle}>Ad Controls</Text>
+      <View style={styles.settingCard}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.settingTitle}>In-App Ads</Text>
+          <Text style={styles.settingSubTitle}>
+            {adsEnabled
+              ? 'Ads are currently enabled for all users.'
+              : 'Ads are currently disabled for all users.'}
+          </Text>
+        </View>
+        <View style={[styles.statusPill, { backgroundColor: adsEnabled ? '#E8F5E9' : '#FFEBEE' }]}>
+          <Text style={[styles.statusPillText, { color: adsEnabled ? '#2E7D32' : '#C62828' }]}>
+            {adsEnabled ? 'ON' : 'OFF'}
+          </Text>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={[
+          styles.settingActionBtn,
+          { backgroundColor: adsEnabled ? '#F44336' : '#2E7D32', opacity: adsToggleLoading ? 0.7 : 1 },
+        ]}
+        disabled={adsToggleLoading}
+        onPress={handleToggleAds}
+      >
+        {adsToggleLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.settingActionBtnText}>{adsEnabled ? 'Disable Ads' : 'Enable Ads'}</Text>
+        )}
+      </TouchableOpacity>
+
+      <Text style={styles.settingHint}>
+        This setting is applied remotely, so users do not need to install a new app version.
+      </Text>
+    </ScrollView>
+  );
+
   const renderNews = () => (
     <FlatList
       data={allNews}
@@ -1344,6 +1420,7 @@ export default function AdminDashboardScreen({ navigation }) {
       case 'News': return renderNews();
       case 'Notify': return renderNotifications();
       case 'Storage': return renderStorage();
+      case 'App Settings': return renderAppSettings();
       default: return null;
     }
   };
@@ -1684,4 +1761,27 @@ const styles = StyleSheet.create({
   },
   notifTipsTitle: { fontSize: 14, fontWeight: '700', color: '#2E7D32', marginBottom: 10 },
   notifTip: { fontSize: 13, color: '#388E3C', lineHeight: 22 },
+  settingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 14,
+  },
+  settingTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  settingSubTitle: { fontSize: 12, color: COLORS.textLight, marginTop: 4 },
+  statusPill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 99, marginLeft: 10 },
+  statusPillText: { fontSize: 11, fontWeight: '800' },
+  settingActionBtn: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  settingActionBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  settingHint: { fontSize: 12, color: COLORS.textSecondary, lineHeight: 18 },
 });

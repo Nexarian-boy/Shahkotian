@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Platform, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
+import { getAdsEnabled, initAdsEnabled, subscribeAdsEnabled } from '../utils/adSettings';
 
 // ─── Ad Unit IDs ──────────────────────────────────────────────────────────────
 // Step 1: Create your AdMob account at https://admob.google.com
@@ -43,6 +44,16 @@ if (!isExpoGo) {
 
 // ─── AdBanner Component ───────────────────────────────────────────────────────
 export default function AdBanner({ size = 'BANNER' }) {
+  const [adsEnabled, setAdsEnabled] = useState(getAdsEnabled());
+
+  useEffect(() => {
+    const unsubscribe = subscribeAdsEnabled((enabled) => setAdsEnabled(enabled));
+    initAdsEnabled();
+    return unsubscribe;
+  }, []);
+
+  if (!adsEnabled) return null;
+
   // In Expo Go: show a dashed placeholder so layout is visible during testing
   if (isExpoGo) {
     return (

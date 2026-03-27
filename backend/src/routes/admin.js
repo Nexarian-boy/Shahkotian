@@ -8,6 +8,7 @@ const firebaseAdmin = require('../config/firebase');
 const { sendPushToUser } = require('../utils/pushNotification');
 
 const router = express.Router();
+const ADS_ENABLED_KEY = 'ads_enabled';
 
 // All routes require authentication. Some routes below require admin role explicitly.
 router.use(authenticate);
@@ -48,6 +49,67 @@ router.post('/job-posters/request', async (req, res) => {
 });
 
 router.use(adminOnly);
+
+/**
+ * GET /api/admin/settings/ads
+ * Read current ads toggle state (defaults to enabled when unset)
+ */
+router.get('/settings/ads', async (req, res) => {
+  try {
+    const setting = await prisma.appSetting.findUnique({
+      where: { key: ADS_ENABLED_KEY },
+      select: { boolValue: true, updatedAt: true },
+    });
+
+    res.json({
+      adsEnabled: setting?.boolValue !== false,
+      source: setting ? 'database' : 'default',
+      updatedAt: setting?.updatedAt || null,
+    });
+  } catch (error) {
+    console.error('Admin ads settings read error:', error);
+    res.status(500).json({ error: 'Failed to load ads settings.' });
+  }
+});
+
+const updateAdsSetting = async (req, res) => {
+  try {
+    const { adsEnabled } = req.body || {};
+    if (typeof adsEnabled !== 'boolean') {
+      return res.status(400).json({ error: 'adsEnabled must be a boolean.' });
+    }
+
+    const updated = await prisma.appSetting.upsert({
+      where: { key: ADS_ENABLED_KEY },
+      update: { boolValue: adsEnabled },
+      create: {
+        key: ADS_ENABLED_KEY,
+        boolValue: adsEnabled,
+      },
+      select: { boolValue: true, updatedAt: true },
+    });
+
+    res.json({
+      message: `Ads ${updated.boolValue ? 'enabled' : 'disabled'} successfully.`,
+      adsEnabled: updated.boolValue !== false,
+      updatedAt: updated.updatedAt,
+    });
+  } catch (error) {
+    console.error('Admin ads settings update error:', error);
+    res.status(500).json({ error: 'Failed to update ads settings.' });
+  }
+};
+
+/**
+ * PUT /api/admin/settings/ads
+ * POST /api/admin/settings/ads
+ * Update ads toggle state
+ */
+router.put('/settings/ads', updateAdsSetting);
+router.post('/settings/ads', updateAdsSetting);
+
+// Backward-compatible alias in case an older client uses this path.
+router.post('/ads/settings', updateAdsSetting);
 
 // ============ DASHBOARD ============
 

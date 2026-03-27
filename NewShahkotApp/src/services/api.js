@@ -225,6 +225,11 @@ export const bloodAPI = {
   unregister: () => api.delete('/blood/unregister'),
 };
 
+// ============ PUBLIC CONFIG API ============
+export const publicConfigAPI = {
+  getPublicConfig: () => api.get('/public-config', { headers: { Authorization: '' } }),
+};
+
 // ============ ADMIN API ============
 export const adminAPI = {
   getDashboard: () => api.get('/admin/dashboard'),
@@ -262,6 +267,9 @@ export const adminAPI = {
   getApprovedJobPosters: () => api.get('/admin/job-posters/approved'),
   approveJobPoster: (userId) => api.put(`/admin/job-posters/${userId}/approve`),
   revokeJobPoster: (userId) => api.put(`/admin/job-posters/${userId}/revoke`),
+  // Ads settings
+  getAdSettings: () => api.get('/admin/settings/ads'),
+  updateAdSettings: (adsEnabled) => api.post('/admin/settings/ads', { adsEnabled }),
 };
 
 // ============ REPORTS API ============

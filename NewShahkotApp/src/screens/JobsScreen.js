@@ -286,6 +286,8 @@ export default function JobsScreen({ navigation }) {
     if (!selectedJob) return null;
     const cat = getCategoryInfo(selectedJob.category);
     const isOwner = selectedJob.userId === user?.id || selectedJob.user?.id === user?.id;
+    const isAdmin = user?.role === 'ADMIN';
+    const canManageJob = isOwner || isAdmin;
 
     return (
       <Modal visible={showDetailModal} animationType="slide" onRequestClose={() => setShowDetailModal(false)}>
@@ -369,22 +371,24 @@ export default function JobsScreen({ navigation }) {
               </>
             )}
 
-            {isOwner && (
+            {canManageJob && (
               <View style={styles.ownerActionsRow}>
-                <TouchableOpacity style={styles.editJobBtn} onPress={() => openEditJob(selectedJob)}>
-                  <Ionicons name="create-outline" size={18} color="#1565C0" />
-                  <Text style={styles.editJobText}>Edit Job</Text>
-                </TouchableOpacity>
+                {isOwner && (
+                  <TouchableOpacity style={styles.editJobBtn} onPress={() => openEditJob(selectedJob)}>
+                    <Ionicons name="create-outline" size={18} color="#1565C0" />
+                    <Text style={styles.editJobText}>Edit Job</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={styles.deleteJobBtn} onPress={() => deleteJob(selectedJob.id)}>
                   <Ionicons name="trash-outline" size={18} color="#F44336" />
-                  <Text style={styles.deleteJobText}>{t('deleteJob')}</Text>
+                  <Text style={styles.deleteJobText}>{isAdmin && !isOwner ? 'Delete Job (Admin)' : t('deleteJob')}</Text>
                 </TouchableOpacity>
               </View>
             )}
             <View style={{ height: 30 }} />
           </ScrollView>
 
-          {!isOwner && (
+          {!canManageJob && (
             <View style={styles.detailCTA}>
               <TouchableOpacity style={styles.callCTABtn} onPress={() => callNumber(selectedJob.phone)}>
                 <Ionicons name="call" size={18} color={COLORS.white} />

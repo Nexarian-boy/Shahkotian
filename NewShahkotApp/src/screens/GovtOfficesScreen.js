@@ -25,6 +25,7 @@ const PUNJAB_HELPLINES = [
   
   // Utilities
   { name: 'LESCO', number: '132', icon: '⚡', desc: 'Lahore Electric Supply Company', color: '#F9A825', category: 'Utility', priority: 2 },
+  { name: 'LWMC', number: '1139', icon: '🗑️', desc: 'Lahore Waste Management Company', color: '#2E7D32', category: 'Utility', priority: 2 },
   { name: 'FESCO', number: '132', icon: '⚡', desc: 'Faisalabad Electric Supply', color: '#F57C00', category: 'Utility', priority: 2 },
   { name: 'GEPCO', number: '132', icon: '⚡', desc: 'Gujranwala Electric Supply', color: '#FFA000', category: 'Utility', priority: 2 },
   { name: 'WASA Lahore', number: '1334', icon: '💧', desc: 'Water & Sanitation Agency', color: '#0277BD', category: 'Utility', priority: 2 },

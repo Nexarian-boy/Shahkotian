@@ -746,6 +746,18 @@ model ServiceReview {
   @@index([seekerId])
 }
 
+model AppSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  boolValue   Boolean?
+  stringValue String?
+  jsonValue   Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([updatedAt(sort: Desc)])
+}
+
 enum Role {
   USER
   VERIFIED_USER

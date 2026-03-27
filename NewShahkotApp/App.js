@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { LanguageProvider } from './src/context/LanguageContext';
 import { COLORS } from './src/config/constants';
 import { initAds, onScreenView } from './src/utils/AdManager';
+import { initAdsEnabled, refreshAdsEnabled, subscribeAdsEnabled } from './src/utils/adSettings';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 
@@ -281,7 +282,20 @@ export default function App() {
   const navigationRef = useRef(null);
 
   useEffect(() => {
-    initAds();
+    let unsubscribeAds = null;
+    let refreshTimer = null;
+
+    (async () => {
+      await initAdsEnabled();
+      initAds();
+      unsubscribeAds = subscribeAdsEnabled((enabled) => {
+        if (enabled) initAds();
+      });
+
+      refreshTimer = setInterval(() => {
+        refreshAdsEnabled();
+      }, 2 * 60 * 1000);
+    })();
 
     // Handle notification tap when app is CLOSED or BACKGROUND
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
@@ -307,6 +321,8 @@ export default function App() {
     });
 
     return () => {
+      if (unsubscribeAds) unsubscribeAds();
+      if (refreshTimer) clearInterval(refreshTimer);
       subscription.remove();
     };
   }, []);

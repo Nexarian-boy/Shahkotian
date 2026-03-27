@@ -21,7 +21,7 @@ export default function PrivacyPolicyScreen({ navigation }) {
         <Text style={styles.date}>Last updated: March 2026</Text>
 
         <Section title="1. Introduction">
-          Apna Shahkot ("the App") is a community platform exclusively for residents and people
+          Ahwal e Shahkot ("the App") is a community platform exclusively for residents and people
           connected to Shahkot city, Pakistan. We are committed to protecting your personal
           information and your right to privacy. This policy explains what data we collect, how
           we use it, and your rights.
@@ -82,7 +82,7 @@ export default function PrivacyPolicyScreen({ navigation }) {
 
         <Section title="7a. User-Generated Content & Reporting">
           {'All posts, listings, chat messages, and other content published in the app are user-generated. ' +
-            'Apna Shahkot does not endorse any user content.\\n\\n' +
+            'Ahwal e Shahkot does not endorse any user content.\\n\\n' +
             'Users can report content that violates our community guidelines using the Report (🚩) button available on posts. ' +
             'Reports are reviewed by the admin team. Violating content is removed within 24-72 hours. ' +
             'Repeat offenders will be permanently banned.\\n\\n' +
@@ -124,7 +124,7 @@ export default function PrivacyPolicyScreen({ navigation }) {
         </Section>
 
         <Section title="12. Contact Us">
-          {`If you have any questions or requests, contact the Apna Shahkot admin:\n\nEmail: mypcjnaab@gmail.com\nWhatsApp: +92 342 5844921\nLocation: Shahkot, Nankana Sahib, Punjab, Pakistan`}
+          {`If you have any questions or requests, contact the Ahwal e Shahkot admin:\n\nEmail: mypcjnaab@gmail.com\nWhatsApp: +92 342 5844921\nLocation: Shahkot, Nankana Sahib, Punjab, Pakistan`}
         </Section>
 
         <View style={styles.footer}>

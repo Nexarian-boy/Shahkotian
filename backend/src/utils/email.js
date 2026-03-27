@@ -47,7 +47,7 @@ async function sendEmail(to, subject, html) {
           'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ from: `Apna Shahkot <${fromEmail}>`, to, subject, html }),
+        body: JSON.stringify({ from: `Ahwal e Shahkot <${fromEmail}>`, to, subject, html }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -83,7 +83,7 @@ async function sendEmail(to, subject, html) {
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
       const info = await getSMTPTransporter().sendMail({
-        from: `"Apna Shahkot" <${fromEmail}>`,
+        from: `"Ahwal e Shahkot" <${fromEmail}>`,
         envelope: { from: fromEmail, to },
         to, subject, html,
       });
@@ -100,14 +100,14 @@ async function sendEmail(to, subject, html) {
 }
 
 async function sendRishtaApprovalEmail(email, name) {
-  const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;border-radius:10px 10px 0 0;"><h1 style="color:#fff;margin:0;text-align:center;">Apna Shahkot</h1></div><div style="background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px;"><h2>Congratulations, ${name}! Your Rishta profile has been APPROVED.</h2></div></div>`;
-  const result = await sendEmail(email, 'Your Rishta Profile is Approved - Apna Shahkot', html);
+  const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;border-radius:10px 10px 0 0;"><h1 style="color:#fff;margin:0;text-align:center;">Ahwal e Shahkot</h1></div><div style="background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px;"><h2>Congratulations, ${name}! Your Rishta profile has been APPROVED.</h2></div></div>`;
+  const result = await sendEmail(email, 'Your Rishta Profile is Approved - Ahwal e Shahkot', html);
   return result.ok;
 }
 
 async function sendRishtaRejectionEmail(email, name, reason) {
-  const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;border-radius:10px 10px 0 0;"><h1 style="color:#fff;margin:0;text-align:center;">Apna Shahkot</h1></div><div style="background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px;"><h2>Hello ${name}, your profile was not approved.</h2>${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}</div></div>`;
-  const result = await sendEmail(email, 'Rishta Profile Update - Apna Shahkot', html);
+  const html = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;"><div style="background:linear-gradient(135deg,#667eea,#764ba2);padding:30px;border-radius:10px 10px 0 0;"><h1 style="color:#fff;margin:0;text-align:center;">Ahwal e Shahkot</h1></div><div style="background:#f9f9f9;padding:30px;border-radius:0 0 10px 10px;"><h2>Hello ${name}, your profile was not approved.</h2>${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}</div></div>`;
+  const result = await sendEmail(email, 'Rishta Profile Update - Ahwal e Shahkot', html);
   return result.ok;
 }
 

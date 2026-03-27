@@ -213,6 +213,24 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </View>
 
+        <View style={styles.teamCard}>
+          <View style={styles.teamHeader}>
+            <Ionicons name="people" size={20} color={COLORS.primary} />
+            <Text style={styles.teamTitle}>Contact Ahwal e Shahkot Team</Text>
+          </View>
+          <View style={styles.teamActionsRow}>
+            <TouchableOpacity style={[styles.contactBtn, { backgroundColor: '#25D36612' }]} onPress={() => Linking.openURL('https://wa.me/923240001222')}>
+              <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+              <Text style={[styles.contactBtnText, { color: '#25D366' }]}>WhatsApp</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.contactBtn, { backgroundColor: '#1877F212' }]} onPress={() => Linking.openURL('https://www.facebook.com/share/16f4GNPJux/')}>
+              <Ionicons name="logo-facebook" size={18} color="#1877F2" />
+              <Text style={[styles.contactBtnText, { color: '#1877F2' }]}>Facebook</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.teamInfo}>WhatsApp: 0324 0001222</Text>
+        </View>
+
         {/* Contact Admin */}
         <View style={styles.contactAdminCard}>
           <View style={styles.contactAdminHeader}>
@@ -550,4 +568,17 @@ const styles = StyleSheet.create({
   contactBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10 },
   contactBtnText: { fontSize: 13, fontWeight: '700' },
   contactAdminInfo: { fontSize: 11, color: COLORS.textLight, textAlign: 'center' },
+  teamCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: COLORS.primary + '20',
+  },
+  teamHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  teamTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  teamActionsRow: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  teamInfo: { fontSize: 11, color: COLORS.textLight, textAlign: 'center' },
 });

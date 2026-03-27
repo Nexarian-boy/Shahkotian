@@ -35,6 +35,7 @@ const HELPLINES = [
 
     // === UTILITIES ===
     { name: 'LESCO (Electricity)', number: '132', icon: '⚡', desc: 'LESCO Complaints & Outages', color: '#F9A825', category: 'Utility' },
+    { name: 'LWMC (Waste Management)', number: '1139', icon: '🗑️', desc: 'Lahore Waste Management Company', color: '#2E7D32', category: 'Utility' },
     { name: 'WASA (Water)', number: '1199', icon: '💧', desc: 'Water Supply & Sewerage', color: '#0277BD', category: 'Utility' },
     { name: 'Sui Gas (SNGPL)', number: '1223', icon: '🔥', desc: 'SNGPL Gas Emergency & Complaints', color: '#E65100', category: 'Utility' },
     { name: 'Excise & Taxation', number: '0800-08786', icon: '🧾', desc: 'Tax & Vehicle Registration', color: '#5D4037', category: 'Utility' },

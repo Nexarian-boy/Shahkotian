@@ -1,4 +1,4 @@
-// Apna Shahkot — translations for English and Urdu (all screens)
+// Ahwal e Shahkot — translations for English and Urdu (all screens)
 const translations = {
   en: {
     // Language selector
@@ -52,8 +52,8 @@ const translations = {
     myListings: 'My Listings',
     adminDashboard: 'Admin Dashboard',
     changePhoto: 'Change Profile Photo',
-    contactAdmin: 'Contact Admin',
-    needHelp: 'Need help? Reach out to the admin',
+    contactAdmin: 'Contact Technical Admin',
+    needHelp: 'Need help? Reach out to technical admin',
     logout: 'Logout',
     editPhoneWhatsapp: 'Edit Phone / WhatsApp',
     editPhoneNumbers: 'Edit Phone Numbers',
@@ -536,8 +536,8 @@ const translations = {
     myListings: 'میری لسٹنگز',
     adminDashboard: 'ایڈمن ڈیش بورڈ',
     changePhoto: 'پروفائل فوٹو تبدیل کریں',
-    contactAdmin: 'ایڈمن سے رابطہ',
-    needHelp: 'مدد چاہیے؟ ایڈمن سے رابطہ کریں',
+    contactAdmin: 'ٹیکنیکل ایڈمن سے رابطہ',
+    needHelp: 'مدد چاہیے؟ ٹیکنیکل ایڈمن سے رابطہ کریں',
     logout: 'لاگ آؤٹ',
     editPhoneWhatsapp: 'فون / واٹس ایپ تبدیل کریں',
     editPhoneNumbers: 'فون نمبرز تبدیل کریں',

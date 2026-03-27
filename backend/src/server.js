@@ -108,6 +108,26 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Ahwal e Shahkot API is running', timestamp: new Date() });
 });
 
+// Public app config used by clients for runtime feature toggles.
+app.get('/api/public-config', async (req, res) => {
+  try {
+    const setting = await prisma.appSetting.findUnique({
+      where: { key: 'ads_enabled' },
+      select: { boolValue: true, updatedAt: true },
+    });
+
+    res.json({
+      adsEnabled: setting?.boolValue !== false,
+      source: setting ? 'database' : 'default',
+      updatedAt: setting?.updatedAt || null,
+    });
+  } catch (error) {
+    console.error('Public config error:', error.message);
+    // Fail open to avoid accidentally hiding the whole ad stack due to transient DB issues.
+    res.json({ adsEnabled: true, source: 'fallback', updatedAt: null });
+  }
+});
+
 // Database status endpoint (admin only)
 app.get('/api/db-status', authenticate, adminOnly, async (req, res) => {
   try {
