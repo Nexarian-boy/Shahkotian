@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Location from 'expo-location';
-import { COLORS, APP_NAME, GEOFENCE_RADIUS_KM } from '../config/constants';
-import { isWithinShahkot } from '../utils/geolocation';
+import { COLORS, APP_NAME } from '../config/constants';
 import { useAuth } from '../context/AuthContext';
 import { authAPI, restaurantsAPI, doctorsAPI, clothBrandsAPI, acAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
@@ -51,12 +49,6 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [otpSending, setOtpSending] = useState(false);
 
-  // Location state
-  const [locationChecked, setLocationChecked] = useState(false);
-  const [locationAllowed, setLocationAllowed] = useState(false);
-  const [userCoords, setUserCoords] = useState(null);
-  const [locationLoading, setLocationLoading] = useState(true);
-
   // Form fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -64,52 +56,6 @@ export default function LoginScreen({ navigation }) {
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
-
-  // ── Check location on mount ────────────────────────────────────────────
-  useEffect(() => {
-    checkLocation();
-  }, []);
-
-  const checkLocation = async () => {
-    setLocationLoading(true);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setLocationChecked(true);
-        setLocationAllowed(false);
-        setLocationLoading(false);
-        Alert.alert(
-          'Location Required',
-          'This app is only available for Shahkot residents. Please enable location services to continue.',
-        );
-        return;
-      }
-
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      const { latitude, longitude } = loc.coords;
-      setUserCoords({ latitude, longitude });
-
-      const result = isWithinShahkot(latitude, longitude);
-      setLocationChecked(true);
-      setLocationAllowed(result.isWithin);
-
-      if (!result.isWithin) {
-        Alert.alert(
-          'Outside Shahkot',
-          `You are ${result.distance} KM away from Shahkot. This app is only available within ${GEOFENCE_RADIUS_KM} KM of Shahkot city.`,
-        );
-      }
-    } catch (error) {
-      console.error('Location check error:', error);
-      setLocationChecked(true);
-      setLocationAllowed(false);
-      Alert.alert('Location Error', 'Could not determine your location. Please enable GPS and try again.');
-    } finally {
-      setLocationLoading(false);
-    }
-  };
 
   const resetForm = () => {
     setName(''); setEmail(''); setPassword(''); setPhone(''); setOtp(''); setNewPassword('');
@@ -145,11 +91,6 @@ export default function LoginScreen({ navigation }) {
 
   // ── Step 2 (Register): verify OTP + create account ────────────────────
   const handleRegister = async () => {
-    if (!locationAllowed) {
-      return Alert.alert('Location Required', 'This app is only available within 50 KM of Shahkot. Please enable location and try again.', [
-        { text: 'Retry', onPress: checkLocation },
-      ]);
-    }
     // Strip all non-digit characters (handles invisible Unicode chars copied from Gmail)
     const cleanOtp = otp.replace(/\D/g, '');
     if (cleanOtp.length !== 6) return Alert.alert('Invalid OTP', 'Please enter the 6-digit code.');
@@ -162,8 +103,6 @@ export default function LoginScreen({ navigation }) {
         otp: cleanOtp,
         phone: phone.trim() || undefined,
         whatsapp: phone.trim() || undefined,
-        latitude: userCoords?.latitude,
-        longitude: userCoords?.longitude,
       });
       Alert.alert('Welcome! 🎉', `Your account has been created. Welcome to ${APP_NAME}!`);
     } catch (error) {
@@ -176,11 +115,6 @@ export default function LoginScreen({ navigation }) {
 
   // ── Login: email + password ────────────────────────────────────────────
   const handleLogin = async () => {
-    if (!locationAllowed) {
-      return Alert.alert('Location Required', 'This app is only available within 50 KM of Shahkot. Please enable location and try again.', [
-        { text: 'Retry', onPress: checkLocation },
-      ]);
-    }
     if (!email.trim() || !password.trim()) {
       return Alert.alert('Required', 'Please enter your email and password.');
     }
@@ -189,8 +123,6 @@ export default function LoginScreen({ navigation }) {
       await login({
         email: email.trim(),
         password: password.trim(),
-        latitude: userCoords?.latitude,
-        longitude: userCoords?.longitude,
       });
     } catch (error) {
       // If regular user login fails, silently try restaurant owner login as fallback
@@ -422,51 +354,6 @@ export default function LoginScreen({ navigation }) {
 
   // ── Login / Register form ──────────────────────────────────────────────
   const isRegister = mode === 'REGISTER';
-
-  // Show loading while checking location
-  if (locationLoading) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <View style={{ position: 'absolute', top: 52, right: 20, flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={[lpStyles.btn, language === 'en' && lpStyles.active]} onPress={() => changeLanguage('en')}>
-            <Text style={[lpStyles.txt, language === 'en' && lpStyles.activeTxt]}>English</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[lpStyles.btn, language === 'ur' && lpStyles.active]} onPress={() => changeLanguage('ur')}>
-            <Text style={[lpStyles.txt, language === 'ur' && lpStyles.activeTxt]}>اردو</Text>
-          </TouchableOpacity>
-        </View>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={[styles.subtitle, { marginTop: 16 }]}>{t('checkingLocation')}</Text>
-        <Text style={[styles.hint, { marginTop: 8, textAlign: 'center', paddingHorizontal: 40 }]}>
-          This app is only available within {GEOFENCE_RADIUS_KM} KM of Shahkot city
-        </Text>
-      </View>
-    );
-  }
-
-  // Show blocked screen if outside geofence
-  if (locationChecked && !locationAllowed) {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
-        <View style={{ position: 'absolute', top: 52, right: 20, flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity style={[lpStyles.btn, language === 'en' && lpStyles.active]} onPress={() => changeLanguage('en')}>
-            <Text style={[lpStyles.txt, language === 'en' && lpStyles.activeTxt]}>English</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[lpStyles.btn, language === 'ur' && lpStyles.active]} onPress={() => changeLanguage('ur')}>
-            <Text style={[lpStyles.txt, language === 'ur' && lpStyles.activeTxt]}>اردو</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={{ fontSize: 60, marginBottom: 16 }}>📍</Text>
-        <Text style={[styles.title, { textAlign: 'center' }]}>{t('outsideShahkot')}</Text>
-        <Text style={[styles.subtitle, { textAlign: 'center', marginTop: 8, marginBottom: 24 }]}>
-          {t('outsideShahkotMsg')} {GEOFENCE_RADIUS_KM} {t('kmOfShahkot')}
-        </Text>
-        <TouchableOpacity style={styles.button} onPress={checkLocation}>
-          <Text style={styles.buttonText}>{t('checkLocationAgain')}</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   return (
     <KeyboardAvoidingView

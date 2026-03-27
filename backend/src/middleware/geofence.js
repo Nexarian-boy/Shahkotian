@@ -2,12 +2,13 @@ const { isWithinShahkot } = require('../utils/geolocation');
 
 /**
  * Geofence Middleware
- * Checks if user's location is within 50KM of Shahkot center
- * Requires latitude and longitude in request body or user profile
+ * Soft-checks user location by default. Strict blocking can be enabled via env.
  */
 function geofenceCheck(req, res, next) {
-  // Skip geofence check if disabled via env variable
-  if (process.env.SKIP_GEOFENCE === 'true') {
+  const strictGeofence = process.env.ENFORCE_GEOFENCE === 'true' && process.env.SKIP_GEOFENCE !== 'true';
+
+  // In non-strict mode, never block authentication based on location.
+  if (!strictGeofence) {
     return next();
   }
 
