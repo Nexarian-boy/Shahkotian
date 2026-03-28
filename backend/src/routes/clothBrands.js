@@ -9,6 +9,13 @@ const { uploadMultipleVideosToCloudinary } = require('../utils/cloudinaryUpload'
 
 const router = express.Router();
 
+const getEligibleTraderForBrandDeals = async (userId) => {
+  return prisma.trader.findUnique({
+    where: { userId },
+    include: { bazar: true },
+  });
+};
+
 const isValidOptionalHttpUrl = (value) => {
   if (value === undefined || value === null || value === '') return true;
   return /^https?:\/\//i.test(String(value).trim());
@@ -41,7 +48,42 @@ router.get('/', async (req, res) => {
       },
     });
 
-    res.json({ brands });
+    const traderWhere = {
+      status: 'APPROVED',
+      isHidden: false,
+      canPostBrandDeals: true,
+    };
+    if (search) {
+      traderWhere.OR = [
+        { shopName: { contains: search, mode: 'insensitive' } },
+        { fullName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const traderShops = await prisma.trader.findMany({
+      where: traderWhere,
+      orderBy: { shopName: 'asc' },
+      include: {
+        _count: { select: { brandDeals: { where: { isActive: true } } } },
+      },
+    });
+
+    const mappedTraderShops = traderShops
+      .map((t) => ({
+        id: t.id,
+        name: t.shopName,
+        address: t.bazar?.name || 'Shahkot',
+        locationLink: null,
+        phone: t.phone,
+        whatsapp: t.phone,
+        description: t.fullName,
+        image: t.photoUrl,
+        isActive: true,
+        sourceType: 'TRADER',
+        _count: { deals: t._count?.brandDeals || 0 },
+      }));
+
+    res.json({ brands: [...brands, ...mappedTraderShops] });
   } catch (error) {
     console.error('Get cloth brands error:', error);
     res.status(500).json({ error: 'Failed to load cloth brands.' });
@@ -67,7 +109,50 @@ router.get('/deals/all', async (req, res) => {
       },
     });
 
-    res.json({ deals });
+    const traderDeals = await prisma.traderBrandDeal.findMany({
+      where: {
+        isActive: true,
+        trader: {
+          status: 'APPROVED',
+          isHidden: false,
+          canPostBrandDeals: true,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        trader: {
+          select: {
+            id: true,
+            fullName: true,
+            shopName: true,
+            photoUrl: true,
+            phone: true,
+            categories: true,
+            bazar: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    const mappedTraderDeals = traderDeals
+      .map((d) => ({
+        ...d,
+        brand: {
+          id: d.trader.id,
+          name: d.trader.shopName,
+          image: d.trader.photoUrl,
+          address: d.trader.bazar?.name || 'Shahkot',
+          locationLink: null,
+          phone: d.trader.phone,
+          sourceType: 'TRADER',
+        },
+      }));
+
+    const allDeals = [...deals, ...mappedTraderDeals].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    res.json({ deals: allDeals });
   } catch (error) {
     console.error('Get all brand deals error:', error);
     res.status(500).json({ error: 'Failed to load deals.' });
@@ -99,7 +184,7 @@ router.get('/owner/profile', authenticateBrand, async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
-    const brand = await prisma.clothBrand.findUnique({
+    let brand = await prisma.clothBrand.findUnique({
       where: { id: req.params.id },
       select: {
         id: true, name: true, address: true, locationLink: true, phone: true, whatsapp: true,
@@ -115,11 +200,149 @@ router.get('/:id', async (req, res) => {
       },
     });
 
+    if (!brand) {
+      const trader = await prisma.trader.findUnique({
+        where: { id: req.params.id },
+        include: {
+          bazar: { select: { name: true } },
+          brandDeals: {
+            where: { isActive: true },
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              price: true,
+              originalPrice: true,
+              images: true,
+              videos: true,
+              expiresAt: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+
+      if (
+        trader &&
+        trader.status === 'APPROVED' &&
+        !trader.isHidden &&
+        trader.canPostBrandDeals
+      ) {
+        brand = {
+          id: trader.id,
+          name: trader.shopName,
+          address: trader.bazar?.name || 'Shahkot',
+          locationLink: null,
+          phone: trader.phone,
+          whatsapp: trader.phone,
+          description: trader.fullName,
+          image: trader.photoUrl,
+          sourceType: 'TRADER',
+          deals: trader.brandDeals,
+        };
+      }
+    }
+
     if (!brand) return res.status(404).json({ error: 'Brand not found.' });
     res.json(brand);
   } catch (error) {
     console.error('Get brand error:', error);
     res.status(500).json({ error: 'Failed to load brand.' });
+  }
+});
+
+// ============ TRADER DEALS: BRANDS ============
+router.get('/trader/my-deals', authenticate, async (req, res) => {
+  try {
+    const trader = await getEligibleTraderForBrandDeals(req.user.id);
+    if (!trader || trader.status !== 'APPROVED') {
+      return res.status(403).json({ error: 'Only approved traders can access this area.' });
+    }
+    if (trader.isHidden || !trader.canPostBrandDeals) {
+      return res.status(403).json({ error: 'You are not allowed to post brand deals.' });
+    }
+
+    const deals = await prisma.traderBrandDeal.findMany({
+      where: { traderId: trader.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      trader: {
+        id: trader.id,
+        shopName: trader.shopName,
+        fullName: trader.fullName,
+      },
+      deals,
+    });
+  } catch (error) {
+    console.error('Get trader brand deals error:', error);
+    res.status(500).json({ error: 'Failed to load trader brand deals.' });
+  }
+});
+
+router.post('/trader/deals', authenticate, uploadListingMedia.array('media', 6), async (req, res) => {
+  try {
+    const trader = await getEligibleTraderForBrandDeals(req.user.id);
+    if (!trader || trader.status !== 'APPROVED') {
+      return res.status(403).json({ error: 'Only approved traders can create deals.' });
+    }
+    if (trader.isHidden || !trader.canPostBrandDeals) {
+      return res.status(403).json({ error: 'You are not allowed to post brand deals.' });
+    }
+
+    const { title, description, price, originalPrice, expiresAt } = req.body;
+    if (!title) {
+      return res.status(400).json({ error: 'Deal title is required.' });
+    }
+
+    let imageUrls = [];
+    let videoUrls = [];
+    if (req.files && req.files.length > 0) {
+      const imageFiles = req.files.filter(f => !ALLOWED_VIDEO_TYPES.includes(f.mimetype));
+      const videoFiles = req.files.filter(f => ALLOWED_VIDEO_TYPES.includes(f.mimetype));
+      if (imageFiles.length > 0) imageUrls = await uploadMultipleImages(imageFiles);
+      if (videoFiles.length > 0) videoUrls = await uploadMultipleVideosToCloudinary(videoFiles, 'shahkot/trader-brands');
+    }
+
+    const deal = await prisma.traderBrandDeal.create({
+      data: {
+        traderId: trader.id,
+        title,
+        description: description || null,
+        price: price || null,
+        originalPrice: originalPrice || null,
+        images: imageUrls,
+        videos: videoUrls,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      },
+    });
+
+    res.status(201).json({ message: 'Deal created!', deal });
+  } catch (error) {
+    console.error('Create trader brand deal error:', error);
+    res.status(500).json({ error: 'Failed to create trader brand deal.' });
+  }
+});
+
+router.delete('/trader/deals/:dealId', authenticate, async (req, res) => {
+  try {
+    const trader = await getEligibleTraderForBrandDeals(req.user.id);
+    if (!trader || trader.status !== 'APPROVED') {
+      return res.status(403).json({ error: 'Only approved traders can delete deals.' });
+    }
+
+    const deal = await prisma.traderBrandDeal.findUnique({ where: { id: req.params.dealId } });
+    if (!deal || deal.traderId !== trader.id) {
+      return res.status(404).json({ error: 'Deal not found.' });
+    }
+
+    await prisma.traderBrandDeal.delete({ where: { id: req.params.dealId } });
+    res.json({ message: 'Deal deleted.' });
+  } catch (error) {
+    console.error('Delete trader brand deal error:', error);
+    res.status(500).json({ error: 'Failed to delete trader brand deal.' });
   }
 });
 
@@ -377,14 +600,26 @@ router.delete('/owner/deals/:dealId', authenticateBrand, async (req, res) => {
 
 router.post('/deals/:dealId/like', authenticate, async (req, res) => {
   try {
-    const deal = await prisma.brandDeal.findUnique({ where: { id: req.params.dealId }, select: { likedBy: true } });
-    if (!deal) return res.status(404).json({ error: 'Not found.' });
-    const alreadyLiked = deal.likedBy.includes(req.user.id);
-    const updated = await prisma.brandDeal.update({
-      where: { id: req.params.dealId },
-      data: { likedBy: alreadyLiked ? { set: deal.likedBy.filter(id => id !== req.user.id) } : { push: req.user.id } },
-      select: { likedBy: true },
-    });
+    const deal = await prisma.brandDeal.findUnique({ where: { id: req.params.dealId }, select: { id: true, likedBy: true } });
+    const traderDeal = !deal
+      ? await prisma.traderBrandDeal.findUnique({ where: { id: req.params.dealId }, select: { id: true, likedBy: true } })
+      : null;
+    const target = deal || traderDeal;
+    if (!target) return res.status(404).json({ error: 'Not found.' });
+
+    const alreadyLiked = target.likedBy.includes(req.user.id);
+    const updated = deal
+      ? await prisma.brandDeal.update({
+        where: { id: req.params.dealId },
+        data: { likedBy: alreadyLiked ? { set: target.likedBy.filter(id => id !== req.user.id) } : { push: req.user.id } },
+        select: { likedBy: true },
+      })
+      : await prisma.traderBrandDeal.update({
+        where: { id: req.params.dealId },
+        data: { likedBy: alreadyLiked ? { set: target.likedBy.filter(id => id !== req.user.id) } : { push: req.user.id } },
+        select: { likedBy: true },
+      });
+
     res.json({ liked: !alreadyLiked, likeCount: updated.likedBy.length });
   } catch {
     res.status(500).json({ error: 'Failed.' });
@@ -393,11 +628,20 @@ router.post('/deals/:dealId/like', authenticate, async (req, res) => {
 
 router.post('/deals/:dealId/view', async (req, res) => {
   try {
-    const updated = await prisma.brandDeal.update({
-      where: { id: req.params.dealId },
-      data: { views: { increment: 1 } },
-      select: { views: true },
-    });
+    let updated;
+    try {
+      updated = await prisma.brandDeal.update({
+        where: { id: req.params.dealId },
+        data: { views: { increment: 1 } },
+        select: { views: true },
+      });
+    } catch {
+      updated = await prisma.traderBrandDeal.update({
+        where: { id: req.params.dealId },
+        data: { views: { increment: 1 } },
+        select: { views: true },
+      });
+    }
     res.json({ views: updated.views });
   } catch {
     res.status(500).json({ error: 'Failed.' });

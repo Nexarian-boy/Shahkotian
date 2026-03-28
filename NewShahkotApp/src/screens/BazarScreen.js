@@ -18,6 +18,7 @@ import { bazarAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import AdBanner from '../components/AdBanner';
 import ImageViewer from '../components/ImageViewer';
+import CategoryPicker from '../components/CategoryPicker';
 
 export default function BazarScreen() {
   const { user } = useAuth();
@@ -32,7 +33,7 @@ export default function BazarScreen() {
   const [myTrader, setMyTrader] = useState(null);
 
   // ========== REGISTRATION ==========
-  const [regForm, setRegForm] = useState({ fullName: '', shopName: '', phone: '', bazarId: '' });
+  const [regForm, setRegForm] = useState({ fullName: '', shopName: '', phone: '', bazarId: '', categories: [] });
   const [regPhoto, setRegPhoto] = useState(null);
   const [registering, setRegistering] = useState(false);
 
@@ -99,19 +100,19 @@ export default function BazarScreen() {
   const [votersLoading, setVotersLoading] = useState(false);
 
   // ========== PRESIDENT ==========
-  const [presidentToken, setPresidentToken] = useState(null);
-  const [presidentData, setPresidentData] = useState(null);
-  const [presidentEmail, setPresidentEmail] = useState('');
-  const [presidentPassword, setPresidentPassword] = useState('');
+  const [adminToken, setAdminToken] = useState(null);
+  const [adminData, setAdminData] = useState(null);
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [pendingTraders, setPendingTraders] = useState([]);
   const [approvedTraders, setApprovedTraders] = useState([]);
-  const [presidentTab, setPresidentTab] = useState('pending');
+  const [adminTab, setAdminTab] = useState('pending');
   const [approvedSearch, setApprovedSearch] = useState('');
-  const [presidentLoading, setPresidentLoading] = useState(false);
-  const [presidentBazars, setPresidentBazars] = useState([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminBazars, setAdminBazars] = useState([]);
   const [newBazarName, setNewBazarName] = useState('');
   const [exportBazarId, setExportBazarId] = useState('all');
-  const [presidentStats, setPresidentStats] = useState(null);
+  const [adminStats, setAdminStats] = useState(null);
 
   // ========== DETAIL MODAL ==========
   const [detailTrader, setDetailTrader] = useState(null);
@@ -175,12 +176,15 @@ export default function BazarScreen() {
     try {
       const [bazarRes, statusRes] = await Promise.all([
         bazarAPI.getBazars(),
-        bazarAPI.getMyStatus(),
+        bazarAPI.getMyStatus().catch((err) => {
+          if (err?.response?.status === 401 || err?.response?.status === 403) return { data: { trader: null } };
+          throw err;
+        }),
       ]);
       setBazars(bazarRes.data.bazars || []);
       setMyTrader(statusRes.data.trader);
-      const token = await AsyncStorage.getItem('presidentToken');
-      if (token) setPresidentToken(token);
+      const token = await AsyncStorage.getItem('bazarAdminToken');
+      if (token) setAdminToken(token);
     } catch (e) {
       console.error('Load error:', e);
     } finally {
@@ -192,11 +196,28 @@ export default function BazarScreen() {
     try {
       const [bazarRes, statusRes] = await Promise.all([
         bazarAPI.getBazars(),
-        bazarAPI.getMyStatus(),
+        bazarAPI.getMyStatus().catch((err) => {
+          if (err?.response?.status === 401 || err?.response?.status === 403) return { data: { trader: null } };
+          throw err;
+        }),
       ]);
       setBazars(bazarRes.data.bazars || []);
       setMyTrader(statusRes.data.trader);
     } catch (e) {}
+  };
+
+  const parseTraderCategories = (value) => {
+    if (Array.isArray(value)) return value;
+    if (!value) return [];
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
   };
 
   const loadVoters = async (bazarId) => {
@@ -375,7 +396,7 @@ export default function BazarScreen() {
   const downloadExcel = async () => {
     try {
       Alert.alert('Downloading...', 'Please wait, preparing Excel file...');
-      const url = bazarAPI.getExportUrl(presidentToken, exportBazarId);
+      const url = bazarAPI.getExportUrl(adminToken, exportBazarId);
       const filename = `traders_${Date.now()}.xlsx`;
       const fileUri = FileSystem.documentDirectory + filename;
 
@@ -524,6 +545,7 @@ export default function BazarScreen() {
       formData.append('shopName', regForm.shopName.trim());
       formData.append('phone', regForm.phone.trim());
       formData.append('bazarId', regForm.bazarId);
+      formData.append('categories', JSON.stringify(regForm.categories || []));
       formData.append('photo', { uri: regPhoto, name: 'photo.jpg', type: 'image/jpeg' });
       const res = await bazarAPI.register(formData);
       Alert.alert('کامیاب / Success', res.data.message || 'Registration submitted!');
@@ -535,73 +557,76 @@ export default function BazarScreen() {
     }
   };
 
-  // ====== PRESIDENT ======
-  const presidentLogin = async () => {
-    if (!presidentEmail.trim() || !presidentPassword.trim()) return;
+  // ====== ADMIN ======
+  const adminLogin = async () => {
+    if (!adminEmail.trim() || !adminPassword.trim()) return;
     try {
-      setPresidentLoading(true);
-      const res = await bazarAPI.presidentLogin({ email: presidentEmail.trim(), password: presidentPassword });
+      setAdminLoading(true);
+      const res = await bazarAPI.adminLogin({
+        email: adminEmail.trim(),
+        password: adminPassword,
+      });
       const token = res.data.token;
-      setPresidentToken(token);
-      await AsyncStorage.setItem('presidentToken', token);
-      setPresidentData(res.data.president);
-      setPresidentTab('pending');
-      setCurrentView('presidentDashboard');
-      loadPresidentData(token);
+      setAdminToken(token);
+      await AsyncStorage.setItem('bazarAdminToken', token);
+      setAdminData(res.data.admin || res.data.president);
+      setAdminTab('pending');
+      setCurrentView('adminDashboard');
+      loadAdminData(token);
     } catch (e) {
       Alert.alert('Error', e.response?.data?.error || 'Login failed');
     } finally {
-      setPresidentLoading(false);
+      setAdminLoading(false);
     }
   };
 
-  const presidentLogout = async () => {
-    setPresidentToken(null);
-    setPresidentData(null);
+  const adminLogout = async () => {
+    setAdminToken(null);
+    setAdminData(null);
     setPendingTraders([]);
     setApprovedTraders([]);
-    setPresidentTab('pending');
+    setAdminTab('pending');
     setApprovedSearch('');
-    setPresidentStats(null);
-    await AsyncStorage.removeItem('presidentToken');
+    setAdminStats(null);
+    await AsyncStorage.removeItem('bazarAdminToken');
     if (myTrader?.status === 'APPROVED') setCurrentView('features');
     else setCurrentView('home');
   };
 
-  const loadPresidentData = async (token) => {
+  const loadAdminData = async (token) => {
     try {
-      setPresidentLoading(true);
+      setAdminLoading(true);
       const [dashRes, pendRes, approvedRes, bazarRes] = await Promise.all([
-        bazarAPI.presidentDashboard(token),
+        bazarAPI.adminDashboard(token),
         bazarAPI.getPending(token),
         bazarAPI.getApproved(token),
         bazarAPI.getBazars(),
       ]);
-      setPresidentData(dashRes.data.president);
-      setPresidentStats(dashRes.data.stats);
+      setAdminData(dashRes.data.admin || dashRes.data.president);
+      setAdminStats(dashRes.data.stats);
       setPendingTraders(pendRes.data.traders || []);
       setApprovedTraders(approvedRes.data.traders || []);
-      setPresidentBazars(bazarRes.data.bazars || []);
+      setAdminBazars(bazarRes.data.bazars || []);
     } catch (e) {
-      if (e.response?.status === 403) presidentLogout();
+      if (e.response?.status === 403) adminLogout();
     } finally {
-      setPresidentLoading(false);
+      setAdminLoading(false);
     }
   };
 
   const approveTrader = async (id) => {
     try {
-      await bazarAPI.approveTrader(id, presidentToken);
+      await bazarAPI.approveTrader(id, adminToken);
       Alert.alert('Done', 'Trader approved');
-      loadPresidentData(presidentToken);
+      loadAdminData(adminToken);
     } catch (e) { Alert.alert('Error', 'Failed'); }
   };
 
   const rejectTrader = async (id) => {
     try {
-      await bazarAPI.rejectTrader(id, presidentToken);
+      await bazarAPI.rejectTrader(id, adminToken);
       Alert.alert('Done', 'Trader rejected');
-      loadPresidentData(presidentToken);
+      loadAdminData(adminToken);
     } catch (e) { Alert.alert('Error', 'Failed'); }
   };
 
@@ -610,19 +635,28 @@ export default function BazarScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try {
-          await bazarAPI.deleteTrader(id, presidentToken);
-          loadPresidentData(presidentToken);
+          await bazarAPI.deleteTrader(id, adminToken);
+          loadAdminData(adminToken);
         } catch (e) { Alert.alert('Error', 'Failed'); }
       }},
     ]);
   };
 
+  const updateTraderControls = async (traderId, updates) => {
+    try {
+      await bazarAPI.updateTraderControls(traderId, updates, adminToken);
+      loadAdminData(adminToken);
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.error || 'Failed to update trader controls');
+    }
+  };
+
   const addBazar = async () => {
     if (!newBazarName.trim()) return;
     try {
-      await bazarAPI.addBazar(newBazarName.trim(), presidentToken);
+      await bazarAPI.addBazar(newBazarName.trim(), adminToken);
       setNewBazarName('');
-      loadPresidentData(presidentToken);
+      loadAdminData(adminToken);
       Alert.alert('Success', 'Bazar added');
     } catch (e) { Alert.alert('Error', e.response?.data?.error || 'Failed'); }
   };
@@ -632,15 +666,15 @@ export default function BazarScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
         try {
-          await bazarAPI.deleteBazar(id, presidentToken);
-          loadPresidentData(presidentToken);
+          await bazarAPI.deleteBazar(id, adminToken);
+          loadAdminData(adminToken);
         } catch (e) { Alert.alert('Error', 'Failed'); }
       }},
     ]);
   };
 
   const exportTraders = () => {
-    const url = bazarAPI.getExportUrl(presidentToken, exportBazarId);
+    const url = bazarAPI.getExportUrl(adminToken, exportBazarId);
     Linking.openURL(url);
   };
 
@@ -667,14 +701,15 @@ export default function BazarScreen() {
           setVoters([]);
           setVoterSearch('');
         } else {
-          setCurrentView('features');
+          if (myTrader?.status === 'APPROVED') setCurrentView('features');
+          else setCurrentView('home');
         }
         break;
-      case 'presidentLogin':
+      case 'adminLogin':
         if (myTrader?.status === 'APPROVED') setCurrentView('features');
         else setCurrentView('home');
         break;
-      case 'presidentDashboard':
+      case 'adminDashboard':
         if (myTrader?.status === 'APPROVED') setCurrentView('features');
         else setCurrentView('home');
         break;
@@ -683,12 +718,12 @@ export default function BazarScreen() {
     }
   };
 
-  const handlePresidentNav = () => {
-    if (presidentToken) {
-      loadPresidentData(presidentToken);
-      setCurrentView('presidentDashboard');
+  const handleAdminNav = () => {
+    if (adminToken) {
+      loadAdminData(adminToken);
+      setCurrentView('adminDashboard');
     } else {
-      setCurrentView('presidentLogin');
+      setCurrentView('adminLogin');
     }
   };
 
@@ -703,8 +738,8 @@ export default function BazarScreen() {
             <Text style={styles.headerTitle}>شاہکوٹ بازار</Text>
             <Text style={styles.headerSub}>Shahkot Bazar – Trader Community</Text>
           </View>
-          {presidentToken && (
-            <TouchableOpacity onPress={() => { loadPresidentData(presidentToken); setCurrentView('presidentDashboard'); }} style={styles.headerPresidentBtn}>
+          {adminToken && (
+            <TouchableOpacity onPress={() => { loadAdminData(adminToken); setCurrentView('adminDashboard'); }} style={styles.headerAdminBtn}>
               <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>👔 Dashboard</Text>
             </TouchableOpacity>
           )}
@@ -716,9 +751,9 @@ export default function BazarScreen() {
       register: 'اندراج / Register',
       pending: 'درخواست کی صورتحال',
       chatRoom: '',
-      voters: votersBazar ? votersBazar.name : 'تصدیق شدہ ووٹرز',
-      presidentLogin: 'President Login',
-      presidentDashboard: 'President Dashboard',
+      voters: votersBazar ? votersBazar.name : 'تصدیق شدہ تاجرز',
+      adminLogin: 'Bazar Admin Login',
+      adminDashboard: 'Bazar Admin Dashboard',
     };
 
     return (
@@ -764,8 +799,16 @@ export default function BazarScreen() {
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.presidentLink} onPress={handlePresidentNav}>
-        <Text style={styles.presidentLinkText}>👔 President Login</Text>
+      <TouchableOpacity style={styles.bigBtn} onPress={() => setCurrentView('voters')}>
+        <Text style={{ fontSize: 28, marginRight: 14 }}>✅</Text>
+        <View>
+          <Text style={styles.bigBtnText}>Browse Traders / تاجر دیکھیں</Text>
+          <Text style={styles.bigBtnSub}>View shop names bazar-wise without registration</Text>
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.adminLink} onPress={handleAdminNav}>
+        <Text style={styles.adminLinkText}>👔 Bazar Admin Login</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -809,6 +852,12 @@ export default function BazarScreen() {
             ))}
           </View>
 
+          <CategoryPicker
+            value={regForm.categories || []}
+            onChange={(categories) => setRegForm({ ...regForm, categories })}
+            maxSelect={5}
+          />
+
           <Text style={styles.inputLabel}>تصویر / Profile Picture (ضروری / Required) *</Text>
           <TouchableOpacity style={styles.photoPicker} onPress={pickRegPhoto}>
             {regPhoto ? (
@@ -851,7 +900,7 @@ export default function BazarScreen() {
         </Text>
         <Text style={[styles.statusMsg, { marginTop: 10, color: COLORS.textSecondary }]}>
           Your registration request has been submitted.{'\n'}
-          Please wait for President approval.
+          Please wait for admin approval.
         </Text>
         {myTrader && (
           <View style={styles.pendingDetails}>
@@ -893,14 +942,14 @@ export default function BazarScreen() {
           <Text style={{ fontSize: 32 }}>✅</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.featureTitle}>Verified Voters / تصدیق شدہ ووٹرز</Text>
+          <Text style={styles.featureTitle}>Verified Traders / تصدیق شدہ تاجرز</Text>
           <Text style={styles.featureSub}>View registered traders by bazar</Text>
         </View>
         <Text style={{ fontSize: 22, color: COLORS.textLight }}>›</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.presidentLink} onPress={handlePresidentNav}>
-        <Text style={styles.presidentLinkText}>👔 President Login</Text>
+      <TouchableOpacity style={styles.adminLink} onPress={handleAdminNav}>
+        <Text style={styles.adminLinkText}>👔 Bazar Admin Login</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -1352,6 +1401,13 @@ export default function BazarScreen() {
                 <Text style={styles.voterName}>{item.fullName}</Text>
                 <Text style={styles.voterShop}>{item.shopName}</Text>
                 <Text style={styles.voterPhone}>📞 {item.phone}</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
+                  {parseTraderCategories(item.categories).map((category) => (
+                    <View key={`${item.id}-list-${category}`} style={styles.catBadge}>
+                      <Text style={styles.catBadgeText}>{category}</Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             </TouchableOpacity>
           )}
@@ -1373,19 +1429,19 @@ export default function BazarScreen() {
     );
   };
 
-  // ========== PRESIDENT LOGIN ==========
-  const renderPresidentLogin = () => (
+  // ========== ADMIN LOGIN ==========
+  const renderAdminLogin = () => (
     <ScrollView style={styles.viewContainer} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, alignItems: 'center' }}>
       <View style={[styles.statusCard, { marginTop: 20 }]}>
         <Text style={{ fontSize: 48, marginBottom: 12 }}>👔</Text>
-        <Text style={styles.statusTitle}>President Login</Text>
+        <Text style={styles.statusTitle}>Bazar Admin Login</Text>
         <Text style={styles.sectionSub}>Manage trader registrations and bazars</Text>
       </View>
       <View style={{ width: '100%', marginTop: 20 }}>
-        <TextInput style={styles.input} placeholder="Email" value={presidentEmail} onChangeText={setPresidentEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
-        <TextInput style={[styles.input, { marginTop: 10 }]} placeholder="Password" value={presidentPassword} onChangeText={setPresidentPassword} secureTextEntry placeholderTextColor={COLORS.textLight} />
-        <TouchableOpacity style={[styles.submitBtn, presidentLoading && { opacity: 0.5 }]} onPress={presidentLogin} disabled={presidentLoading}>
-          <Text style={styles.submitBtnText}>{presidentLoading ? 'Logging in...' : 'Login'}</Text>
+        <TextInput style={styles.input} placeholder="Email" value={adminEmail} onChangeText={setAdminEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
+        <TextInput style={[styles.input, { marginTop: 10 }]} placeholder="Password" value={adminPassword} onChangeText={setAdminPassword} secureTextEntry placeholderTextColor={COLORS.textLight} />
+        <TouchableOpacity style={[styles.submitBtn, adminLoading && { opacity: 0.5 }]} onPress={adminLogin} disabled={adminLoading}>
+          <Text style={styles.submitBtnText}>{adminLoading ? 'Logging in...' : 'Login'}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -1408,6 +1464,13 @@ export default function BazarScreen() {
               <Text style={{ fontSize: 13, color: COLORS.textSecondary }}>{trader.shopName}</Text>
               <Text style={{ fontSize: 12, color: COLORS.primary }}>{trader.bazar?.name}</Text>
               <Text style={{ fontSize: 11, color: COLORS.textLight }}>📞 {trader.phone}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
+                {parseTraderCategories(trader.categories).map((category) => (
+                  <View key={`${trader.id}-pending-${category}`} style={styles.catBadge}>
+                    <Text style={styles.catBadgeText}>{category}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1457,7 +1520,43 @@ export default function BazarScreen() {
               <Text style={{ fontSize: 13 }}>{trader.shopName}</Text>
               <Text style={{ fontSize: 12 }}>{trader.bazar?.name}</Text>
               <Text style={{ fontSize: 11 }}>📞 {trader.phone}</Text>
+              <Text style={{ fontSize: 11, color: trader.isHidden ? COLORS.error : COLORS.success, marginTop: 2 }}>
+                {trader.isHidden ? 'Hidden in app' : 'Visible in app'}
+              </Text>
+              <Text style={{ fontSize: 11, color: COLORS.textSecondary }}>
+                Brand deals: {trader.canPostBrandDeals ? 'Allowed' : 'Blocked'} | Restaurant deals: {trader.canPostRestaurantDeals ? 'Allowed' : 'Blocked'}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 6 }}>
+                {parseTraderCategories(trader.categories).map((category) => (
+                  <View key={`${trader.id}-approved-${category}`} style={styles.catBadge}>
+                    <Text style={styles.catBadgeText}>{category}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+            <TouchableOpacity
+              style={[styles.smallActionBtn, trader.isHidden ? styles.smallActionBtnDanger : styles.smallActionBtnSuccess]}
+              onPress={() => updateTraderControls(trader.id, { isHidden: !trader.isHidden })}
+            >
+              <Text style={styles.smallActionBtnText}>{trader.isHidden ? 'Allow Visibility' : 'Hide Trader'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.smallActionBtn, trader.canPostBrandDeals ? styles.smallActionBtnSuccess : styles.smallActionBtnMuted]}
+              onPress={() => updateTraderControls(trader.id, { canPostBrandDeals: !trader.canPostBrandDeals })}
+            >
+              <Text style={styles.smallActionBtnText}>{trader.canPostBrandDeals ? 'Block Brand Deals' : 'Allow Brand Deals'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.smallActionBtn, trader.canPostRestaurantDeals ? styles.smallActionBtnSuccess : styles.smallActionBtnMuted]}
+              onPress={() => updateTraderControls(trader.id, { canPostRestaurantDeals: !trader.canPostRestaurantDeals })}
+            >
+              <Text style={styles.smallActionBtnText}>{trader.canPostRestaurantDeals ? 'Block Restaurant Deals' : 'Allow Restaurant Deals'}</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -1480,7 +1579,7 @@ export default function BazarScreen() {
           <Text style={{ color: '#fff', fontWeight: '700' }}>+ Add</Text>
         </TouchableOpacity>
       </View>
-      {presidentBazars.map(b => (
+      {adminBazars.map(b => (
         <View key={b.id} style={styles.bazarManageRow}>
           <Text style={{ flex: 1, fontWeight: '600', color: COLORS.text }}>{b.name}</Text>
           <Text style={{ fontSize: 12, color: COLORS.textSecondary, marginRight: 10 }}>{b._count?.traders || 0} traders</Text>
@@ -1495,12 +1594,12 @@ export default function BazarScreen() {
   const renderExportSection = () => (
     <>
       <Text style={styles.dashSectionTitle}>📥 Export Traders (Excel/CSV)</Text>
-      <Text style={styles.sectionSub}>Download registered voters list bazar-wise</Text>
+      <Text style={styles.sectionSub}>Download registered traders list bazar-wise</Text>
       <View style={styles.bazarGrid}>
         <TouchableOpacity style={[styles.bazarChip, exportBazarId === 'all' && styles.bazarChipSelected]} onPress={() => setExportBazarId('all')}>
           <Text style={[styles.bazarChipText, exportBazarId === 'all' && { color: '#fff' }]}>All Bazars</Text>
         </TouchableOpacity>
-        {presidentBazars.map(b => (
+        {adminBazars.map(b => (
           <TouchableOpacity key={b.id} style={[styles.bazarChip, exportBazarId === b.id && styles.bazarChipSelected]} onPress={() => setExportBazarId(b.id)}>
             <Text style={[styles.bazarChipText, exportBazarId === b.id && { color: '#fff' }]}>{b.name}</Text>
           </TouchableOpacity>
@@ -1512,63 +1611,63 @@ export default function BazarScreen() {
     </>
   );
 
-  // ========== PRESIDENT DASHBOARD ==========
-  const renderPresidentDashboard = () => (
-    <ScrollView style={styles.viewContainer} refreshControl={<RefreshControl refreshing={presidentLoading} onRefresh={() => loadPresidentData(presidentToken)} colors={[COLORS.primary]} />}>
+  // ========== ADMIN DASHBOARD ==========
+  const renderAdminDashboard = () => (
+    <ScrollView style={styles.viewContainer} refreshControl={<RefreshControl refreshing={adminLoading} onRefresh={() => loadAdminData(adminToken)} colors={[COLORS.primary]} />}>
       <View style={{ padding: 16 }}>
-        {/* President Info */}
-        <View style={styles.presidentHeader}>
+        {/* Admin Info */}
+        <View style={styles.adminHeader}>
           <View>
-            <Text style={styles.presidentName}>{presidentData?.name || 'President'}</Text>
-            <Text style={styles.presidentEmailText}>{presidentData?.email}</Text>
+            <Text style={styles.adminName}>{adminData?.name || 'Admin'}</Text>
+            <Text style={styles.adminEmailText}>{adminData?.email}</Text>
           </View>
-          <TouchableOpacity onPress={presidentLogout} style={styles.logoutBtn}>
+          <TouchableOpacity onPress={adminLogout} style={styles.logoutBtn}>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
 
         {/* Stats */}
-        {presidentStats && (
+        {adminStats && (
           <View style={styles.statsRow}>
-            <View style={styles.statCard}><Text style={styles.statNum}>{presidentStats.totalTraders}</Text><Text style={styles.statLabel}>Total</Text></View>
-            <View style={styles.statCard}><Text style={[styles.statNum, { color: COLORS.warning }]}>{presidentStats.pendingTraders}</Text><Text style={styles.statLabel}>Pending</Text></View>
-            <View style={styles.statCard}><Text style={[styles.statNum, { color: COLORS.success }]}>{presidentStats.approvedTraders}</Text><Text style={styles.statLabel}>Approved</Text></View>
-            <View style={styles.statCard}><Text style={styles.statNum}>{presidentStats.totalBazars}</Text><Text style={styles.statLabel}>Bazars</Text></View>
+            <View style={styles.statCard}><Text style={styles.statNum}>{adminStats.totalTraders}</Text><Text style={styles.statLabel}>Total</Text></View>
+            <View style={styles.statCard}><Text style={[styles.statNum, { color: COLORS.warning }]}>{adminStats.pendingTraders}</Text><Text style={styles.statLabel}>Pending</Text></View>
+            <View style={styles.statCard}><Text style={[styles.statNum, { color: COLORS.success }]}>{adminStats.approvedTraders}</Text><Text style={styles.statLabel}>Approved</Text></View>
+            <View style={styles.statCard}><Text style={styles.statNum}>{adminStats.totalBazars}</Text><Text style={styles.statLabel}>Bazars</Text></View>
           </View>
         )}
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.presidentTabs}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.adminTabs}>
           <TouchableOpacity
-            style={[styles.tabBtn, presidentTab === 'pending' && styles.activeTab]}
-            onPress={() => setPresidentTab('pending')}
+            style={[styles.tabBtn, adminTab === 'pending' && styles.activeTab]}
+            onPress={() => setAdminTab('pending')}
           >
-            <Text style={[styles.tabText, presidentTab === 'pending' && styles.activeTabText]}>📥 Pending</Text>
+            <Text style={[styles.tabText, adminTab === 'pending' && styles.activeTabText]}>📥 Pending</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tabBtn, presidentTab === 'approved' && styles.activeTab]}
-            onPress={() => setPresidentTab('approved')}
+            style={[styles.tabBtn, adminTab === 'approved' && styles.activeTab]}
+            onPress={() => setAdminTab('approved')}
           >
-            <Text style={[styles.tabText, presidentTab === 'approved' && styles.activeTabText]}>✅ Approved</Text>
+            <Text style={[styles.tabText, adminTab === 'approved' && styles.activeTabText]}>✅ Approved</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tabBtn, presidentTab === 'bazars' && styles.activeTab]}
-            onPress={() => setPresidentTab('bazars')}
+            style={[styles.tabBtn, adminTab === 'bazars' && styles.activeTab]}
+            onPress={() => setAdminTab('bazars')}
           >
-            <Text style={[styles.tabText, presidentTab === 'bazars' && styles.activeTabText]}>🏪 Bazars</Text>
+            <Text style={[styles.tabText, adminTab === 'bazars' && styles.activeTabText]}>🏪 Bazars</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tabBtn, presidentTab === 'export' && styles.activeTab]}
-            onPress={() => setPresidentTab('export')}
+            style={[styles.tabBtn, adminTab === 'export' && styles.activeTab]}
+            onPress={() => setAdminTab('export')}
           >
-            <Text style={[styles.tabText, presidentTab === 'export' && styles.activeTabText]}>📊 Export</Text>
+            <Text style={[styles.tabText, adminTab === 'export' && styles.activeTabText]}>📊 Export</Text>
           </TouchableOpacity>
         </ScrollView>
 
-        <View style={styles.presidentTabContent}>
-          {presidentTab === 'pending' && renderPendingTraders()}
-          {presidentTab === 'approved' && renderApprovedTraders()}
-          {presidentTab === 'bazars' && renderBazarManagement()}
-          {presidentTab === 'export' && renderExportSection()}
+        <View style={styles.adminTabContent}>
+          {adminTab === 'pending' && renderPendingTraders()}
+          {adminTab === 'approved' && renderApprovedTraders()}
+          {adminTab === 'bazars' && renderBazarManagement()}
+          {adminTab === 'export' && renderExportSection()}
         </View>
 
         <View style={{ height: 40 }} />
@@ -1733,8 +1832,8 @@ export default function BazarScreen() {
       {currentView === 'features' && renderFeatures()}
       {currentView === 'chatRoom' && renderChatRoom()}
       {currentView === 'voters' && renderVoters()}
-      {currentView === 'presidentLogin' && renderPresidentLogin()}
-      {currentView === 'presidentDashboard' && renderPresidentDashboard()}
+      {currentView === 'adminLogin' && renderAdminLogin()}
+      {currentView === 'adminDashboard' && renderAdminDashboard()}
       {renderTraderDetailModal()}
       {renderSenderProfileModal()}
       {renderMediaViewer()}
@@ -1750,7 +1849,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, padding: 16, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 30) + 10 : 12 },
   headerTitle: { fontSize: 22, fontWeight: '700', color: COLORS.white },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
-  headerPresidentBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  headerAdminBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
 
   // Sub Header (feature screens)
   subHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, paddingVertical: 12, paddingHorizontal: 8, paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 30) + 8 : 12 },
@@ -1774,8 +1873,8 @@ const styles = StyleSheet.create({
   bigBtnSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
 
   // President Link
-  presidentLink: { marginTop: 24, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  presidentLinkText: { color: COLORS.textSecondary, fontWeight: '600', fontSize: 14 },
+  adminLink: { marginTop: 24, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 10, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  adminLinkText: { color: COLORS.textSecondary, fontWeight: '600', fontSize: 14 },
 
   // Form
   formTitle: { fontSize: 20, fontWeight: '700', color: COLORS.text, textAlign: 'center' },
@@ -1905,19 +2004,21 @@ const styles = StyleSheet.create({
   voterName: { fontSize: 15, fontWeight: '700', color: COLORS.text },
   voterShop: { fontSize: 13, color: COLORS.textSecondary },
   voterPhone: { fontSize: 12, color: COLORS.primary, marginTop: 2 },
+  catBadge: { backgroundColor: COLORS.primary + '12', borderWidth: 1, borderColor: COLORS.primary + '30', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, marginRight: 6, marginTop: 4 },
+  catBadgeText: { fontSize: 11, color: COLORS.primary, fontWeight: '600' },
 
   // President Dashboard
-  presidentHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.surface, padding: 16, borderRadius: 12, marginBottom: 16, elevation: 1 },
-  presidentName: { fontSize: 18, fontWeight: '700', color: COLORS.text },
-  presidentEmailText: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
+  adminHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: COLORS.surface, padding: 16, borderRadius: 12, marginBottom: 16, elevation: 1 },
+  adminName: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  adminEmailText: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
   logoutBtn: { backgroundColor: COLORS.error + '15', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   logoutText: { color: COLORS.error, fontWeight: '600', fontSize: 13 },
-  presidentTabs: { paddingBottom: 4, marginBottom: 12, gap: 8 },
+  adminTabs: { paddingBottom: 4, marginBottom: 12, gap: 8 },
   tabBtn: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: 10, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   activeTab: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   tabText: { color: COLORS.text, fontWeight: '600', fontSize: 13 },
   activeTabText: { color: COLORS.white },
-  presidentTabContent: { minHeight: 220 },
+  adminTabContent: { minHeight: 220 },
 
   // Stats
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
@@ -1936,6 +2037,11 @@ const styles = StyleSheet.create({
   approveBtnText: { color: COLORS.success, fontWeight: '700', fontSize: 13 },
   rejectBtn: { flex: 1, backgroundColor: COLORS.error + '15', padding: 10, borderRadius: 8, alignItems: 'center' },
   rejectBtnText: { color: COLORS.error, fontWeight: '700', fontSize: 13 },
+  smallActionBtn: { paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8 },
+  smallActionBtnSuccess: { backgroundColor: COLORS.success + '18' },
+  smallActionBtnDanger: { backgroundColor: COLORS.error + '18' },
+  smallActionBtnMuted: { backgroundColor: COLORS.textLight + '22' },
+  smallActionBtnText: { fontSize: 11, fontWeight: '700', color: COLORS.text },
   trashBtn: { backgroundColor: COLORS.error + '10', padding: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 
   // Bazar Management

@@ -1,5 +1,5 @@
 // Shahkot App API Configuration
-const DEV_API_URL = 'http://192.168.100.40:5000/api'; // Local network (updated to current machine IP)
+const DEV_API_URL = 'https://lionfish-app-tkr7y.ondigitalocean.app/api'; // Production API
 const PROD_API_URL = 'https://lionfish-app-tkr7y.ondigitalocean.app/api';
 
 // EXPO_PUBLIC_API_URL is injected by EAS build profile (eas.json env section)

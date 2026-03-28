@@ -9,10 +9,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../config/constants';
-import { useAuth } from '../context/AuthContext';
-import { clothBrandsAPI } from '../services/api';
+import { bazarAPI, clothBrandsAPI } from '../services/api';
 import AdBanner from '../components/AdBanner';
 import { useLanguage } from '../context/LanguageContext';
+import { CategoryFilterBar, BAZAR_CATEGORIES } from '../components/CategoryPicker';
 
 const { width } = Dimensions.get('window');
 
@@ -53,7 +53,6 @@ function SkeletonCard() {
 }
 
 export default function ClothBrandDealsScreen({ navigation, route }) {
-  const { isAdmin } = useAuth();
   const { t } = useLanguage();
   const [brands, setBrands] = useState([]);
   const [allDeals, setAllDeals] = useState([]);
@@ -61,21 +60,9 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('deals');
   const [selectedBrand, setSelectedBrand] = useState(null);
-  const [showAddBrand, setShowAddBrand] = useState(false);
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState({ visible: false, message: '' });
-
-  // Add brand form
-  const [formName, setFormName] = useState('');
-  const [formAddress, setFormAddress] = useState('');
-  const [formLocationLink, setFormLocationLink] = useState('');
-  const [formPhone, setFormPhone] = useState('');
-  const [formWhatsapp, setFormWhatsapp] = useState('');
-  const [formDesc, setFormDesc] = useState('');
-  const [formEmail, setFormEmail] = useState('');
-  const [formPassword, setFormPassword] = useState('');
-  const [formImage, setFormImage] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
 
   // Owner state
   const [ownerToken, setOwnerToken] = useState(null);
@@ -91,6 +78,9 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
   const [dealMedia, setDealMedia] = useState([]); // images + optional video
   const [dealSubmitting, setDealSubmitting] = useState(false);
   const [showOwnerLoginModal, setShowOwnerLoginModal] = useState(false);
+  const [traderCanPostDeals, setTraderCanPostDeals] = useState(false);
+  const [traderShopName, setTraderShopName] = useState('');
+  const [traderDeals, setTraderDeals] = useState([]);
 
   // Image viewer (for deal photos)
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
@@ -103,6 +93,7 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
 
   useEffect(() => {
     loadData();
+    loadTraderDealAccess();
     const p = route?.params;
     if (p?.ownerToken && p?.ownerProfile) {
       setOwnerToken(p.ownerToken);
@@ -110,6 +101,31 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
       setActiveTab('owner');
     }
   }, []);
+
+  const loadTraderDealAccess = async () => {
+    try {
+      const statusRes = await bazarAPI.getMyStatus();
+      const trader = statusRes?.data?.trader;
+      const canPost = !!(
+        trader &&
+        trader.status === 'APPROVED' &&
+        !trader.isHidden &&
+        trader.canPostBrandDeals
+      );
+      setTraderCanPostDeals(canPost);
+      setTraderShopName(trader?.shopName || '');
+
+      if (canPost) {
+        const dealsRes = await clothBrandsAPI.traderMyDeals();
+        setTraderDeals(dealsRes?.data?.deals || []);
+      } else {
+        setTraderDeals([]);
+      }
+    } catch {
+      setTraderCanPostDeals(false);
+      setTraderDeals([]);
+    }
+  };
 
   const openImageViewer = (images = [], index = 0) => {
     if (!Array.isArray(images) || images.length === 0) return;
@@ -155,83 +171,6 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
     } catch {
       Alert.alert(t('error'), 'Could not load brand details.');
     }
-  };
-
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 });
-    if (!result.canceled) setFormImage(result.assets[0]);
-  };
-
-  const handleAddBrand = async () => {
-    if (!formName.trim() || !formAddress.trim() || !formEmail.trim() || !formPassword.trim()) {
-      return Alert.alert(t('required'), 'Name, address, email, and password are required.');
-    }
-    if (formPassword.length < 6) {
-      return Alert.alert(t('error'), 'Password must be at least 6 characters.');
-    }
-
-    const trimmedLocationLink = formLocationLink.trim();
-    if (trimmedLocationLink && !/^https?:\/\//i.test(trimmedLocationLink)) {
-      return Alert.alert('Invalid link', 'Location link must start with http:// or https://');
-    }
-
-    setSubmitting(true);
-    try {
-      const formData = new FormData();
-      formData.append('name', formName.trim());
-      formData.append('address', formAddress.trim());
-      formData.append('locationLink', trimmedLocationLink);
-      formData.append('phone', formPhone.trim());
-      formData.append('whatsapp', formWhatsapp.trim());
-      formData.append('description', formDesc.trim());
-      formData.append('email', formEmail.trim());
-      formData.append('password', formPassword.trim());
-      if (formImage) {
-        formData.append('image', { uri: formImage.uri, type: 'image/jpeg', name: 'brand.jpg' });
-      }
-      const res = await clothBrandsAPI.adminCreate(formData);
-      Alert.alert(t('done') + ' 🎉', `${res.data.brand.name} added.\n\nLogin: ${res.data.brand.email}\nPassword: ${formPassword.trim()}\n\nShare these credentials with the brand owner.`);
-      setShowAddBrand(false);
-      resetForm();
-      loadData();
-    } catch (err) {
-      Alert.alert(t('error'), err.response?.data?.error || 'Failed to create brand.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteBrand = (id, name) => {
-    Alert.alert(t('deleteBrand') || 'Delete Brand', `Remove "${name}" and all its deals?`, [
-      { text: t('cancel'), style: 'cancel' },
-      {
-        text: t('delete'), style: 'destructive',
-        onPress: async () => {
-          try {
-            await clothBrandsAPI.adminDelete(id);
-            Alert.alert(t('deleted'), 'Brand removed.');
-            loadData();
-            setSelectedBrand(null);
-          } catch {
-            Alert.alert(t('error'), 'Failed to delete.');
-          }
-        },
-      },
-    ]);
-  };
-
-  const toggleBrand = async (id, currentActive) => {
-    try {
-      await clothBrandsAPI.adminUpdate(id, { isActive: !currentActive });
-      loadData();
-    } catch {
-      Alert.alert(t('error'), 'Failed to update.');
-    }
-  };
-
-  const resetForm = () => {
-    setFormName(''); setFormAddress(''); setFormLocationLink(''); setFormPhone(''); setFormWhatsapp('');
-    setFormDesc(''); setFormEmail(''); setFormPassword(''); setFormImage(null);
   };
 
   // ── Owner: login ──────────────────────────────────────────────────────
@@ -301,11 +240,18 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
           name: isVideo ? `deal_video_${i}.mp4` : `deal_img_${i}.jpg`,
         });
       });
-      await clothBrandsAPI.ownerCreateDeal(ownerToken, fd);
+      if (ownerToken) {
+        await clothBrandsAPI.ownerCreateDeal(ownerToken, fd);
+      } else if (traderCanPostDeals) {
+        await clothBrandsAPI.traderCreateDeal(fd);
+      } else {
+        throw new Error('You are not allowed to add brand deals.');
+      }
       Alert.alert(t('done') + ' 🎉', t('dealAdded'));
       setShowAddDeal(false);
       setDealTitle(''); setDealDesc(''); setDealPrice(''); setDealOriginalPrice(''); setDealMedia([]);
-      reloadOwnerProfile();
+      if (ownerToken) reloadOwnerProfile();
+      loadTraderDealAccess();
       loadData();
     } catch (err) {
       Alert.alert(t('error'), err.response?.data?.error || 'Failed to add deal.');
@@ -320,8 +266,13 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
       {
         text: t('delete'), style: 'destructive', onPress: async () => {
           try {
-            await clothBrandsAPI.ownerDeleteDeal(ownerToken, dealId);
-            reloadOwnerProfile();
+            if (ownerToken) {
+              await clothBrandsAPI.ownerDeleteDeal(ownerToken, dealId);
+              reloadOwnerProfile();
+            } else if (traderCanPostDeals) {
+              await clothBrandsAPI.traderDeleteDeal(dealId);
+              loadTraderDealAccess();
+            }
             loadData();
           } catch {
             Alert.alert(t('error'), 'Failed to delete deal.');
@@ -508,6 +459,20 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
             <Text style={styles.brandCardName}>{item.name}</Text>
             <Text style={styles.brandAddress} numberOfLines={1}>📍 {item.address}</Text>
             <Text style={styles.brandDeals}>{item._count?.deals || 0} {t('activeDeals')}</Text>
+            {item.categories?.length > 0 && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6 }}>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {item.categories.map(catId => {
+                    const cat = BAZAR_CATEGORIES.find(c => c.id === catId);
+                    return cat ? (
+                      <View key={catId} style={styles.catBadge}>
+                        <Text style={styles.catBadgeText}>{cat.icon} {cat.label.split(' ')[0]}</Text>
+                      </View>
+                    ) : null;
+                  })}
+                </View>
+              </ScrollView>
+            )}
           </View>
         </View>
         {(item.phone || item.whatsapp || item.locationLink || item.address) && (
@@ -532,24 +497,6 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
             )}
           </View>
         )}
-        {isAdmin && (
-          <View style={styles.adminActions}>
-            <TouchableOpacity
-              style={[styles.adminBtn, { borderColor: item.isActive ? '#EF4444' : '#10B981' }]}
-              onPress={() => toggleBrand(item.id, item.isActive)}
-            >
-              <Text style={{ color: item.isActive ? '#EF4444' : '#10B981', fontSize: 12, fontWeight: '600' }}>
-                {item.isActive ? 'Deactivate' : 'Activate'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.adminBtn, { borderColor: '#EF4444' }]}
-              onPress={() => handleDeleteBrand(item.id, item.name)}
-            >
-              <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </TouchableOpacity>
     );
   };
@@ -561,7 +508,7 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
             <Ionicons name="arrow-back" size={22} color="#FFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitleNew}>{t('brandsTitle') || 'Cloth Brands & Deals'}</Text>
+          <Text style={styles.headerTitleNew}>{t('brandsTitle') || 'Brands & Deals'}</Text>
           <View style={{ width: 40 }} />
         </LinearGradient>
         <View style={{ padding: 12 }}>
@@ -573,6 +520,13 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
     );
   }
 
+  const filteredDeals = selectedCategory
+    ? allDeals.filter(d => d.brand?.categories?.includes(selectedCategory) || d.categories?.includes(selectedCategory))
+    : allDeals;
+  const filteredBrands = selectedCategory
+    ? brands.filter(b => b.categories?.includes(selectedCategory))
+    : brands;
+
   return (
     <View style={styles.container}>
       <Toast
@@ -583,9 +537,8 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
       {/* Header */}
       <LinearGradient colors={[COLORS.primary, '#047857']} style={styles.headerNew}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <Ionicons name="arrow-back" size={22} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitleNew}>{t('brandsTitle') || 'Cloth Brands & Deals'}</Text>
+        <Text style={styles.headerTitleNew}>{t('brandsTitle') || 'Brands & Deals'}</Text>
         <View style={styles.headerBtn} />
       </LinearGradient>
 
@@ -594,9 +547,8 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabsScrollNew}>
           {[
             { key: 'deals', icon: 'flame', label: 'Deals', badge: allDeals.length },
-            { key: 'brands', icon: 'shirt', label: 'Brands', badge: null },
+            { key: 'brands', icon: 'storefront', label: 'Brands', badge: null },
             ...(ownerToken ? [{ key: 'owner', icon: 'person-circle', label: 'Owner', badge: 'NEW' }] : []),
-            ...(isAdmin ? [{ key: 'admin', icon: 'settings', label: 'Admin', badge: null }] : []),
           ].map(tab => {
             const active = activeTab === tab.key;
             return (
@@ -621,50 +573,105 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
 
       {/* Deals Tab */}
       {activeTab === 'deals' && (
-        <FlatList
-          data={(() => { const out = []; allDeals.forEach((d, i) => { out.push(d); if ((i + 1) % 4 === 0) out.push({ id: `ad-deal-${i}`, type: 'AD_ITEM' }); }); return out; })()}
-          keyExtractor={(item) => item.id}
-          renderItem={renderDealCard}
-          contentContainerStyle={{ padding: 12 }}
-          ListHeaderComponent={<AdBanner />}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ fontSize: 48, marginBottom: 12 }}>👔</Text>
-              <Text style={styles.emptyText}>{t('noDealsYet')}</Text>
-              <Text style={styles.emptySubText}>{t('checkBackLaterDeals')}</Text>
-            </View>
-          }
-        />
+        <View style={{ flex: 1 }}>
+          <CategoryFilterBar
+            selected={selectedCategory}
+            onSelect={setSelectedCategory}
+            style={{ backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}
+          />
+          <FlatList
+            data={(() => { const out = []; filteredDeals.forEach((d, i) => { out.push(d); if ((i + 1) % 4 === 0) out.push({ id: `ad-deal-${i}`, type: 'AD_ITEM' }); }); return out; })()}
+            keyExtractor={(item) => item.id}
+            renderItem={renderDealCard}
+            contentContainerStyle={{ padding: 12 }}
+            ListHeaderComponent={
+              <View>
+                <AdBanner />
+                {traderCanPostDeals && (
+                  <View style={styles.traderPanel}>
+                    <Text style={styles.traderPanelTitle}>✅ Trader Deal Access</Text>
+                    <Text style={styles.traderPanelSub}>{traderShopName || 'Your shop'} can post in Brands.</Text>
+                    <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddDeal(true)}>
+                      <Ionicons name="add-circle" size={22} color={COLORS.white} />
+                      <Text style={styles.addBtnText}>Add Deal as Trader</Text>
+                    </TouchableOpacity>
+
+                    {traderDeals.map((deal) => (
+                      <View key={deal.id} style={[styles.adminCard, { marginTop: 8 }]}>
+                        <Text style={styles.adminCardName}>{deal.title}</Text>
+                        <Text style={styles.adminCardSub}>{deal.price || 'No price'}</Text>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteDeal(deal.id)}
+                          style={{ alignSelf: 'flex-start', marginTop: 6, padding: 6, backgroundColor: '#FEE2E2', borderRadius: 6 }}
+                        >
+                          <Text style={{ fontSize: 11, color: '#EF4444', fontWeight: '700' }}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            }
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={{ fontSize: 48, marginBottom: 12 }}>
+                  {selectedCategory ? (BAZAR_CATEGORIES.find(c => c.id === selectedCategory)?.icon || '🏷️') : '🏷️'}
+                </Text>
+                <Text style={styles.emptyText}>{t('noDealsYet')}</Text>
+                <Text style={styles.emptySubText}>{selectedCategory ? 'No deals found in this category.' : t('checkBackLaterDeals')}</Text>
+                {selectedCategory && (
+                  <TouchableOpacity style={[styles.adminBtn, { marginTop: 10, borderColor: COLORS.primary }]} onPress={() => setSelectedCategory(null)}>
+                    <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: '700' }}>Clear Filter</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            }
+          />
+        </View>
       )}
 
       {/* Brands Tab */}
       {activeTab === 'brands' && (
-        <FlatList
-          data={(() => { const out = []; brands.forEach((r, i) => { out.push(r); if ((i + 1) % 4 === 0) out.push({ id: `ad-brand-${i}`, type: 'AD_ITEM' }); }); return out; })()}
-          keyExtractor={(item) => item.id}
-          renderItem={renderBrandCard}
-          contentContainerStyle={{ padding: 12 }}
-          ListHeaderComponent={<AdBanner />}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ fontSize: 48, marginBottom: 12 }}>🏪</Text>
-              <Text style={styles.emptyText}>{t('noBrandsYet')}</Text>
-            </View>
-          }
-          ListFooterComponent={
-            !ownerToken ? (
-              <TouchableOpacity
-                onPress={() => setShowOwnerLoginModal(true)}
-                style={{ alignItems: 'center', paddingVertical: 24 }}
-              >
-                <Text style={{ fontSize: 12, color: COLORS.textLight }}>{t('brandOwnerPrompt')}</Text>
-                <Text style={{ fontSize: 13, color: COLORS.primary, fontWeight: '600', marginTop: 2 }}>{t('loginToManage')}</Text>
-              </TouchableOpacity>
-            ) : null
-          }
-        />
+        <View style={{ flex: 1 }}>
+          <CategoryFilterBar
+            selected={selectedCategory}
+            onSelect={setSelectedCategory}
+            style={{ backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}
+          />
+          <FlatList
+            data={(() => { const out = []; filteredBrands.forEach((r, i) => { out.push(r); if ((i + 1) % 4 === 0) out.push({ id: `ad-brand-${i}`, type: 'AD_ITEM' }); }); return out; })()}
+            keyExtractor={(item) => item.id}
+            renderItem={renderBrandCard}
+            contentContainerStyle={{ padding: 12 }}
+            ListHeaderComponent={<AdBanner />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={{ fontSize: 48, marginBottom: 12 }}>
+                  {selectedCategory ? (BAZAR_CATEGORIES.find(c => c.id === selectedCategory)?.icon || '🏪') : '🏪'}
+                </Text>
+                <Text style={styles.emptyText}>{t('noBrandsYet')}</Text>
+                {selectedCategory && (
+                  <TouchableOpacity style={[styles.adminBtn, { marginTop: 10, borderColor: COLORS.primary }]} onPress={() => setSelectedCategory(null)}>
+                    <Text style={{ color: COLORS.primary, fontSize: 12, fontWeight: '700' }}>Clear Filter</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            }
+            ListFooterComponent={
+              !ownerToken ? (
+                <TouchableOpacity
+                  onPress={() => setShowOwnerLoginModal(true)}
+                  style={{ alignItems: 'center', paddingVertical: 24 }}
+                >
+                  <Text style={{ fontSize: 12, color: COLORS.textLight }}>{t('brandOwnerPrompt')}</Text>
+                  <Text style={{ fontSize: 13, color: COLORS.primary, fontWeight: '600', marginTop: 2 }}>{t('loginToManage')}</Text>
+                </TouchableOpacity>
+              ) : null
+            }
+          />
+        </View>
       )}
 
       {/* Owner Tab */}
@@ -726,44 +733,6 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
               </View>
             ))
           )}
-        </ScrollView>
-      )}
-
-      {/* Admin Tab */}
-      {activeTab === 'admin' && isAdmin && (
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddBrand(true)}>
-            <Ionicons name="add-circle" size={22} color={COLORS.white} />
-            <Text style={styles.addBtnText}>{t('addNewBrand')}</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.sectionTitle}>{t('allBrands') || 'All Brands'} ({brands.length})</Text>
-          {brands.map((r) => (
-            <View key={r.id} style={styles.adminCard}>
-              <Text style={styles.adminCardName}>{r.name}</Text>
-              <Text style={styles.adminCardSub}>📍 {r.address}</Text>
-              <Text style={styles.adminCardSub}>📧 Active deals: {r._count?.deals || 0}</Text>
-              <Text style={[styles.adminCardSub, { color: r.isActive ? '#10B981' : '#EF4444' }]}>
-                {r.isActive ? '✅ Active' : '❌ Deactivated'}
-              </Text>
-              <View style={styles.adminActions}>
-                <TouchableOpacity
-                  style={[styles.adminBtn, { borderColor: r.isActive ? '#EF4444' : '#10B981' }]}
-                  onPress={() => toggleBrand(r.id, r.isActive)}
-                >
-                  <Text style={{ color: r.isActive ? '#EF4444' : '#10B981', fontSize: 12, fontWeight: '600' }}>
-                    {r.isActive ? 'Deactivate' : 'Activate'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.adminBtn, { borderColor: '#EF4444' }]}
-                  onPress={() => handleDeleteBrand(r.id, r.name)}
-                >
-                  <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
         </ScrollView>
       )}
 
@@ -932,49 +901,6 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
         </View>
       </Modal>
 
-      {/* Add Brand Modal */}
-      <Modal visible={showAddBrand} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
-            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <Text style={styles.detailName}>Add Brand</Text>
-                <TouchableOpacity onPress={() => { setShowAddBrand(false); resetForm(); }}>
-                  <Ionicons name="close" size={24} color={COLORS.text} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                <TextInput style={styles.input} placeholder={t('brandName')} value={formName} onChangeText={setFormName} placeholderTextColor={COLORS.textLight} />
-                <TextInput style={styles.input} placeholder={t('restaurantAddress')} value={formAddress} onChangeText={setFormAddress} placeholderTextColor={COLORS.textLight} />
-                <TextInput style={styles.input} placeholder="Google Maps Link (optional)" value={formLocationLink} onChangeText={setFormLocationLink} keyboardType="url" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
-                <TextInput style={styles.input} placeholder="Phone" value={formPhone} onChangeText={setFormPhone} keyboardType="phone-pad" placeholderTextColor={COLORS.textLight} />
-                <TextInput style={styles.input} placeholder="WhatsApp" value={formWhatsapp} onChangeText={setFormWhatsapp} keyboardType="phone-pad" placeholderTextColor={COLORS.textLight} />
-                <TextInput style={[styles.input, { height: 80 }]} placeholder="Description" value={formDesc} onChangeText={setFormDesc} multiline placeholderTextColor={COLORS.textLight} />
-
-                <Text style={styles.formSection}>🔑 Owner Login Credentials</Text>
-                <TextInput style={styles.input} placeholder="Email (for login) *" value={formEmail} onChangeText={setFormEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
-                <TextInput style={styles.input} placeholder="Password *" value={formPassword} onChangeText={setFormPassword} secureTextEntry placeholderTextColor={COLORS.textLight} />
-
-                <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-                  <Text style={{ fontSize: 24 }}>{formImage ? '✅' : '📷'}</Text>
-                  <Text style={styles.imagePickerText}>{formImage ? 'Image Selected' : 'Add Brand Logo'}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.submitBtn, submitting && { opacity: 0.5 }]}
-                  onPress={handleAddBrand}
-                  disabled={submitting}
-                >
-                  {submitting ? <ActivityIndicator color={COLORS.white} /> : <Text style={styles.submitBtnText}>Create Brand</Text>}
-                </TouchableOpacity>
-                <View style={{ height: 40 }} />
-              </ScrollView>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
-
       {/* Owner Login Modal */}
       <Modal visible={showOwnerLoginModal} animationType="slide" transparent onRequestClose={() => setShowOwnerLoginModal(false)}>
         <View style={styles.modalOverlay}>
@@ -1011,7 +937,7 @@ export default function ClothBrandDealsScreen({ navigation, route }) {
         </View>
       </Modal>
 
-      {/* Add Deal Modal (Owner) */}
+      {/* Add Deal Modal */}
       <Modal visible={showAddDeal} animationType="slide" transparent onRequestClose={() => setShowAddDeal(false)}>
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
@@ -1292,6 +1218,11 @@ const styles = StyleSheet.create({
   // Admin
   adminActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   adminBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  catBadge: { backgroundColor: COLORS.primary + '12', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: COLORS.primary + '30' },
+  catBadgeText: { fontSize: 10, color: COLORS.primary, fontWeight: '700' },
+  traderPanel: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, padding: 12, marginTop: 10, marginBottom: 12 },
+  traderPanelTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  traderPanelSub: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2, marginBottom: 10 },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: COLORS.primary, padding: 14, borderRadius: 12, marginBottom: 16,

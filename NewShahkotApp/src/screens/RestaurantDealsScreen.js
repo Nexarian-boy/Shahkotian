@@ -9,10 +9,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../config/constants';
-import { useAuth } from '../context/AuthContext';
-import { restaurantsAPI } from '../services/api';
+import { bazarAPI, restaurantsAPI } from '../services/api';
 import AdBanner from '../components/AdBanner';
 import { useLanguage } from '../context/LanguageContext';
+import { CategoryFilterBar, FOOD_CATEGORIES } from '../components/CategoryPicker';
 
 const { width } = Dimensions.get('window');
 
@@ -53,29 +53,16 @@ function SkeletonCard() {
 }
 
 export default function RestaurantDealsScreen({ navigation, route }) {
-  const { isAdmin } = useAuth();
   const { t } = useLanguage();
   const [restaurants, setRestaurants] = useState([]);
   const [allDeals, setAllDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState('deals'); // deals, restaurants, admin, owner
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedRestaurant, setSelectedRestaurant] = useState(null);
-  const [showAddRestaurant, setShowAddRestaurant] = useState(false);
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState({ visible: false, message: '' });
-
-  // Add restaurant form
-  const [formName, setFormName] = useState('');
-  const [formAddress, setFormAddress] = useState('');
-  const [formLocationLink, setFormLocationLink] = useState('');
-  const [formPhone, setFormPhone] = useState('');
-  const [formWhatsapp, setFormWhatsapp] = useState('');
-  const [formDesc, setFormDesc] = useState('');
-  const [formEmail, setFormEmail] = useState('');
-  const [formPassword, setFormPassword] = useState('');
-  const [formImage, setFormImage] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
 
   // Owner state
   const [ownerToken, setOwnerToken] = useState(null);
@@ -91,6 +78,9 @@ export default function RestaurantDealsScreen({ navigation, route }) {
   const [dealMedia, setDealMedia] = useState([]); // images + optional video
   const [dealSubmitting, setDealSubmitting] = useState(false);
   const [showOwnerLoginModal, setShowOwnerLoginModal] = useState(false);
+  const [traderCanPostDeals, setTraderCanPostDeals] = useState(false);
+  const [traderShopName, setTraderShopName] = useState('');
+  const [traderDeals, setTraderDeals] = useState([]);
 
   // Owner stats (safe optional UI)
   const [ownerStats, setOwnerStats] = useState({ totalViews: 0, totalLikes: 0, activeDeals: 0 });
@@ -122,6 +112,7 @@ export default function RestaurantDealsScreen({ navigation, route }) {
 
   useEffect(() => {
     loadData();
+    loadTraderDealAccess();
     // Auto-login owner if navigation params provided (from LoginScreen fallback)
     const p = route?.params;
     if (p?.ownerToken && p?.ownerProfile) {
@@ -130,6 +121,31 @@ export default function RestaurantDealsScreen({ navigation, route }) {
       setActiveTab('owner');
     }
   }, []);
+
+  const loadTraderDealAccess = async () => {
+    try {
+      const statusRes = await bazarAPI.getMyStatus();
+      const trader = statusRes?.data?.trader;
+      const canPost = !!(
+        trader &&
+        trader.status === 'APPROVED' &&
+        !trader.isHidden &&
+        trader.canPostRestaurantDeals
+      );
+      setTraderCanPostDeals(canPost);
+      setTraderShopName(trader?.shopName || '');
+
+      if (canPost) {
+        const dealsRes = await restaurantsAPI.traderMyDeals();
+        setTraderDeals(dealsRes?.data?.deals || []);
+      } else {
+        setTraderDeals([]);
+      }
+    } catch {
+      setTraderCanPostDeals(false);
+      setTraderDeals([]);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'owner' && ownerToken) {
@@ -167,91 +183,6 @@ export default function RestaurantDealsScreen({ navigation, route }) {
     } catch (err) {
       Alert.alert('Error', 'Could not load restaurant details.');
     }
-  };
-
-  const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-    if (!result.canceled) setFormImage(result.assets[0]);
-  };
-
-  const handleAddRestaurant = async () => {
-    if (!formName.trim() || !formAddress.trim() || !formEmail.trim() || !formPassword.trim()) {
-      return Alert.alert('Required', 'Name, address, email, and password are required.');
-    }
-    if (formPassword.length < 6) {
-      return Alert.alert('Error', 'Password must be at least 6 characters.');
-    }
-
-    const trimmedLocationLink = formLocationLink.trim();
-    if (trimmedLocationLink && !/^https?:\/\//i.test(trimmedLocationLink)) {
-      return Alert.alert('Invalid link', 'Location link must start with http:// or https://');
-    }
-
-    setSubmitting(true);
-    try {
-      const formData = new FormData();
-      formData.append('name', formName.trim());
-      formData.append('address', formAddress.trim());
-      formData.append('locationLink', trimmedLocationLink);
-      formData.append('phone', formPhone.trim());
-      formData.append('whatsapp', formWhatsapp.trim());
-      formData.append('description', formDesc.trim());
-      formData.append('email', formEmail.trim());
-      formData.append('password', formPassword.trim());
-      if (formImage) {
-        formData.append('image', {
-          uri: formImage.uri,
-          type: 'image/jpeg',
-          name: 'restaurant.jpg',
-        });
-      }
-
-      const res = await restaurantsAPI.adminCreate(formData);
-      Alert.alert(t('done') + ' 🎉', `${res.data.restaurant.name} added.\n\nLogin: ${res.data.restaurant.email}\nPassword: ${formPassword.trim()}\n\nShare these credentials with the restaurant owner.`);
-      setShowAddRestaurant(false);
-      resetForm();
-      loadData();
-    } catch (err) {
-      Alert.alert(t('error'), err.response?.data?.error || 'Failed to create restaurant.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleDeleteRestaurant = (id, name) => {
-    Alert.alert(t('deleteRestaurant'), `Remove "${name}" and all its deals?`, [
-      { text: t('cancel'), style: 'cancel' },
-      {
-        text: t('delete'), style: 'destructive',
-        onPress: async () => {
-          try {
-            await restaurantsAPI.adminDelete(id);
-            Alert.alert(t('deleted'), t('restaurantDeleted') || 'Restaurant removed.');
-            loadData();
-            setSelectedRestaurant(null);
-          } catch (err) {
-            Alert.alert(t('error'), 'Failed to delete.');
-          }
-        },
-      },
-    ]);
-  };
-
-  const toggleRestaurant = async (id, currentActive) => {
-    try {
-      await restaurantsAPI.adminUpdate(id, { isActive: !currentActive });
-      loadData();
-    } catch {
-      Alert.alert(t('error'), 'Failed to update.');
-    }
-  };
-
-  const resetForm = () => {
-    setFormName(''); setFormAddress(''); setFormLocationLink(''); setFormPhone(''); setFormWhatsapp('');
-    setFormDesc(''); setFormEmail(''); setFormPassword(''); setFormImage(null);
   };
 
   // ── Owner: login ─────────────────────────────────────────────────────────
@@ -307,11 +238,18 @@ export default function RestaurantDealsScreen({ navigation, route }) {
           name: isVideo ? `deal_video_${i}.mp4` : `deal_img_${i}.jpg`,
         });
       });
-      await restaurantsAPI.ownerCreateDeal(ownerToken, fd);
+      if (ownerToken) {
+        await restaurantsAPI.ownerCreateDeal(ownerToken, fd);
+      } else if (traderCanPostDeals) {
+        await restaurantsAPI.traderCreateDeal(fd);
+      } else {
+        throw new Error('You are not allowed to add restaurant deals.');
+      }
       Alert.alert(t('done') + ' 🎉', t('dealAdded'));
       setShowAddDeal(false);
       setDealTitle(''); setDealDesc(''); setDealPrice(''); setDealOriginalPrice(''); setDealMedia([]);
-      reloadOwnerProfile();
+      if (ownerToken) reloadOwnerProfile();
+      loadTraderDealAccess();
       loadData();
     } catch (err) {
       Alert.alert(t('error'), err.response?.data?.error || 'Failed to add deal.');
@@ -326,8 +264,13 @@ export default function RestaurantDealsScreen({ navigation, route }) {
       {
         text: t('delete'), style: 'destructive', onPress: async () => {
           try {
-            await restaurantsAPI.ownerDeleteDeal(ownerToken, dealId);
-            reloadOwnerProfile();
+            if (ownerToken) {
+              await restaurantsAPI.ownerDeleteDeal(ownerToken, dealId);
+              reloadOwnerProfile();
+            } else if (traderCanPostDeals) {
+              await restaurantsAPI.traderDeleteDeal(dealId);
+              loadTraderDealAccess();
+            }
             loadData();
           } catch {
             Alert.alert(t('error'), 'Failed to delete deal.');
@@ -549,24 +492,6 @@ export default function RestaurantDealsScreen({ navigation, route }) {
           )}
         </View>
       )}
-      {isAdmin && (
-        <View style={styles.adminActions}>
-          <TouchableOpacity
-            style={[styles.adminBtn, { borderColor: item.isActive ? '#EF4444' : '#10B981' }]}
-            onPress={() => toggleRestaurant(item.id, item.isActive)}
-          >
-            <Text style={{ color: item.isActive ? '#EF4444' : '#10B981', fontSize: 12, fontWeight: '600' }}>
-              {item.isActive ? 'Deactivate' : 'Activate'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.adminBtn, { borderColor: '#EF4444' }]}
-            onPress={() => handleDeleteRestaurant(item.id, item.name)}
-          >
-            <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </TouchableOpacity>
   );};
 
@@ -588,6 +513,13 @@ export default function RestaurantDealsScreen({ navigation, route }) {
       </View>
     );
   }
+
+  const filteredDeals = selectedCategory
+    ? allDeals.filter(d => d.restaurant?.categories?.includes(selectedCategory) || d.categories?.includes(selectedCategory))
+    : allDeals;
+  const filteredRestaurants = selectedCategory
+    ? restaurants.filter(r => r.categories?.includes(selectedCategory))
+    : restaurants;
 
   return (
     <View style={styles.container}>
@@ -612,7 +544,6 @@ export default function RestaurantDealsScreen({ navigation, route }) {
             { key: 'deals', icon: 'flame', label: 'Deals', badge: allDeals.length },
             { key: 'restaurants', icon: 'storefront', label: 'Restaurants', badge: null },
             ...(ownerToken ? [{ key: 'owner', icon: 'person-circle', label: 'Owner', badge: 'NEW' }] : []),
-            ...(isAdmin ? [{ key: 'admin', icon: 'settings', label: 'Admin', badge: null }] : []),
           ].map(tab => {
             const active = activeTab === tab.key;
             return (
@@ -637,50 +568,93 @@ export default function RestaurantDealsScreen({ navigation, route }) {
 
       {/* Deals Tab */}
       {activeTab === 'deals' && (
-        <FlatList
-          data={(() => { const out = []; allDeals.forEach((d, i) => { out.push(d); if ((i + 1) % 4 === 0) out.push({ id: `ad-deal-${i}`, type: 'AD_ITEM' }); }); return out; })()}
-          keyExtractor={(item) => item.id}
-          renderItem={renderDealCard}
-          contentContainerStyle={{ padding: 12 }}
-          ListHeaderComponent={<AdBanner />}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ fontSize: 48, marginBottom: 12 }}>🍽️</Text>
-              <Text style={styles.emptyText}>{t('noDealsYet')}</Text>
-              <Text style={styles.emptySubText}>{t('checkBackLaterDeals')}</Text>
-            </View>
-          }
-        />
+        <View style={{ flex: 1 }}>
+          <CategoryFilterBar
+            categories={FOOD_CATEGORIES}
+            selected={selectedCategory}
+            onSelect={setSelectedCategory}
+            style={{ backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}
+          />
+          <FlatList
+            data={(() => { const out = []; filteredDeals.forEach((d, i) => { out.push(d); if ((i + 1) % 4 === 0) out.push({ id: `ad-deal-${i}`, type: 'AD_ITEM' }); }); return out; })()}
+            keyExtractor={(item) => item.id}
+            renderItem={renderDealCard}
+            contentContainerStyle={{ padding: 12 }}
+            ListHeaderComponent={
+              <View>
+                <AdBanner />
+                {traderCanPostDeals && (
+                  <View style={styles.traderPanel}>
+                    <Text style={styles.traderPanelTitle}>✅ Trader Deal Access</Text>
+                    <Text style={styles.traderPanelSub}>{traderShopName || 'Your shop'} can post in Restaurants.</Text>
+                    <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddDeal(true)}>
+                      <Ionicons name="add-circle" size={22} color={COLORS.white} />
+                      <Text style={styles.addBtnText}>Add Deal as Trader</Text>
+                    </TouchableOpacity>
+
+                    {traderDeals.map((deal) => (
+                      <View key={deal.id} style={[styles.adminCard, { marginTop: 8 }]}>
+                        <Text style={styles.adminCardName}>{deal.title}</Text>
+                        <Text style={styles.adminCardSub}>{deal.price || 'No price'}</Text>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteDeal(deal.id)}
+                          style={{ alignSelf: 'flex-start', marginTop: 6, padding: 6, backgroundColor: '#FEE2E2', borderRadius: 6 }}
+                        >
+                          <Text style={{ fontSize: 11, color: '#EF4444', fontWeight: '700' }}>Delete</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            }
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={{ fontSize: 48, marginBottom: 12 }}>🍽️</Text>
+                <Text style={styles.emptyText}>{t('noDealsYet')}</Text>
+                <Text style={styles.emptySubText}>{t('checkBackLaterDeals')}</Text>
+              </View>
+            }
+          />
+        </View>
       )}
 
       {/* Restaurants Tab */}
       {activeTab === 'restaurants' && (
-        <FlatList
-          data={(() => { const out = []; restaurants.forEach((r, i) => { out.push(r); if ((i + 1) % 4 === 0) out.push({ id: `ad-rest-${i}`, type: 'AD_ITEM' }); }); return out; })()}
-          keyExtractor={(item) => item.id}
-          renderItem={renderRestaurantCard}
-          contentContainerStyle={{ padding: 12 }}
-          ListHeaderComponent={<AdBanner />}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <Text style={{ fontSize: 48, marginBottom: 12 }}>🏪</Text>
-              <Text style={styles.emptyText}>No restaurants yet</Text>
-            </View>
-          }
-          ListFooterComponent={
-            !ownerToken ? (
-              <TouchableOpacity
-                onPress={() => setShowOwnerLoginModal(true)}
-                style={{ alignItems: 'center', paddingVertical: 24 }}
-              >
-                <Text style={{ fontSize: 12, color: COLORS.textLight }}>{t('restaurantOwnerPrompt')}</Text>
-                <Text style={{ fontSize: 13, color: COLORS.primary, fontWeight: '600', marginTop: 2 }}>{t('loginToManage')}</Text>
-              </TouchableOpacity>
-            ) : null
-          }
-        />
+        <View style={{ flex: 1 }}>
+          <CategoryFilterBar
+            categories={FOOD_CATEGORIES}
+            selected={selectedCategory}
+            onSelect={setSelectedCategory}
+            style={{ backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}
+          />
+          <FlatList
+            data={(() => { const out = []; filteredRestaurants.forEach((r, i) => { out.push(r); if ((i + 1) % 4 === 0) out.push({ id: `ad-rest-${i}`, type: 'AD_ITEM' }); }); return out; })()}
+            keyExtractor={(item) => item.id}
+            renderItem={renderRestaurantCard}
+            contentContainerStyle={{ padding: 12 }}
+            ListHeaderComponent={<AdBanner />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <Text style={{ fontSize: 48, marginBottom: 12 }}>🏪</Text>
+                <Text style={styles.emptyText}>No restaurants yet</Text>
+              </View>
+            }
+            ListFooterComponent={
+              !ownerToken ? (
+                <TouchableOpacity
+                  onPress={() => setShowOwnerLoginModal(true)}
+                  style={{ alignItems: 'center', paddingVertical: 24 }}
+                >
+                  <Text style={{ fontSize: 12, color: COLORS.textLight }}>{t('restaurantOwnerPrompt')}</Text>
+                  <Text style={{ fontSize: 13, color: COLORS.primary, fontWeight: '600', marginTop: 2 }}>{t('loginToManage')}</Text>
+                </TouchableOpacity>
+              ) : null
+            }
+          />
+        </View>
       )}
 
       {/* Owner Tab — only visible after owner login */}
@@ -749,44 +723,6 @@ export default function RestaurantDealsScreen({ navigation, route }) {
               </View>
             ))
           )}
-        </ScrollView>
-      )}
-
-      {/* Admin Tab */}
-      {activeTab === 'admin' && isAdmin && (
-        <ScrollView contentContainerStyle={{ padding: 16 }}>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddRestaurant(true)}>
-            <Ionicons name="add-circle" size={22} color={COLORS.white} />
-            <Text style={styles.addBtnText}>{t('addNewRestaurant')}</Text>
-          </TouchableOpacity>
-
-          <Text style={styles.sectionTitle}>{t('allRestaurants')} ({restaurants.length})</Text>
-          {restaurants.map((r) => (
-            <View key={r.id} style={styles.adminCard}>
-              <Text style={styles.adminCardName}>{r.name}</Text>
-              <Text style={styles.adminCardSub}>📍 {r.address}</Text>
-              <Text style={styles.adminCardSub}>📧 Active deals: {r._count?.deals || 0}</Text>
-              <Text style={[styles.adminCardSub, { color: r.isActive ? '#10B981' : '#EF4444' }]}>
-                {r.isActive ? '✅ Active' : '❌ Deactivated'}
-              </Text>
-              <View style={styles.adminActions}>
-                <TouchableOpacity
-                  style={[styles.adminBtn, { borderColor: r.isActive ? '#EF4444' : '#10B981' }]}
-                  onPress={() => toggleRestaurant(r.id, r.isActive)}
-                >
-                  <Text style={{ color: r.isActive ? '#EF4444' : '#10B981', fontSize: 12, fontWeight: '600' }}>
-                    {r.isActive ? 'Deactivate' : 'Activate'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.adminBtn, { borderColor: '#EF4444' }]}
-                  onPress={() => handleDeleteRestaurant(r.id, r.name)}
-                >
-                  <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
         </ScrollView>
       )}
 
@@ -884,53 +820,6 @@ export default function RestaurantDealsScreen({ navigation, route }) {
               </ScrollView>
             )}
           </View>
-        </View>
-      </Modal>
-
-      {/* Add Restaurant Modal */}
-      <Modal visible={showAddRestaurant} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, justifyContent: 'flex-end' }}>
-            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <Text style={styles.detailName}>Add Restaurant</Text>
-                <TouchableOpacity onPress={() => { setShowAddRestaurant(false); resetForm(); }}>
-                  <Ionicons name="close" size={24} color={COLORS.text} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                <TextInput style={styles.input} placeholder={t('restaurantName')} value={formName} onChangeText={setFormName} placeholderTextColor={COLORS.textLight} />
-                <TextInput style={styles.input} placeholder={t('restaurantAddress')} value={formAddress} onChangeText={setFormAddress} placeholderTextColor={COLORS.textLight} />
-                <TextInput style={styles.input} placeholder="Google Maps Link (optional)" value={formLocationLink} onChangeText={setFormLocationLink} keyboardType="url" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
-                <TextInput style={styles.input} placeholder="Phone" value={formPhone} onChangeText={setFormPhone} keyboardType="phone-pad" placeholderTextColor={COLORS.textLight} />
-                <TextInput style={styles.input} placeholder="WhatsApp" value={formWhatsapp} onChangeText={setFormWhatsapp} keyboardType="phone-pad" placeholderTextColor={COLORS.textLight} />
-                <TextInput style={[styles.input, { height: 80 }]} placeholder="Description" value={formDesc} onChangeText={setFormDesc} multiline placeholderTextColor={COLORS.textLight} />
-
-                <Text style={styles.formSection}>🔑 Owner Login Credentials</Text>
-                <TextInput style={styles.input} placeholder="Email (for login) *" value={formEmail} onChangeText={setFormEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
-                <TextInput style={styles.input} placeholder="Password *" value={formPassword} onChangeText={setFormPassword} secureTextEntry placeholderTextColor={COLORS.textLight} />
-
-                <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-                  <Text style={{ fontSize: 24 }}>{formImage ? '✅' : '📷'}</Text>
-                  <Text style={styles.imagePickerText}>{formImage ? 'Image Selected' : 'Add Cover Photo'}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.submitBtn, submitting && { opacity: 0.5 }]}
-                  onPress={handleAddRestaurant}
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <ActivityIndicator color={COLORS.white} />
-                  ) : (
-                    <Text style={styles.submitBtnText}>Create Restaurant</Text>
-                  )}
-                </TouchableOpacity>
-                <View style={{ height: 40 }} />
-              </ScrollView>
-            </View>
-          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -1345,6 +1234,9 @@ const styles = StyleSheet.create({
   // Admin
   adminActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   adminBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
+  traderPanel: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, padding: 12, marginTop: 10, marginBottom: 12 },
+  traderPanelTitle: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  traderPanelSub: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2, marginBottom: 10 },
   addBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     backgroundColor: COLORS.primary, padding: 14, borderRadius: 12, marginBottom: 16,

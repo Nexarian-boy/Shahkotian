@@ -31,7 +31,7 @@ function getCategories(t) {
         { key: 'GovtOffices', label: t('govtOffices'), icon: 'business', desc: t('directoryHelplines'), color: '#F59E0B' },
         { key: 'Doctors', label: t('doctors'), icon: 'medkit', desc: t('findHealthcare'), color: '#E11D48' },
         { key: 'RestaurantDeals', label: t('restaurants'), icon: 'restaurant', desc: t('dealsOffers'), color: '#F97316' },
-        { key: 'ClothBrands', label: t('brands'), icon: 'shirt', desc: t('dealsOffers'), color: '#8B5CF6' },
+        { key: 'ClothBrands', label: t('brandsTitle'), icon: 'storefront', desc: t('dealsOffers'), color: '#8B5CF6' },
       ],
     },
     {

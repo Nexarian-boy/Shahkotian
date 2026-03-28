@@ -55,6 +55,7 @@ const translations = {
     contactAdmin: 'Contact Technical Admin',
     needHelp: 'Need help? Reach out to technical admin',
     logout: 'Logout',
+    editName: 'Edit Name',
     editPhoneWhatsapp: 'Edit Phone / WhatsApp',
     editPhoneNumbers: 'Edit Phone Numbers',
     phoneNumber: 'Phone Number',
@@ -125,6 +126,9 @@ const translations = {
     foodDeals: 'Food Deals',
     blood: 'Blood',
     bazar: 'Bazar',
+    bazarAdminLogin: 'Bazar Admin Login',
+    bazarAdminDashboard: 'Bazar Admin Dashboard',
+    brandsTitle: 'Brands & Deals',
     sports: 'Sports',
 
     // Common / shared
@@ -450,7 +454,7 @@ const translations = {
     restaurantAddress: 'Address *',
 
     // Cloth Brands
-    brandsTitle: '👔 Cloth Brands & Deals',
+    brandsTitle: 'Brands & Deals',
     brandsTab: '👔 Brands',
     noBrandsYet: 'No brands yet',
     brandOwnerPrompt: 'Are you a brand owner?',
@@ -539,6 +543,7 @@ const translations = {
     contactAdmin: 'ٹیکنیکل ایڈمن سے رابطہ',
     needHelp: 'مدد چاہیے؟ ٹیکنیکل ایڈمن سے رابطہ کریں',
     logout: 'لاگ آؤٹ',
+    editName: 'نام میں ترمیم',
     editPhoneWhatsapp: 'فون / واٹس ایپ تبدیل کریں',
     editPhoneNumbers: 'فون نمبرز تبدیل کریں',
     phoneNumber: 'فون نمبر',
@@ -609,6 +614,9 @@ const translations = {
     foodDeals: 'فوڈ ڈیلز',
     blood: 'خون',
     bazar: 'بازار',
+    bazarAdminLogin: 'بازار ایڈمن لاگ اِن',
+    bazarAdminDashboard: 'بازار ایڈمن ڈیش بورڈ',
+    brandsTitle: 'برانڈز اور ڈیلز',
     sports: 'کھیل',
 
     // Common / shared
@@ -932,7 +940,7 @@ const translations = {
     restaurantAddress: 'پتہ *',
 
     // Cloth Brands
-    brandsTitle: '👔 کپڑوں کے برانڈز اور ڈیلز',
+    brandsTitle: 'برانڈز اور ڈیلز',
     brandsTab: '👔 برانڈز',
     noBrandsYet: 'ابھی کوئی برانڈ نہیں',
     brandOwnerPrompt: 'کیا آپ برانڈ کے مالک ہیں؟',

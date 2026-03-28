@@ -1,4 +1,4 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API_URL } from '../config/constants';
 
@@ -334,7 +334,7 @@ export const appointmentsAPI = {
   noShow: (token, id) => withDoctorTokenRetry(() => api.put(`/appointments/${id}/no-show`, {}, {
     headers: { Authorization: `Bearer ${token}` },
   })),
-  // Public — returns { currentToken, totalTokensToday } for live queue display
+  // Public - returns { currentToken, totalTokensToday } for live queue display
   getLiveToken: (doctorId) => api.get(`/appointments/live-token/${doctorId}`),
 };
 
@@ -412,6 +412,12 @@ export const restaurantsAPI = {
   ownerDeleteDeal: (token, dealId) => api.delete(`/restaurants/owner/deals/${dealId}`, {
     headers: { Authorization: `Bearer ${token}` },
   }),
+  // Approved trader deal posting (uses user JWT)
+  traderMyDeals: () => api.get('/restaurants/trader/my-deals'),
+  traderCreateDeal: (formData) => api.post('/restaurants/trader/deals', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  traderDeleteDeal: (dealId) => api.delete(`/restaurants/trader/deals/${dealId}`),
 };
 
 // ============ CLOTH BRANDS & DEALS API ============
@@ -441,6 +447,13 @@ export const clothBrandsAPI = {
   ownerDeleteDeal: (token, dealId) => api.delete(`/cloth-brands/owner/deals/${dealId}`, {
     headers: { Authorization: `Bearer ${token}` },
   }),
+  // Approved trader deal posting (uses user JWT)
+  traderMyDeals: () => api.get('/cloth-brands/trader/my-deals'),
+  traderCreateDeal: (formData) => api.post('/cloth-brands/trader/deals', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 300000,
+  }),
+  traderDeleteDeal: (dealId) => api.delete(`/cloth-brands/trader/deals/${dealId}`),
 };
 
 // ============ BAZAR / TRADER API ============
@@ -467,40 +480,54 @@ export const bazarAPI = {
   reportMessage: (messageId, reason) =>
     api.post(`/bazar/chat/messages/${messageId}/report`, { reason }),
   // Admin/President
-  getPending: (presidentToken) => api.get('/bazar/pending', {
-    headers: presidentToken ? { 'x-president-token': presidentToken } : {},
+  getPending: (adminToken) => api.get('/bazar/pending', {
+    headers: adminToken ? { 'x-president-token': adminToken } : {},
   }),
-  getApproved: (presidentToken) => api.get('/bazar/approved', {
-    headers: presidentToken ? { 'x-president-token': presidentToken } : {},
+  getApproved: (adminToken) => api.get('/bazar/approved', {
+    headers: adminToken ? { 'x-president-token': adminToken } : {},
   }),
-  approveTrader: (id, presidentToken) => api.put(`/bazar/${id}/approve`, {}, {
-    headers: presidentToken ? { 'x-president-token': presidentToken } : {},
+  approveTrader: (id, adminToken) => api.put(`/bazar/${id}/approve`, {}, {
+    headers: adminToken ? { 'x-president-token': adminToken } : {},
   }),
-  rejectTrader: (id, presidentToken) => api.put(`/bazar/${id}/reject`, {}, {
-    headers: presidentToken ? { 'x-president-token': presidentToken } : {},
+  rejectTrader: (id, adminToken) => api.put(`/bazar/${id}/reject`, {}, {
+    headers: adminToken ? { 'x-president-token': adminToken } : {},
   }),
-  deleteTrader: (id, presidentToken) => api.delete(`/bazar/trader/${id}`, {
-    headers: presidentToken ? { 'x-president-token': presidentToken } : {},
+  deleteTrader: (id, adminToken) => api.delete(`/bazar/trader/${id}`, {
+    headers: adminToken ? { 'x-president-token': adminToken } : {},
   }),
+  updateTraderControls: async (id, data, adminToken) => {
+    const headers = adminToken ? { 'x-president-token': adminToken } : {};
+    try {
+      return await api.put(`/bazar/trader/${id}/controls`, data, { headers });
+    } catch (err) {
+      if (err?.response?.status !== 404) throw err;
+      try {
+        return await api.put(`/bazar/traders/${id}/controls`, data, { headers });
+      } catch (err2) {
+        if (err2?.response?.status !== 404) throw err2;
+        return api.put(`/bazar/${id}/controls`, data, { headers });
+      }
+    }
+  },
   getAllTraders: () => api.get('/bazar/all-traders'),
   // Bazar management (admin/president)
-  addBazar: (name, presidentToken) => api.post('/bazar/bazars', { name }, {
-    headers: presidentToken ? { 'x-president-token': presidentToken } : {},
+  addBazar: (name, adminToken) => api.post('/bazar/bazars', { name }, {
+    headers: adminToken ? { 'x-president-token': adminToken } : {},
   }),
-  deleteBazar: (id, presidentToken) => api.delete(`/bazar/bazars/${id}`, {
-    headers: presidentToken ? { 'x-president-token': presidentToken } : {},
+  deleteBazar: (id, adminToken) => api.delete(`/bazar/bazars/${id}`, {
+    headers: adminToken ? { 'x-president-token': adminToken } : {},
   }),
   // President
-  presidentLogin: (data) => api.post('/bazar/president/login', data),
-  presidentDashboard: (presidentToken) => api.get('/bazar/president/dashboard', {
-    headers: { 'x-president-token': presidentToken },
+  adminLogin: (data) => api.post('/bazar/president/login', data),
+  adminDashboard: (adminToken) => api.get('/bazar/president/dashboard', {
+    headers: { 'x-president-token': adminToken },
   }),
-  createPresident: (data) => api.post('/bazar/president/create', data),
-  listPresidents: () => api.get('/bazar/presidents'),
-  deletePresident: (id) => api.delete(`/bazar/president/${id}`),
+  createAdmin: (data) => api.post('/bazar/president/create', data),
+  listAdmins: () => api.get('/bazar/presidents'),
+  deleteAdmin: (id) => api.delete(`/bazar/president/${id}`),
   // Export
-  getExportUrl: (presidentToken, bazarId) =>
-    `${API_URL}/bazar/export-traders?presidentToken=${encodeURIComponent(presidentToken)}${bazarId && bazarId !== 'all' ? '&bazarId=' + bazarId : ''}`,
+  getExportUrl: (adminToken, bazarId) =>
+    `${API_URL}/bazar/export-traders?presidentToken=${encodeURIComponent(adminToken)}${bazarId && bazarId !== 'all' ? '&bazarId=' + bazarId : ''}`,
 };
 
 // ============ AC OFFICE API ============
@@ -560,3 +587,4 @@ export const acAPI = {
 };
 
 export default api;
+

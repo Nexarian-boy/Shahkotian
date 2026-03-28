@@ -16,6 +16,9 @@ export default function ProfileScreen({ navigation }) {
   const [showEditPhone, setShowEditPhone] = useState(false);
   const [editPhone, setEditPhone] = useState(user?.phone || '');
   const [editWhatsapp, setEditWhatsapp] = useState(user?.whatsapp || '');
+  const [showEditName, setShowEditName] = useState(false);
+  const [editName, setEditName] = useState(user?.name || '');
+  const [savingName, setSavingName] = useState(false);
   const [savingPhone, setSavingPhone] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmed, setDeleteConfirmed] = useState(false);
@@ -124,6 +127,23 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
+  const saveName = async () => {
+    if (!editName.trim() || editName.trim().length < 2) {
+      return Alert.alert('Invalid', 'Name must be at least 2 characters.');
+    }
+    setSavingName(true);
+    try {
+      const response = await authAPI.updateProfile({ name: editName.trim() });
+      if (response.data.user && updateUser) updateUser(response.data.user);
+      setShowEditName(false);
+      Alert.alert('Success', 'Name updated!');
+    } catch (error) {
+      Alert.alert('Error', error.response?.data?.error || 'Failed to update name.');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Profile Header */}
@@ -145,7 +165,10 @@ export default function ProfileScreen({ navigation }) {
           </View>
         </TouchableOpacity>
         <View style={styles.nameRow}>
-          <Text style={styles.name}>{user?.name}</Text>
+          <TouchableOpacity onPress={() => { setEditName(user?.name || ''); setShowEditName(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.name}>{user?.name}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>✏️</Text>
+          </TouchableOpacity>
           {isAdmin && (
             <View style={styles.adminBadge}>
               <Text style={styles.adminBadgeText}>⭐ ADMIN</Text>
@@ -190,6 +213,12 @@ export default function ProfileScreen({ navigation }) {
         <TouchableOpacity style={styles.actionButton} onPress={showPhotoOptions}>
           <Text style={styles.actionIcon}>📸</Text>
           <Text style={styles.actionText}>{t('changePhoto')}</Text>
+          <Text style={styles.actionArrow}>›</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={() => { setEditName(user?.name || ''); setShowEditName(true); }}>
+          <Text style={styles.actionIcon}>✏️</Text>
+          <Text style={styles.actionText}>Edit Name</Text>
           <Text style={styles.actionArrow}>›</Text>
         </TouchableOpacity>
 
@@ -392,6 +421,25 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </View>
         </View>
+      </Modal>
+
+      <Modal visible={showEditName} animationType="slide" transparent>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit Name</Text>
+            <Text style={styles.modalLabel}>Your Display Name</Text>
+            <TextInput style={styles.modalInput} placeholder="Enter your full name" value={editName} onChangeText={setEditName} autoFocus maxLength={50} placeholderTextColor={COLORS.textLight} />
+            <Text style={{ fontSize: 11, color: COLORS.textLight, marginBottom: 16 }}>This name will be shown on your posts and profile.</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setShowEditName(false)}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalSaveBtn, savingName && { opacity: 0.6 }]} onPress={saveName} disabled={savingName}>
+                {savingName ? <ActivityIndicator color={COLORS.white} size="small" /> : <Text style={styles.modalSaveText}>Save</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Image Viewer */}

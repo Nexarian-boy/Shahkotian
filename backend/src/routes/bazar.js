@@ -10,6 +10,37 @@ const { sendPushToUser } = require('../utils/pushNotification');
 
 const router = express.Router();
 
+const parseCategories = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+const ensureAdminOrPresident = (req) => {
+  if (req.user.role === 'ADMIN') return;
+  const presidentToken = req.headers['x-president-token'];
+  if (!presidentToken) {
+    const err = new Error('Access denied.');
+    err.status = 403;
+    throw err;
+  }
+  try {
+    jwt.verify(presidentToken, process.env.JWT_SECRET);
+  } catch {
+    const err = new Error('Invalid president token.');
+    err.status = 403;
+    throw err;
+  }
+};
+
 // Predefined bazars for Shahkot
 const DEFAULT_BAZARS = [
   'Sangla Bazar', 'Manawala Bazar', 'Faisalabad Bazar',
@@ -30,12 +61,18 @@ async function seedBazars() {
 seedBazars().catch(err => console.error('Bazar seed error:', err));
 
 // ============ PUBLIC: LIST BAZARS ============
-router.get('/bazars', authenticate, async (req, res) => {
+router.get('/bazars', async (req, res) => {
   try {
     const bazars = await prisma.bazar.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
-      include: { _count: { select: { traders: { where: { status: 'APPROVED' } } } } },
+      include: {
+        _count: {
+          select: {
+            traders: { where: { status: 'APPROVED', isHidden: false } },
+          },
+        },
+      },
     });
     res.json({ bazars });
   } catch (error) {
@@ -48,6 +85,7 @@ router.get('/bazars', authenticate, async (req, res) => {
 router.post('/register', authenticate, upload.single('photo'), async (req, res) => {
   try {
     const { fullName, shopName, phone, bazarId } = req.body;
+    const categories = parseCategories(req.body.categories);
     if (!fullName || !shopName || !phone || !bazarId) {
       return res.status(400).json({ error: 'Full name, shop name, phone and bazar are required.' });
     }
@@ -75,6 +113,7 @@ router.post('/register', authenticate, upload.single('photo'), async (req, res) 
         phone,
         photoUrl,
         bazarId,
+        categories,
         status: 'PENDING',
       },
       include: { bazar: true },
@@ -102,7 +141,7 @@ router.get('/my-status', authenticate, async (req, res) => {
 });
 
 // ============ SEARCH TRADERS (must be before :bazarId) ============
-router.get('/traders/search', authenticate, async (req, res) => {
+router.get('/traders/search', async (req, res) => {
   try {
     const { q } = req.query;
     if (!q) return res.json({ traders: [] });
@@ -110,6 +149,7 @@ router.get('/traders/search', authenticate, async (req, res) => {
     const traders = await prisma.trader.findMany({
       where: {
         status: 'APPROVED',
+        isHidden: false,
         OR: [
           { fullName: { contains: q, mode: 'insensitive' } },
           { shopName: { contains: q, mode: 'insensitive' } },
@@ -127,10 +167,10 @@ router.get('/traders/search', authenticate, async (req, res) => {
 });
 
 // ============ TRADERS BY BAZAR ============
-router.get('/traders/:bazarId', authenticate, async (req, res) => {
+router.get('/traders/:bazarId', async (req, res) => {
   try {
     const traders = await prisma.trader.findMany({
-      where: { bazarId: req.params.bazarId, status: 'APPROVED' },
+      where: { bazarId: req.params.bazarId, status: 'APPROVED', isHidden: false },
       orderBy: { shopName: 'asc' },
       include: { bazar: true },
     });
@@ -414,15 +454,7 @@ router.post('/chat/messages/:id/report', authenticate, async (req, res) => {
 // ============ ADMIN/PRESIDENT: PENDING TRADERS ============
 router.get('/pending', authenticate, async (req, res) => {
   try {
-    // Allow admin or president
-    if (req.user.role !== 'ADMIN') {
-      // Check president token
-      const presidentToken = req.headers['x-president-token'];
-      if (!presidentToken) return res.status(403).json({ error: 'Access denied.' });
-      try {
-        jwt.verify(presidentToken, process.env.JWT_SECRET);
-      } catch { return res.status(403).json({ error: 'Invalid president token.' }); }
-    }
+    ensureAdminOrPresident(req);
 
     const traders = await prisma.trader.findMany({
       where: { status: 'PENDING' },
@@ -431,6 +463,7 @@ router.get('/pending', authenticate, async (req, res) => {
     });
     res.json({ traders });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error('Pending traders error:', error);
     res.status(500).json({ error: 'Failed to load pending traders.' });
   }
@@ -439,16 +472,7 @@ router.get('/pending', authenticate, async (req, res) => {
 // ============ ADMIN/PRESIDENT: APPROVED TRADERS ============
 router.get('/approved', authenticate, async (req, res) => {
   try {
-    // Allow admin or president
-    if (req.user.role !== 'ADMIN') {
-      const presidentToken = req.headers['x-president-token'];
-      if (!presidentToken) return res.status(403).json({ error: 'Access denied.' });
-      try {
-        jwt.verify(presidentToken, process.env.JWT_SECRET);
-      } catch {
-        return res.status(403).json({ error: 'Invalid president token.' });
-      }
-    }
+    ensureAdminOrPresident(req);
 
     const traders = await prisma.trader.findMany({
       where: { status: 'APPROVED' },
@@ -457,6 +481,7 @@ router.get('/approved', authenticate, async (req, res) => {
     });
     res.json({ traders });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error('Approved traders error:', error);
     res.status(500).json({ error: 'Failed to load approved traders.' });
   }
@@ -465,16 +490,11 @@ router.get('/approved', authenticate, async (req, res) => {
 // ============ ADMIN/PRESIDENT: APPROVE TRADER ============
 router.put('/:id/approve', authenticate, async (req, res) => {
   try {
-    if (req.user.role !== 'ADMIN') {
-      const presidentToken = req.headers['x-president-token'];
-      if (!presidentToken) return res.status(403).json({ error: 'Access denied.' });
-      try { jwt.verify(presidentToken, process.env.JWT_SECRET); }
-      catch { return res.status(403).json({ error: 'Invalid president token.' }); }
-    }
+    ensureAdminOrPresident(req);
 
     const trader = await prisma.trader.update({
       where: { id: req.params.id },
-      data: { status: 'APPROVED' },
+      data: { status: 'APPROVED', isHidden: false },
       include: { bazar: true },
     });
 
@@ -492,6 +512,7 @@ router.put('/:id/approve', authenticate, async (req, res) => {
 
     res.json({ trader, message: 'Trader approved.' });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error('Approve trader error:', error);
     res.status(500).json({ error: 'Failed to approve.' });
   }
@@ -500,12 +521,7 @@ router.put('/:id/approve', authenticate, async (req, res) => {
 // ============ ADMIN/PRESIDENT: REJECT TRADER ============
 router.put('/:id/reject', authenticate, async (req, res) => {
   try {
-    if (req.user.role !== 'ADMIN') {
-      const presidentToken = req.headers['x-president-token'];
-      if (!presidentToken) return res.status(403).json({ error: 'Access denied.' });
-      try { jwt.verify(presidentToken, process.env.JWT_SECRET); }
-      catch { return res.status(403).json({ error: 'Invalid president token.' }); }
-    }
+    ensureAdminOrPresident(req);
 
     const trader = await prisma.trader.update({
       where: { id: req.params.id },
@@ -514,6 +530,7 @@ router.put('/:id/reject', authenticate, async (req, res) => {
     });
     res.json({ trader, message: 'Trader rejected.' });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error('Reject trader error:', error);
     res.status(500).json({ error: 'Failed to reject.' });
   }
@@ -522,16 +539,12 @@ router.put('/:id/reject', authenticate, async (req, res) => {
 // ============ ADMIN/PRESIDENT: DELETE TRADER ============
 router.delete('/trader/:id', authenticate, async (req, res) => {
   try {
-    if (req.user.role !== 'ADMIN') {
-      const presidentToken = req.headers['x-president-token'];
-      if (!presidentToken) return res.status(403).json({ error: 'Access denied.' });
-      try { jwt.verify(presidentToken, process.env.JWT_SECRET); }
-      catch { return res.status(403).json({ error: 'Invalid president token.' }); }
-    }
+    ensureAdminOrPresident(req);
 
     await prisma.trader.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Trader deleted.' });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error('Delete trader error:', error);
     res.status(500).json({ error: 'Failed to delete.' });
   }
@@ -540,12 +553,7 @@ router.delete('/trader/:id', authenticate, async (req, res) => {
 // ============ ADMIN/PRESIDENT: ADD BAZAR ============
 router.post('/bazars', authenticate, async (req, res) => {
   try {
-    if (req.user.role !== 'ADMIN') {
-      const presidentToken = req.headers['x-president-token'];
-      if (!presidentToken) return res.status(403).json({ error: 'Access denied.' });
-      try { jwt.verify(presidentToken, process.env.JWT_SECRET); }
-      catch { return res.status(403).json({ error: 'Invalid president token.' }); }
-    }
+    ensureAdminOrPresident(req);
 
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'Bazar name is required.' });
@@ -556,6 +564,7 @@ router.post('/bazars', authenticate, async (req, res) => {
     const bazar = await prisma.bazar.create({ data: { name } });
     res.status(201).json({ bazar });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error('Add bazar error:', error);
     res.status(500).json({ error: 'Failed to add bazar.' });
   }
@@ -564,16 +573,12 @@ router.post('/bazars', authenticate, async (req, res) => {
 // ============ ADMIN/PRESIDENT: DELETE BAZAR ============
 router.delete('/bazars/:id', authenticate, async (req, res) => {
   try {
-    if (req.user.role !== 'ADMIN') {
-      const presidentToken = req.headers['x-president-token'];
-      if (!presidentToken) return res.status(403).json({ error: 'Access denied.' });
-      try { jwt.verify(presidentToken, process.env.JWT_SECRET); }
-      catch { return res.status(403).json({ error: 'Invalid president token.' }); }
-    }
+    ensureAdminOrPresident(req);
 
     await prisma.bazar.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Bazar deleted.' });
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ error: error.message });
     console.error('Delete bazar error:', error);
     res.status(500).json({ error: 'Failed to delete bazar.' });
   }
@@ -587,7 +592,7 @@ router.get('/export-traders', async (req, res) => {
     try { jwt.verify(presidentToken, process.env.JWT_SECRET); }
     catch { return res.status(403).json({ error: 'Invalid token.' }); }
 
-    const where = { status: 'APPROVED' };
+    const where = { status: 'APPROVED', isHidden: false };
     if (bazarId && bazarId !== 'all') where.bazarId = bazarId;
 
     const traders = await prisma.trader.findMany({
@@ -754,5 +759,43 @@ router.get('/all-traders', authenticate, adminOnly, async (req, res) => {
     res.status(500).json({ error: 'Failed to load traders.' });
   }
 });
+
+// ============ ADMIN/PRESIDENT: TRADER VISIBILITY & DEAL CONTROLS ============
+const updateTraderControlsHandler = async (req, res) => {
+  try {
+    ensureAdminOrPresident(req);
+
+    const {
+      isHidden,
+      canPostBrandDeals,
+      canPostRestaurantDeals,
+    } = req.body || {};
+
+    const data = {};
+    if (typeof isHidden === 'boolean') data.isHidden = isHidden;
+    if (typeof canPostBrandDeals === 'boolean') data.canPostBrandDeals = canPostBrandDeals;
+    if (typeof canPostRestaurantDeals === 'boolean') data.canPostRestaurantDeals = canPostRestaurantDeals;
+
+    if (Object.keys(data).length === 0) {
+      return res.status(400).json({ error: 'No controls provided.' });
+    }
+
+    const trader = await prisma.trader.update({
+      where: { id: req.params.id },
+      data,
+      include: { bazar: true },
+    });
+
+    res.json({ trader, message: 'Trader controls updated.' });
+  } catch (error) {
+    const status = error.status || 500;
+    console.error('Update trader controls error:', error);
+    res.status(status).json({ error: error.message || 'Failed to update trader controls.' });
+  }
+};
+
+router.put('/trader/:id/controls', authenticate, updateTraderControlsHandler);
+router.put('/traders/:id/controls', authenticate, updateTraderControlsHandler);
+router.put('/:id/controls', authenticate, updateTraderControlsHandler);
 
 module.exports = router;

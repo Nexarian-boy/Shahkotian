@@ -9,6 +9,13 @@ const { uploadMultipleVideosToCloudinary } = require('../utils/cloudinaryUpload'
 
 const router = express.Router();
 
+const getEligibleTraderForRestaurantDeals = async (userId) => {
+  return prisma.trader.findUnique({
+    where: { userId },
+    include: { bazar: true },
+  });
+};
+
 const isValidOptionalHttpUrl = (value) => {
   if (value === undefined || value === null || value === '') return true;
   return /^https?:\/\//i.test(String(value).trim());
@@ -41,7 +48,43 @@ router.get('/', async (req, res) => {
       },
     });
 
-    res.json({ restaurants });
+    const traderWhere = {
+      status: 'APPROVED',
+      isHidden: false,
+      canPostRestaurantDeals: true,
+    };
+    if (search) {
+      traderWhere.OR = [
+        { shopName: { contains: search, mode: 'insensitive' } },
+        { fullName: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const traderShops = await prisma.trader.findMany({
+      where: traderWhere,
+      orderBy: { shopName: 'asc' },
+      include: {
+        bazar: { select: { name: true } },
+        _count: { select: { restaurantDeals: { where: { isActive: true } } } },
+      },
+    });
+
+    const mappedTraderRestaurants = traderShops
+      .map((t) => ({
+        id: t.id,
+        name: t.shopName,
+        address: t.bazar?.name || 'Shahkot',
+        locationLink: null,
+        phone: t.phone,
+        whatsapp: t.phone,
+        description: t.fullName,
+        image: t.photoUrl,
+        isActive: true,
+        sourceType: 'TRADER',
+        _count: { deals: t._count?.restaurantDeals || 0 },
+      }));
+
+    res.json({ restaurants: [...restaurants, ...mappedTraderRestaurants] });
   } catch (error) {
     console.error('Get restaurants error:', error);
     res.status(500).json({ error: 'Failed to load restaurants.' });
@@ -68,7 +111,50 @@ router.get('/deals/all', async (req, res) => {
       },
     });
 
-    res.json({ deals });
+    const traderDeals = await prisma.traderRestaurantDeal.findMany({
+      where: {
+        isActive: true,
+        trader: {
+          status: 'APPROVED',
+          isHidden: false,
+          canPostRestaurantDeals: true,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        trader: {
+          select: {
+            id: true,
+            fullName: true,
+            shopName: true,
+            photoUrl: true,
+            phone: true,
+            categories: true,
+            bazar: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    const mappedTraderDeals = traderDeals
+      .map((d) => ({
+        ...d,
+        restaurant: {
+          id: d.trader.id,
+          name: d.trader.shopName,
+          image: d.trader.photoUrl,
+          address: d.trader.bazar?.name || 'Shahkot',
+          locationLink: null,
+          phone: d.trader.phone,
+          sourceType: 'TRADER',
+        },
+      }));
+
+    const allDeals = [...deals, ...mappedTraderDeals].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    res.json({ deals: allDeals });
   } catch (error) {
     console.error('Get all deals error:', error);
     res.status(500).json({ error: 'Failed to load deals.' });
@@ -129,7 +215,7 @@ router.get('/owner/stats', authenticateRestaurant, async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
-    const restaurant = await prisma.restaurant.findUnique({
+    let restaurant = await prisma.restaurant.findUnique({
       where: { id: req.params.id },
       select: {
         id: true, name: true, address: true, locationLink: true, phone: true, whatsapp: true,
@@ -145,11 +231,155 @@ router.get('/:id', async (req, res) => {
       },
     });
 
+    if (!restaurant) {
+      const trader = await prisma.trader.findUnique({
+        where: { id: req.params.id },
+        include: {
+          bazar: { select: { name: true } },
+          restaurantDeals: {
+            where: { isActive: true },
+            orderBy: { createdAt: 'desc' },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              price: true,
+              originalPrice: true,
+              image: true,
+              images: true,
+              videos: true,
+              expiresAt: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+
+      if (
+        trader &&
+        trader.status === 'APPROVED' &&
+        !trader.isHidden &&
+        trader.canPostRestaurantDeals
+      ) {
+        restaurant = {
+          id: trader.id,
+          name: trader.shopName,
+          address: trader.bazar?.name || 'Shahkot',
+          locationLink: null,
+          phone: trader.phone,
+          whatsapp: trader.phone,
+          description: trader.fullName,
+          image: trader.photoUrl,
+          sourceType: 'TRADER',
+          deals: trader.restaurantDeals,
+        };
+      }
+    }
+
     if (!restaurant) return res.status(404).json({ error: 'Restaurant not found.' });
     res.json(restaurant);
   } catch (error) {
     console.error('Get restaurant error:', error);
     res.status(500).json({ error: 'Failed to load restaurant.' });
+  }
+});
+
+// ============ TRADER DEALS: RESTAURANTS ============
+router.get('/trader/my-deals', authenticate, async (req, res) => {
+  try {
+    const trader = await getEligibleTraderForRestaurantDeals(req.user.id);
+    if (!trader || trader.status !== 'APPROVED') {
+      return res.status(403).json({ error: 'Only approved traders can access this area.' });
+    }
+    if (trader.isHidden || !trader.canPostRestaurantDeals) {
+      return res.status(403).json({ error: 'You are not allowed to post restaurant deals.' });
+    }
+
+    const deals = await prisma.traderRestaurantDeal.findMany({
+      where: { traderId: trader.id },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      trader: {
+        id: trader.id,
+        shopName: trader.shopName,
+        fullName: trader.fullName,
+      },
+      deals,
+    });
+  } catch (error) {
+    console.error('Get trader restaurant deals error:', error);
+    res.status(500).json({ error: 'Failed to load trader restaurant deals.' });
+  }
+});
+
+router.post('/trader/deals', authenticate, uploadListingMedia.array('media', 6), async (req, res) => {
+  try {
+    const trader = await getEligibleTraderForRestaurantDeals(req.user.id);
+    if (!trader || trader.status !== 'APPROVED') {
+      return res.status(403).json({ error: 'Only approved traders can create deals.' });
+    }
+    if (trader.isHidden || !trader.canPostRestaurantDeals) {
+      return res.status(403).json({ error: 'You are not allowed to post restaurant deals.' });
+    }
+
+    const { title, description, price, originalPrice, expiresAt } = req.body;
+    if (!title) {
+      return res.status(400).json({ error: 'Deal title is required.' });
+    }
+
+    let imageUrl = null;
+    let imageUrls = [];
+    let videoUrls = [];
+    if (req.files && req.files.length > 0) {
+      const imageFiles = req.files.filter(f => !ALLOWED_VIDEO_TYPES.includes(f.mimetype));
+      const videoFiles = req.files.filter(f => ALLOWED_VIDEO_TYPES.includes(f.mimetype));
+      if (imageFiles.length > 0) {
+        imageUrls = await uploadMultipleImages(imageFiles);
+        imageUrl = imageUrls[0] || null;
+      }
+      if (videoFiles.length > 0) videoUrls = await uploadMultipleVideosToCloudinary(videoFiles, 'shahkot/trader-restaurants');
+    }
+
+    const deal = await prisma.traderRestaurantDeal.create({
+      data: {
+        traderId: trader.id,
+        title,
+        description: description || null,
+        price: price || null,
+        originalPrice: originalPrice || null,
+        image: imageUrl,
+        images: imageUrls,
+        videos: videoUrls,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      },
+    });
+
+    res.status(201).json({ message: 'Deal created!', deal });
+  } catch (error) {
+    console.error('Create trader restaurant deal error:', error);
+    res.status(500).json({ error: 'Failed to create trader restaurant deal.' });
+  }
+});
+
+router.delete('/trader/deals/:dealId', authenticate, async (req, res) => {
+  try {
+    const trader = await getEligibleTraderForRestaurantDeals(req.user.id);
+    if (!trader || trader.status !== 'APPROVED') {
+      return res.status(403).json({ error: 'Only approved traders can delete deals.' });
+    }
+
+    const deal = await prisma.traderRestaurantDeal.findUnique({ where: { id: req.params.dealId } });
+    if (!deal || deal.traderId !== trader.id) {
+      return res.status(404).json({ error: 'Deal not found.' });
+    }
+
+    await prisma.traderRestaurantDeal.delete({ where: { id: req.params.dealId } });
+    res.json({ message: 'Deal deleted.' });
+  } catch (error) {
+    console.error('Delete trader restaurant deal error:', error);
+    res.status(500).json({ error: 'Failed to delete trader restaurant deal.' });
   }
 });
 
@@ -421,14 +651,26 @@ router.delete('/owner/deals/:dealId', authenticateRestaurant, async (req, res) =
 
 router.post('/deals/:dealId/like', authenticate, async (req, res) => {
   try {
-    const deal = await prisma.deal.findUnique({ where: { id: req.params.dealId }, select: { likedBy: true } });
-    if (!deal) return res.status(404).json({ error: 'Not found.' });
-    const alreadyLiked = deal.likedBy.includes(req.user.id);
-    const updated = await prisma.deal.update({
-      where: { id: req.params.dealId },
-      data: { likedBy: alreadyLiked ? { set: deal.likedBy.filter(id => id !== req.user.id) } : { push: req.user.id } },
-      select: { likedBy: true },
-    });
+    const deal = await prisma.deal.findUnique({ where: { id: req.params.dealId }, select: { id: true, likedBy: true } });
+    const traderDeal = !deal
+      ? await prisma.traderRestaurantDeal.findUnique({ where: { id: req.params.dealId }, select: { id: true, likedBy: true } })
+      : null;
+    const target = deal || traderDeal;
+    if (!target) return res.status(404).json({ error: 'Not found.' });
+
+    const alreadyLiked = target.likedBy.includes(req.user.id);
+    const updated = deal
+      ? await prisma.deal.update({
+        where: { id: req.params.dealId },
+        data: { likedBy: alreadyLiked ? { set: target.likedBy.filter(id => id !== req.user.id) } : { push: req.user.id } },
+        select: { likedBy: true },
+      })
+      : await prisma.traderRestaurantDeal.update({
+        where: { id: req.params.dealId },
+        data: { likedBy: alreadyLiked ? { set: target.likedBy.filter(id => id !== req.user.id) } : { push: req.user.id } },
+        select: { likedBy: true },
+      });
+
     res.json({ liked: !alreadyLiked, likeCount: updated.likedBy.length });
   } catch {
     res.status(500).json({ error: 'Failed.' });
@@ -437,11 +679,20 @@ router.post('/deals/:dealId/like', authenticate, async (req, res) => {
 
 router.post('/deals/:dealId/view', async (req, res) => {
   try {
-    const updated = await prisma.deal.update({
-      where: { id: req.params.dealId },
-      data: { views: { increment: 1 } },
-      select: { views: true },
-    });
+    let updated;
+    try {
+      updated = await prisma.deal.update({
+        where: { id: req.params.dealId },
+        data: { views: { increment: 1 } },
+        select: { views: true },
+      });
+    } catch {
+      updated = await prisma.traderRestaurantDeal.update({
+        where: { id: req.params.dealId },
+        data: { views: { increment: 1 } },
+        select: { views: true },
+      });
+    }
     res.json({ views: updated.views });
   } catch {
     res.status(500).json({ error: 'Failed.' });

@@ -52,9 +52,9 @@ export default function AdminDashboardScreen({ navigation }) {
   // Trader management
   const [allTraders, setAllTraders] = useState([]);
   const [pendingTraders, setPendingTraders] = useState([]);
-  const [presidents, setPresidents] = useState([]);
-  const [presidentForm, setPresidentForm] = useState({ name: '', email: '', password: '' });
-  const [creatingPresident, setCreatingPresident] = useState(false);
+  const [bazarAdmins, setBazarAdmins] = useState([]);
+  const [bazarAdminForm, setBazarAdminForm] = useState({ name: '', email: '', password: '' });
+  const [creatingBazarAdmin, setCreatingBazarAdmin] = useState(false);
   const [traderSearch, setTraderSearch] = useState('');
 
   // Services management
@@ -117,10 +117,10 @@ export default function AdminDashboardScreen({ navigation }) {
         const res = await adminAPI.getNotificationStats();
         setNotifStats(res.data);
       } else if (activeTab === 'Traders') {
-        const [allRes, pendRes, presRes] = await Promise.all([bazarAPI.getAllTraders(), bazarAPI.getPending(), bazarAPI.listPresidents()]);
+        const [allRes, pendRes, adminRes] = await Promise.all([bazarAPI.getAllTraders(), bazarAPI.getPending(), bazarAPI.listAdmins()]);
         setAllTraders(allRes.data.traders || []);
         setPendingTraders(pendRes.data.traders || []);
-        setPresidents(presRes.data.presidents || []);
+        setBazarAdmins(adminRes.data.presidents || []);
       } else if (activeTab === 'Services') {
         const [pendingRes, categoriesRes] = await Promise.all([
           servicesAPI.adminGetPending(),
@@ -1295,10 +1295,10 @@ export default function AdminDashboardScreen({ navigation }) {
       ))}
       {filteredTraders.length === 0 && q && <Text style={{ color: COLORS.textLight, textAlign: 'center', marginTop: 10 }}>No traders matching "{traderSearch}"</Text>}
 
-      {/* Presidents Section */}
+      {/* Bazar Admins Section */}
       <View style={{ marginTop: 20, backgroundColor: COLORS.surface, borderRadius: 12, padding: 14, elevation: 1, borderWidth: 1, borderColor: COLORS.border }}>
-        <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>👔 Presidents ({presidents.length})</Text>
-        {presidents.map(p => (
+        <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>👔 Bazar Admins ({bazarAdmins.length})</Text>
+        {bazarAdmins.map(p => (
           <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border + '50' }}>
             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.primary + '15', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
               <Text style={{ fontSize: 14 }}>👔</Text>
@@ -1311,25 +1311,25 @@ export default function AdminDashboardScreen({ navigation }) {
               <View style={{ backgroundColor: p.isActive ? COLORS.success + '15' : COLORS.error + '15', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
                 <Text style={{ fontSize: 10, color: p.isActive ? COLORS.success : COLORS.error, fontWeight: '600' }}>{p.isActive ? 'Active' : 'Inactive'}</Text>
               </View>
-              <TouchableOpacity onPress={() => Alert.alert('Delete President', `Remove ${p.name}?`, [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await bazarAPI.deletePresident(p.id); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } } }])}>
+              <TouchableOpacity onPress={() => Alert.alert('Delete Bazar Admin', `Remove ${p.name}?`, [{ text: 'Cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { try { await bazarAPI.deleteAdmin(p.id); loadData(); } catch (e) { Alert.alert('Error', 'Failed'); } } }])}>
                 <Ionicons name="trash" size={16} color={COLORS.error} />
               </TouchableOpacity>
             </View>
           </View>
         ))}
-        {presidents.length === 0 && <Text style={{ color: COLORS.textLight, textAlign: 'center', fontStyle: 'italic', marginVertical: 6 }}>No presidents yet</Text>}
+        {bazarAdmins.length === 0 && <Text style={{ color: COLORS.textLight, textAlign: 'center', fontStyle: 'italic', marginVertical: 6 }}>No bazar admins yet</Text>}
 
-        {/* Create President Form */}
+        {/* Create Bazar Admin Form */}
         <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: COLORS.border }}>
-          <Text style={{ fontWeight: '700', color: COLORS.text, fontSize: 14, marginBottom: 8 }}>+ Create New President</Text>
-          <TextInput style={styles.notifInput} placeholder="Name" value={presidentForm.name} onChangeText={v => setPresidentForm({ ...presidentForm, name: v })} placeholderTextColor={COLORS.textLight} />
-          <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Email" value={presidentForm.email} onChangeText={v => setPresidentForm({ ...presidentForm, email: v })} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
-          <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Password" value={presidentForm.password} onChangeText={v => setPresidentForm({ ...presidentForm, password: v })} secureTextEntry placeholderTextColor={COLORS.textLight} />
-          <TouchableOpacity style={[styles.sendNotifBtn, { marginTop: 10 }, creatingPresident && { opacity: 0.5 }]} disabled={creatingPresident} onPress={async () => {
-            if (!presidentForm.name.trim() || !presidentForm.email.trim() || !presidentForm.password.trim()) { Alert.alert('Required', 'Fill all fields'); return; }
-            try { setCreatingPresident(true); const res = await bazarAPI.createPresident(presidentForm); Alert.alert('Done', 'President account created'); setPresidentForm({ name: '', email: '', password: '' }); loadData(); } catch (e) { Alert.alert('Error', e.response?.data?.error || 'Failed to create president'); } finally { setCreatingPresident(false); }
+          <Text style={{ fontWeight: '700', color: COLORS.text, fontSize: 14, marginBottom: 8 }}>+ Create New Bazar Admin</Text>
+          <TextInput style={styles.notifInput} placeholder="Name" value={bazarAdminForm.name} onChangeText={v => setBazarAdminForm({ ...bazarAdminForm, name: v })} placeholderTextColor={COLORS.textLight} />
+          <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Email" value={bazarAdminForm.email} onChangeText={v => setBazarAdminForm({ ...bazarAdminForm, email: v })} keyboardType="email-address" autoCapitalize="none" placeholderTextColor={COLORS.textLight} />
+          <TextInput style={[styles.notifInput, { marginTop: 8 }]} placeholder="Password" value={bazarAdminForm.password} onChangeText={v => setBazarAdminForm({ ...bazarAdminForm, password: v })} secureTextEntry placeholderTextColor={COLORS.textLight} />
+          <TouchableOpacity style={[styles.sendNotifBtn, { marginTop: 10 }, creatingBazarAdmin && { opacity: 0.5 }]} disabled={creatingBazarAdmin} onPress={async () => {
+            if (!bazarAdminForm.name.trim() || !bazarAdminForm.email.trim() || !bazarAdminForm.password.trim()) { Alert.alert('Required', 'Fill all fields'); return; }
+            try { setCreatingBazarAdmin(true); const res = await bazarAPI.createAdmin(bazarAdminForm); Alert.alert('Done', 'Bazar admin account created'); setBazarAdminForm({ name: '', email: '', password: '' }); loadData(); } catch (e) { Alert.alert('Error', e.response?.data?.error || 'Failed to create bazar admin'); } finally { setCreatingBazarAdmin(false); }
           }}>
-            <Text style={styles.sendNotifBtnText}>{creatingPresident ? 'Creating...' : 'Create President'}</Text>
+            <Text style={styles.sendNotifBtnText}>{creatingBazarAdmin ? 'Creating...' : 'Create Bazar Admin'}</Text>
           </TouchableOpacity>
         </View>
       </View>

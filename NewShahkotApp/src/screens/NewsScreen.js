@@ -92,6 +92,7 @@ export default function NewsScreen() {
   };
 
   const handleCreate = async () => {
+    if (!isAdmin) { Alert.alert('Permission Denied', 'Only admins can publish news.'); return; }
     if (!title.trim() || !content.trim()) {
       return Alert.alert(t('required'), 'Title and content are required.');
     }
@@ -190,9 +191,11 @@ export default function NewsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t('newsTitle')}</Text>
-        <TouchableOpacity style={styles.publishBtn} onPress={() => setShowCreate(true)}>
-          <Text style={styles.publishBtnText}>{t('publishArticle')}</Text>
-        </TouchableOpacity>
+        {isAdmin && (
+          <TouchableOpacity style={styles.publishBtn} onPress={() => setShowCreate(true)}>
+            <Text style={styles.publishBtnText}>{t('publishArticle')}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Category Filter */}
